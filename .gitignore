@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+*/node_modules/
+*/*/node_modules/
+*/*/*/node_modules/
+
+# Environment files
+.env
+.env*.local
+*.env
+*/.env
+*/*/.env
+
+# Database and runtime data files
+backend/data/
+*/backend/data/
+data/db/
+**/data/db/
+*.wt
+*.turtle
+WiredTiger*
+mongod.lock
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Build / Output folders
+dist/
+build/
+.expo/
+android/.gradle
+android/app/build
+ios/Pods
+ios/build

@@ -1,0 +1,61 @@
+apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+
+android {
+    ndkVersion rootProject.ext.ndkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+    compileSdk rootProject.ext.compileSdkVersion
+
+    namespace "com.connectinvestadminmobile"
+    defaultConfig {
+        applicationId "com.connectinvestadminmobile"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        debug {
+            // Development debug build
+        }
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+}
+
+repositories {
+    mavenCentral()
+    google()
+    maven {
+        // Point directly to React Native Android AAR artifacts in node_modules
+        url("$rootDir/../node_modules/react-native/android")
+    }
+    maven {
+        // Android JSC / Hermes repository
+        url("$rootDir/../node_modules/jsc-android/dist")
+    }
+}
+
+dependencies {
+    implementation("com.facebook.react:react-android:0.76.1")
+    implementation("com.facebook.react:hermes-android:0.76.1")
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation(project(":react-native-async-storage_async-storage"))
+    implementation(project(":react-native-safe-area-context"))
+}

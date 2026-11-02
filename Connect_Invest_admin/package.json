@@ -1,0 +1,20 @@
+{
+  "name": "connect-invest-admin-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Connect Invest - Single-Admin Operations Console & Core API Engine",
+  "scripts": {
+    "dev": "start-all.bat",
+    "dev:all": "start-all.bat",
+    "dev:backend": "cd backend && npm run start",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:mobile": "cd mobile && npm start",
+    "android": "cd mobile && npm run android",
+    "mobile:doctor": "cd mobile && npm run doctor",
+    "mobile:android": "cd mobile && npm run android",
+    "mobile:ios": "cd mobile && npm run ios",
+    "db:seed": "cd backend && npm run db:seed",
+    "test:rules": "cd backend && node scripts/test-rules.js",
+    "install:all": "cd backend && npm install && cd ../frontend && npm install && cd ../mobile && npm install"
+  }
+}

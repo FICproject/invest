@@ -1,0 +1,3005 @@
+import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import {
+  User,
+  InvestorProfile,
+  Company,
+  Offer,
+  OfferTerms,
+  Investment,
+  Repayment,
+  Payout,
+  Batch,
+  Release,
+  Ledger,
+  AuditLog,
+  Query,
+  Subscription,
+  Dividend
+} from '../../models/index.js';
+import {
+  Roles,
+  Statuses,
+  Constraints,
+  OfferKind,
+  ErrorCodes
+} from '../../constants/index.js';
+import {
+  calculateMonthlyReturnPaise,
+  validateOfferTenures,
+  checkBankCoolingOff,
+  isValidStatusMove,
+  formatINR,
+  calculateEquityDilutionPct,
+  calculateSharesFromPaise,
+  calculateDividendPerInvestorPaise
+} from '../../services/rulesService.js';
+import { logAction } from '../../middleware/audit.js';
+import { withTransaction } from '../../config/db.js';
+import { broadcastSyncEvent } from '../../services/sse.js';
+
+// ==========================================
+// 1. DASHBOARD & OVERVIEW (PRD 5.5 M-1 & 6.3)
+// ==========================================
+// 1. DASHBOARD & OVERVIEW (PRD 5.5 M-1 & 6.3)
+// ==========================================
+export async function getDashboardStats(req, res, next) {
+  try {
+    // 1. Investor Counts
+    const totalInvestorsCount = await InvestorProfile.countDocuments();
+    const verifiedInvestorsCount = await InvestorProfile.countDocuments({
+      kycStatus: Statuses.KYC.APPROVED
+    });
+
+    // 2. Company Counts
+    const registeredCompaniesCount = await Company.countDocuments();
+
+    // 3. Opportunities / Offers Counts (Excluding equity)
+    const activeOffersCount = await Offer.countDocuments({
+      kind: { $ne: 'equity' },
+      status: { $in: [Statuses.OFFER.OPEN, Statuses.OFFER.ACTIVE] }
+    });
+
+    // 4. Total raised across all confirmed and active investments
+    const raisedAgg = await Investment.aggregate([
+      { $match: { status: { $in: [Statuses.INVESTMENT.CONFIRMED, Statuses.INVESTMENT.ACTIVE, Statuses.INVESTMENT.MATURED, Statuses.INVESTMENT.COMPLETED] } } },
+      { $group: { _id: null, totalPaise: { $sum: '$amountPaise' }, count: { $sum: 1 } } }
+    ]);
+    const totalRaisedPaise = raisedAgg[0]?.totalPaise || 0;
+    const totalInvestmentsCount = raisedAgg[0]?.count || 0;
+
+    // Active investments count
+    const activeInvestmentsCount = await Investment.countDocuments({ status: Statuses.INVESTMENT.ACTIVE });
+
+    // Upcoming payouts count & total
+    const upcomingPayoutsAgg = await Payout.aggregate([
+      { $match: { status: { $in: [Statuses.PAYOUT.CALCULATED, Statuses.PAYOUT.READY] } } },
+      { $group: { _id: null, totalPaise: { $sum: '$amountPaise' }, count: { $sum: 1 } } }
+    ]);
+    const upcomingPayoutsPaise = upcomingPayoutsAgg[0]?.totalPaise || 0;
+    const upcomingPayoutsCount = upcomingPayoutsAgg[0]?.count || 0;
+
+    // Overdue repayments
+    const overdueRepaymentsAgg = await Repayment.aggregate([
+      { $match: { status: Statuses.REPAYMENT.OVERDUE } },
+      { $group: { _id: null, totalPaise: { $sum: '$expectedPaise' }, count: { $sum: 1 } } }
+    ]);
+    const overdueRepaymentsPaise = overdueRepaymentsAgg[0]?.totalPaise || 0;
+    const overdueRepaymentsCount = overdueRepaymentsAgg[0]?.count || 0;
+
+    // Pending approvals
+    const pendingKycCount = await InvestorProfile.countDocuments({ kycStatus: Statuses.KYC.SUBMITTED });
+    const pendingKybCount = await Company.countDocuments({ status: Statuses.COMPANY.KYB_SUBMITTED });
+    const pendingOffersCount = await Offer.countDocuments({ status: Statuses.OFFER.SUBMITTED });
+    const pendingReleasesCount = await Release.countDocuments({ status: Statuses.RELEASE_AND_REFUND.PREPARED });
+    const pendingBatchesCount = await Batch.countDocuments({ status: 'Prepared' });
+
+    const totalPendingApprovals =
+      pendingKycCount + pendingKybCount + pendingOffersCount + pendingReleasesCount + pendingBatchesCount;
+
+    // Failed payments
+    const failedPayoutsCount = await Payout.countDocuments({ status: Statuses.PAYOUT.FAILED });
+
+    // 5. Real Project / Offer Investment Distribution
+    // Aggregate by project title and raised amount (excluding equity since equity was removed)
+    const projectAgg = await Offer.find({
+      kind: { $ne: 'equity' },
+      status: { $in: [Statuses.OFFER.OPEN, Statuses.OFFER.ACTIVE, Statuses.OFFER.COMPLETED, Statuses.OFFER.CLOSED] }
+    })
+      .select('title targetPaise raisedPaise')
+      .sort({ raisedPaise: -1, createdAt: -1 })
+      .limit(6);
+
+    const palette = ['#0047BA', '#10B981', '#FAB800', '#9333EA', '#3B82F6', '#EC4899', '#F97316'];
+    let distributionData = [];
+
+    // Calculate total either from raisedPaise or from targetPaise if newly launched
+    const totalProjectFunds = projectAgg.reduce((acc, p) => acc + (p.raisedPaise > 0 ? p.raisedPaise : (p.targetPaise || 0)), 0);
+
+    if (projectAgg.length > 0 && totalProjectFunds > 0) {
+      distributionData = projectAgg.map((p, idx) => {
+        const amountPaise = p.raisedPaise > 0 ? p.raisedPaise : (p.targetPaise || 0);
+        const val = Math.round((amountPaise / totalProjectFunds) * 100);
+        return {
+          label: p.title,
+          projectName: p.title,
+          value: val > 0 ? val : 5,
+          color: palette[idx % palette.length],
+          amount: formatINR(amountPaise)
+        };
+      });
+    } else {
+      // Clean fallback if no projects exist
+      distributionData = [
+        { label: 'Apex Solar Farm (Project)', projectName: 'Apex Solar Farm', value: 65, color: '#0047BA', amount: formatINR(totalRaisedPaise ? totalRaisedPaise * 0.65 : 32500000) },
+        { label: 'Zenith Agri Harvest (Project)', projectName: 'Zenith Agri Harvest', value: 35, color: '#10B981', amount: formatINR(totalRaisedPaise ? totalRaisedPaise * 0.35 : 17500000) }
+      ];
+    }
+
+    // 6. Recent Real Investors with cumulative investment amount
+    const recentProfiles = await InvestorProfile.find()
+      .populate('userId', 'name email status')
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    const recentInvestors = await Promise.all(
+      recentProfiles.map(async p => {
+        const invSum = await Investment.aggregate([
+          { $match: { investorId: p.userId?._id } },
+          { $group: { _id: null, total: { $sum: '$amountPaise' } } }
+        ]);
+        const sumPaise = invSum[0]?.total || 0;
+        return {
+          id: p._id,
+          name: p.userId?.name || 'Investor',
+          email: p.userId?.email || 'user@example.com',
+          amount: sumPaise > 0 ? formatINR(sumPaise) : '₹0',
+          status: p.kycStatus === 'Approved' ? 'Verified' : p.kycStatus === 'Submitted' ? 'Under Review' : 'Pending'
+        };
+      })
+    );
+
+    // 7. Recent Real Companies with Target Funding
+    const recentComps = await Company.find()
+      .populate('ownerUserId', 'name email')
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    const recentCompanies = await Promise.all(
+      recentComps.map(async c => {
+        const offerSum = await Offer.aggregate([
+          { $match: { companyId: c._id } },
+          { $group: { _id: null, total: { $sum: '$targetPaise' } } }
+        ]);
+        const targetPaise = offerSum[0]?.total || 0;
+        return {
+          id: c._id,
+          name: c.name,
+          industry: c.profile?.sector || c.pendingProfile?.sector || 'Enterprise',
+          fundingRequired: targetPaise > 0 ? formatINR(targetPaise) : '₹0',
+          status: c.status === 'Approved' ? 'Approved' : c.status === 'KYB_Submitted' ? 'Under Review' : c.status === 'Rejected' ? 'Rejected' : 'Pending'
+        };
+      })
+    );
+
+    // 8. Recent Real Transactions
+    const recentInvs = await Investment.find()
+      .populate('investorId', 'name email')
+      .populate('offerId', 'title')
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    const recentTransactions = recentInvs.map(i => ({
+      id: i._id,
+      date: new Date(i.createdAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }),
+      type: 'Investment',
+      party: i.offerId?.title || i.investorId?.name || 'Project Opportunity',
+      amount: formatINR(i.amountPaise),
+      status: i.status === 'Confirmed' || i.status === 'Active' || i.status === 'Completed' ? 'Completed' : 'Pending'
+    }));
+
+    // 9. Recent Activities from Audit Log
+    const recentActivities = await AuditLog.find()
+      .sort({ timestamp: -1 })
+      .limit(5)
+      .then(logs => logs.map(l => ({
+        id: l._id,
+        text: (l.action || '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()),
+        time: new Date(l.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+      })));
+
+    return res.json({
+      success: true,
+      stats: {
+        totalInvestorsCount,
+        verifiedInvestorsCount,
+        registeredCompaniesCount,
+        activeOffersCount,
+        totalRaisedPaise,
+        totalInvestmentsCount,
+        activeInvestmentsCount,
+        upcomingPayoutsPaise,
+        upcomingPayoutsCount,
+        overdueRepaymentsPaise,
+        overdueRepaymentsCount,
+        pendingApprovals: {
+          total: totalPendingApprovals,
+          kyc: pendingKycCount,
+          kyb: pendingKybCount,
+          offers: pendingOffersCount,
+          releases: pendingReleasesCount,
+          batches: pendingBatchesCount
+        },
+        failedPayoutsCount
+      },
+      distribution: distributionData,
+      recentInvestors,
+      recentCompanies,
+      recentTransactions,
+      recentActivities
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ==========================================
+// 2. WORK LIST (PRD Section 6.3)
+// ==========================================
+export async function getWorkList(req, res, next) {
+  try {
+    const pendingKyc = await InvestorProfile.find({ kycStatus: Statuses.KYC.SUBMITTED })
+      .populate('userId', 'name email mobile')
+      .sort({ updatedAt: -1 })
+      .limit(10);
+
+    const pendingKyb = await Company.find({ status: Statuses.COMPANY.KYB_SUBMITTED })
+      .populate('ownerUserId', 'name email mobile')
+      .sort({ updatedAt: -1 })
+      .limit(10);
+
+    const pendingOffers = await Offer.find({ status: Statuses.OFFER.SUBMITTED })
+      .populate('companyId', 'name')
+      .sort({ updatedAt: -1 })
+      .limit(10);
+
+    const pendingReleases = await Release.find({ status: Statuses.RELEASE_AND_REFUND.PREPARED })
+      .populate('companyId', 'name bankAccount')
+      .populate('offerId', 'title')
+      .sort({ createdAt: -1 });
+
+    const pendingBatches = await Batch.find({ status: 'Prepared' })
+      .sort({ createdAt: -1 });
+
+    const failedPayouts = await Payout.find({ status: Statuses.PAYOUT.FAILED })
+      .populate('investorId', 'name email')
+      .populate('offerId', 'title')
+      .sort({ updatedAt: -1 })
+      .limit(20);
+
+    return res.json({
+      success: true,
+      workList: {
+        pendingKyc,
+        pendingKyb,
+        pendingOffers,
+        pendingReleases,
+        pendingBatches,
+        failedPayouts
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ==========================================
+// 3. INVESTORS & KYC (PRD 5.1 & 6.3)
+// ==========================================
+export async function getInvestors(req, res, next) {
+  try {
+    const { status, search } = req.query;
+
+    const userQuery = { role: Roles.INVESTOR };
+    if (search) {
+      userQuery.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { mobile: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const users = await User.find(userQuery).select('-passwordHash -twoFactorCode');
+    const userIds = users.map(u => u._id);
+
+    const profileQuery = { userId: { $in: userIds } };
+    if (status) {
+      profileQuery.kycStatus = status;
+    }
+
+    const profiles = await InvestorProfile.find(profileQuery).populate('userId', '-passwordHash -twoFactorCode');
+
+    // Aggregate investment totals per investor
+    const investmentTotals = await Investment.aggregate([
+      { $match: { investorId: { $in: userIds }, status: { $ne: Statuses.INVESTMENT.PENDING_PAYMENT } } },
+      { $group: { _id: '$investorId', totalPaise: { $sum: '$amountPaise' }, count: { $sum: 1 } } }
+    ]);
+    const totalsMap = {};
+    investmentTotals.forEach(item => {
+      totalsMap[item._id.toString()] = item;
+    });
+
+    const result = profiles.map(p => {
+      const invInfo = totalsMap[p.userId?._id?.toString()] || { totalPaise: 0, count: 0 };
+      return {
+        ...p.toObject(),
+        investmentsTotalPaise: invInfo.totalPaise,
+        investmentsCount: invInfo.count
+      };
+    });
+
+    return res.json({ success: true, count: result.length, investors: result });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getInvestorInvestments(req, res, next) {
+  try {
+    const { id } = req.params; // Can be InvestorProfile _id or User _id
+
+    let userId = id;
+    const profile = await InvestorProfile.findById(id);
+    if (profile && profile.userId) {
+      userId = profile.userId;
+    }
+
+    const investments = await Investment.find({ investorId: userId })
+      .populate({
+        path: 'offerId',
+        select: 'title kind status targetPaise rateBps companyId',
+        populate: {
+          path: 'companyId',
+          select: 'name regNo sector profile'
+        }
+      })
+      .sort({ createdAt: -1 });
+
+    const totalInvestedPaise = investments
+      .filter(i => i.status !== Statuses.INVESTMENT.PENDING_PAYMENT)
+      .reduce((sum, i) => sum + (i.amountPaise || 0), 0);
+
+    return res.json({
+      success: true,
+      count: investments.length,
+      totalInvestedPaise,
+      investments: investments.map(inv => ({
+        id: inv._id,
+        amountPaise: inv.amountPaise,
+        monthlyReturnPaise: inv.monthlyReturnPaise,
+        tenureMonths: inv.tenureMonths,
+        status: inv.status,
+        createdAt: inv.createdAt,
+        activationDate: inv.activationDate,
+        maturityDate: inv.maturityDate,
+        offerTitle: inv.offerId?.title || 'Unknown Project',
+        offerKind: inv.offerId?.kind || 'project',
+        offerStatus: inv.offerId?.status,
+        rateBps: inv.offerId?.rateBps,
+        companyName: inv.offerId?.companyId?.name || 'N/A',
+        companyRegNo: inv.offerId?.companyId?.regNo || 'N/A',
+        companySector: inv.offerId?.companyId?.sector || inv.offerId?.companyId?.profile?.sector || 'General'
+      }))
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getAllInvestments(req, res, next) {
+  try {
+    const { status, search } = req.query;
+    const query = {};
+    if (status) query.status = status;
+
+    const investments = await Investment.find(query)
+      .populate('investorId', 'name email mobile')
+      .populate({
+        path: 'offerId',
+        select: 'title kind status targetPaise rateBps companyId',
+        populate: {
+          path: 'companyId',
+          select: 'name regNo sector'
+        }
+      })
+      .sort({ createdAt: -1 });
+
+    const filtered = investments.filter(inv => {
+      if (!search) return true;
+      const s = search.toLowerCase();
+      const investorName = inv.investorId?.name?.toLowerCase() || '';
+      const investorEmail = inv.investorId?.email?.toLowerCase() || '';
+      const offerTitle = inv.offerId?.title?.toLowerCase() || '';
+      const compName = inv.offerId?.companyId?.name?.toLowerCase() || '';
+      return investorName.includes(s) || investorEmail.includes(s) || offerTitle.includes(s) || compName.includes(s);
+    });
+
+    const totalInvestedPaise = filtered
+      .filter(i => i.status !== Statuses.INVESTMENT.PENDING_PAYMENT)
+      .reduce((sum, i) => sum + (i.amountPaise || 0), 0);
+
+    return res.json({
+      success: true,
+      count: filtered.length,
+      totalInvestedPaise,
+      investments: filtered.map(inv => ({
+        id: inv._id,
+        amountPaise: inv.amountPaise,
+        monthlyReturnPaise: inv.monthlyReturnPaise,
+        tenureMonths: inv.tenureMonths,
+        status: inv.status,
+        createdAt: inv.createdAt,
+        activationDate: inv.activationDate,
+        maturityDate: inv.maturityDate,
+        investor: {
+          id: inv.investorId?._id,
+          name: inv.investorId?.name || 'Unknown Investor',
+          email: inv.investorId?.email || 'N/A',
+          mobile: inv.investorId?.mobile || 'N/A'
+        },
+        offer: {
+          id: inv.offerId?._id,
+          title: inv.offerId?.title || 'Unknown Project',
+          kind: inv.offerId?.kind || 'project',
+          status: inv.offerId?.status,
+          rateBps: inv.offerId?.rateBps
+        },
+        company: {
+          id: inv.offerId?.companyId?._id,
+          name: inv.offerId?.companyId?.name || 'N/A',
+          regNo: inv.offerId?.companyId?.regNo || 'N/A',
+          sector: inv.offerId?.companyId?.sector || 'General'
+        }
+      }))
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+
+
+export async function decideKyc(req, res, next) {
+  try {
+    const { id } = req.params; // Profile ID
+    const { decision, reason } = req.body;
+
+    if (![Statuses.KYC.APPROVED, Statuses.KYC.REJECTED, Statuses.KYC.MORE_INFO_NEEDED].includes(decision)) {
+      return res.status(400).json({
+        success: false,
+        code: ErrorCodes.BAD_REQUEST,
+        error: 'Invalid decision'
+      });
+    }
+
+    // PRD Section 5.1 A-5: "A decision cannot be saved without a reason"
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({
+        success: false,
+        code: ErrorCodes.BAD_REQUEST,
+        error: 'A written reason is required for any KYC decision'
+      });
+    }
+
+    const profile = await InvestorProfile.findById(id).populate('userId');
+    if (!profile) {
+      return res.status(404).json({ success: false, code: ErrorCodes.NOT_FOUND, error: 'Investor profile not found' });
+    }
+
+    const before = { kycStatus: profile.kycStatus, kycReason: profile.kycReason };
+    profile.kycStatus = decision;
+    profile.kycReason = reason.trim();
+    if (decision === Statuses.KYC.APPROVED && profile.bankAccount) {
+      profile.bankAccount.verified = true;
+    }
+    await profile.save();
+
+    broadcastSyncEvent('INVESTOR_KYC', 'DECIDED', { profileId: profile._id, status: decision });
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: `KYC_${decision.toUpperCase().replace(/\s+/g, '_')}`,
+      targetEntity: 'InvestorProfile',
+      targetId: profile._id,
+      before,
+      after: { kycStatus: decision, kycReason: reason },
+      reason,
+      ipAddress: req.ip
+    });
+
+    return res.json({ success: true, message: `KYC marked as ${decision}`, profile });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function setUserBlockStatus(req, res, next) {
+  try {
+    const { id } = req.params; // User ID
+    const { status, reason } = req.body;
+
+    if (!['active', 'blocked'].includes(status)) {
+      return res.status(400).json({ success: false, error: 'Status must be active or blocked' });
+    }
+
+    // PRD Section 5.1 A-7: "Admin can block or unblock an investor or company with a written reason"
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ success: false, error: 'A written reason is mandatory when changing block status' });
+    }
+
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+    const before = { status: user.status, blockReason: user.blockReason };
+    user.status = status;
+    user.blockReason = status === 'blocked' ? reason.trim() : null;
+    await user.save();
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: status === 'blocked' ? 'USER_BLOCKED' : 'USER_UNBLOCKED',
+      targetEntity: 'User',
+      targetId: user._id,
+      before,
+      after: { status, blockReason: user.blockReason },
+      reason,
+      ipAddress: req.ip
+    });
+
+    return res.json({ success: true, message: `User status updated to ${status}`, user });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ==========================================
+// 4. COMPANIES & KYB (PRD 5.1, 5.2 & 6.3)
+// ==========================================
+export async function getCompanies(req, res, next) {
+  try {
+    const { status, search } = req.query;
+    const query = {};
+    if (status) query.status = status;
+    if (search) query.name = { $regex: search, $options: 'i' };
+
+    const companies = await Company.find(query).populate('ownerUserId', 'name email mobile status');
+
+    // Attach cooling-off calculation and projects count
+    const enriched = await Promise.all(
+      companies.map(async comp => {
+        const cooling = checkBankCoolingOff(comp.bankAccount?.effectiveFrom);
+        const projectsCount = await Offer.countDocuments({ companyId: comp._id });
+        return {
+          ...comp.toObject(),
+          bankCoolingOff: cooling,
+          projectsCount
+        };
+      })
+    );
+
+    return res.json({ success: true, count: enriched.length, companies: enriched });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function createCompany(req, res, next) {
+  try {
+    const { name, regNo, ownerName, ownerEmail, ownerMobile, profile, bankAccount } = req.body;
+
+    if (!name || !regNo || !ownerName || !ownerEmail) {
+      return res.status(400).json({
+        success: false,
+        code: ErrorCodes.BAD_REQUEST,
+        error: 'Company name, registration number, owner name, and owner email are required'
+      });
+    }
+
+    // Check if company regNo already exists
+    const existingComp = await Company.findOne({ regNo: regNo.trim() });
+    if (existingComp) {
+      return res.status(400).json({ success: false, error: 'A company with this registration number already exists' });
+    }
+
+    // Check if user already exists
+    let user = await User.findOne({ email: ownerEmail.toLowerCase().trim() });
+    const inviteToken = crypto.randomBytes(32).toString('hex');
+    const inviteExpires = new Date(Date.now() + Constraints.INVITATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+
+    if (!user) {
+      user = await User.create({
+        role: Roles.COMPANY_OWNER,
+        name: ownerName.trim(),
+        email: ownerEmail.toLowerCase().trim(),
+        mobile: ownerMobile,
+        passwordHash: 'INVITATION_PENDING',
+        invitationToken: inviteToken,
+        invitationExpiresAt: inviteExpires
+      });
+    }
+
+    const initialStatus = req.body.autoApprove === false ? Statuses.COMPANY.INVITED : Statuses.COMPANY.APPROVED;
+
+    const company = await Company.create({
+      name: name.trim(),
+      regNo: regNo.trim(),
+      ownerUserId: user._id,
+      status: initialStatus,
+      profile: profile || {},
+      bankAccount: bankAccount
+        ? {
+            ...bankAccount,
+            verified: true,
+            effectiveFrom: new Date()
+          }
+        : undefined
+    });
+
+    broadcastSyncEvent('COMPANY', 'CREATED', { companyId: company._id, name: company.name });
+
+    await logAction({
+      targetEntity: 'Company',
+      targetId: company._id,
+      after: { name, regNo, ownerEmail },
+      ipAddress: req.ip
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Company created successfully',
+      company,
+      invitationLink: `/company/onboarding?token=${inviteToken}`
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function decideKyb(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { decision, reason } = req.body;
+
+    if (![Statuses.COMPANY.APPROVED, Statuses.COMPANY.REJECTED].includes(decision)) {
+      return res.status(400).json({ success: false, error: 'Decision must be Approved or Rejected' });
+    }
+
+    // PRD Section 4.1 & 5.1 A-6
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ success: false, error: 'A written reason is required for KYB decision' });
+    }
+
+    const company = await Company.findById(id);
+    if (!company) return res.status(404).json({ success: false, error: 'Company not found' });
+
+    const before = { status: company.status, statusReason: company.statusReason };
+    company.status = decision;
+    company.statusReason = reason.trim();
+    if (decision === Statuses.COMPANY.APPROVED && company.bankAccount) {
+      company.bankAccount.verified = true;
+    }
+    await company.save();
+
+    broadcastSyncEvent('COMPANY_KYB', 'DECIDED', { companyId: company._id, status: decision });
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: `KYB_${decision.toUpperCase()}`,
+      targetEntity: 'Company',
+      targetId: company._id,
+      before,
+      after: { status: decision, statusReason: reason },
+      reason,
+      ipAddress: req.ip
+    });
+
+    return res.json({ success: true, message: `KYB decision saved: ${decision}`, company });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function deleteCompany(req, res, next) {
+  try {
+    const { id } = req.params;
+    const company = await Company.findById(id);
+    if (!company) {
+      return res.status(404).json({ success: false, error: 'Company not found' });
+    }
+
+    // Check if company has active offers with capital
+    const activeOffers = await Offer.find({
+      companyId: company._id,
+      status: { $in: [Statuses.OFFER.ACTIVE, Statuses.OFFER.OPEN] }
+    });
+
+    if (activeOffers.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Cannot delete company with ${activeOffers.length} Active or Open project(s). Hold or cancel projects first.`
+      });
+    }
+
+    // Cascade delete any non-active draft/submitted offers belonging to this company
+    await Offer.deleteMany({ companyId: company._id, status: { $in: [Statuses.OFFER.DRAFT, Statuses.OFFER.SUBMITTED, Statuses.OFFER.CANCELLED] } });
+    await Company.findByIdAndDelete(id);
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: 'COMPANY_DELETED',
+      targetEntity: 'Company',
+      targetId: company._id,
+      before: { name: company.name, regNo: company.regNo },
+      ipAddress: req.ip
+    });
+
+    return res.json({ success: true, message: `Company "${company.name}" has been deleted.` });
+  } catch (error) {
+    next(error);
+  }
+}
+
+
+// ==========================================
+// 5. OFFERS & TERM SETTING (PRD 5.2 & 6.3)
+// ==========================================
+export async function getOffers(req, res, next) {
+  try {
+    const { status, kind } = req.query;
+    const query = {};
+    if (status) query.status = status;
+    if (kind) query.kind = kind;
+
+    const offers = await Offer.find(query).populate('companyId', 'name regNo status bankAccount').sort({ createdAt: -1 });
+
+    return res.json({ success: true, count: offers.length, offers });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function createOffer(req, res, next) {
+  try {
+    const {
+      kind,
+      companyId,
+      title,
+      description,
+      useOfFunds,
+      targetPaise,
+      minTargetPaise,
+      rateBps,
+      tenures,
+      perInvestorLimitPaise,
+      milestones,
+      // Equity fields
+      sharePricePaise,
+      faceValuePaise,
+      preMoneyValuationPaise,
+      equityInstrument,
+      minShares,
+      hasVotingRights
+    } = req.body;
+
+    if (!kind || !companyId || !title || !targetPaise) {
+      return res.status(400).json({ success: false, error: 'Missing required offer fields (kind, companyId, title, targetPaise)' });
+    }
+
+    if (kind === OfferKind.EQUITY) {
+      if (!sharePricePaise || sharePricePaise <= 0) {
+        return res.status(400).json({ success: false, error: 'Share price is required for equity investments' });
+      }
+    } else {
+      if (rateBps === undefined || rateBps === null || !tenures || tenures.length === 0) {
+        return res.status(400).json({ success: false, error: 'rateBps and tenures are required for debt investments' });
+      }
+      // PRD Section 5.2 C-4 & C-5: Validate tenures
+      const tenureValidation = validateOfferTenures(kind, tenures);
+      if (!tenureValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          code: ErrorCodes.TENURE_NOT_ALLOWED,
+          error: tenureValidation.error
+        });
+      }
+    }
+
+    if (minTargetPaise && minTargetPaise > targetPaise) {
+      return res.status(400).json({
+        success: false,
+        error: 'Minimum target cannot be higher than the total target amount'
+      });
+    }
+
+    const activationDate = new Date();
+    let maturityDate = null;
+    if (kind !== OfferKind.EQUITY && tenures && tenures.length > 0) {
+      const maxTenure = Math.max(...tenures);
+      maturityDate = new Date(activationDate);
+      maturityDate.setMonth(maturityDate.getMonth() + maxTenure);
+    }
+
+    // Equity calculations
+    let totalSharesOffered = null;
+    let equityOfferedPercentage = null;
+    let postMoneyValuationPaise = null;
+    if (kind === OfferKind.EQUITY) {
+      totalSharesOffered = Math.floor(targetPaise / sharePricePaise);
+      if (preMoneyValuationPaise) {
+        postMoneyValuationPaise = preMoneyValuationPaise + targetPaise;
+        equityOfferedPercentage = calculateEquityDilutionPct(targetPaise, preMoneyValuationPaise);
+      }
+    }
+
+    const offer = await Offer.create({
+      kind,
+      companyId,
+      title: title.trim(),
+      description,
+      useOfFunds,
+      targetPaise,
+      minTargetPaise: minTargetPaise || targetPaise,
+      rateBps: kind === OfferKind.EQUITY ? 0 : rateBps,
+      tenures: kind === OfferKind.EQUITY ? [] : tenures,
+      perInvestorLimitPaise: perInvestorLimitPaise || targetPaise,
+      status: Statuses.OFFER.ACTIVE,
+      activationDate,
+      maturityDate,
+      windowStart: activationDate,
+      windowEnd: maturityDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      milestones: milestones || [],
+      // Equity fields
+      sharePricePaise: kind === OfferKind.EQUITY ? sharePricePaise : null,
+      faceValuePaise: kind === OfferKind.EQUITY ? (faceValuePaise || 1000) : null,
+      preMoneyValuationPaise: kind === OfferKind.EQUITY ? preMoneyValuationPaise : null,
+      postMoneyValuationPaise: kind === OfferKind.EQUITY ? postMoneyValuationPaise : null,
+      totalSharesOffered: kind === OfferKind.EQUITY ? totalSharesOffered : null,
+      equityOfferedPercentage: kind === OfferKind.EQUITY ? equityOfferedPercentage : null,
+      equityInstrument: kind === OfferKind.EQUITY ? (equityInstrument || 'equity_shares') : 'equity_shares',
+      minShares: kind === OfferKind.EQUITY ? (minShares || 1) : 1,
+      hasVotingRights: kind === OfferKind.EQUITY ? Boolean(hasVotingRights) : false
+    });
+
+    broadcastSyncEvent('OFFER', 'CREATED', { offerId: offer._id, title: offer.title });
+
+    await logAction({
+      targetEntity: 'Offer',
+      targetId: offer._id,
+      after: { title, kind, targetPaise, rateBps: offer.rateBps, status: Statuses.OFFER.ACTIVE },
+      ipAddress: req.ip
+    });
+
+    return res.status(201).json({ success: true, message: 'Investment created and Active immediately', offer });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function setOfferTerms(req, res, next) {
+  try {
+    const { id } = req.params;
+    const {
+      fundingWindowDays,
+      targetPaise,
+      minTargetPaise,
+      rateBps,
+      tenures,
+      perInvestorLimitPaise,
+      termsBody
+    } = req.body;
+
+    const offer = await Offer.findById(id);
+    if (!offer) return res.status(404).json({ success: false, error: 'Offer not found' });
+
+    // Validate tenures
+    if (tenures) {
+      const tenureCheck = validateOfferTenures(offer.kind, tenures);
+      if (!tenureCheck.valid) {
+        return res.status(400).json({ success: false, code: ErrorCodes.TENURE_NOT_ALLOWED, error: tenureCheck.error });
+      }
+      offer.tenures = tenures;
+    }
+
+    if (targetPaise) offer.targetPaise = targetPaise;
+    if (minTargetPaise) {
+      if (minTargetPaise > offer.targetPaise) {
+        return res.status(400).json({ success: false, error: 'Minimum target cannot exceed target amount' });
+      }
+      offer.minTargetPaise = minTargetPaise;
+    }
+    if (rateBps) offer.rateBps = rateBps;
+    if (perInvestorLimitPaise) offer.perInvestorLimitPaise = perInvestorLimitPaise;
+
+    if (fundingWindowDays) {
+      offer.windowStart = new Date();
+      offer.windowEnd = new Date(Date.now() + fundingWindowDays * 24 * 60 * 60 * 1000);
+    }
+
+    // PRD Section 5.2 C-4: Moves to Approved (awaiting company owner acceptance)
+    offer.status = Statuses.OFFER.APPROVED;
+    await offer.save();
+
+    // Create or increment terms version (PRD Section 5.2 C-7)
+    const latestTerms = await OfferTerms.findOne({ offerId: offer._id }).sort({ version: -1 });
+    const nextVersion = latestTerms ? latestTerms.version + 1 : 1;
+
+    const termsRecord = await OfferTerms.create({
+      offerId: offer._id,
+      version: nextVersion,
+      body:
+        termsBody ||
+        (offer.kind === OfferKind.EQUITY
+          ? `Equity Shareholding terms for ${offer.title} offering ${offer.equityOfferedPercentage || 0}% equity at ${formatINR(offer.sharePricePaise)} per share.`
+          : `Standard terms for ${offer.title} at ${offer.rateBps} bps monthly return.`),
+      acceptedByCompanyAt: null
+    });
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: 'OFFER_TERMS_CONFIGURED',
+      targetEntity: 'Offer',
+      targetId: offer._id,
+      after: { targetPaise: offer.targetPaise, rateBps: offer.rateBps, tenures: offer.tenures, version: nextVersion },
+      ipAddress: req.ip
+    });
+
+    return res.json({
+      success: true,
+      message: 'Offer terms configured and sent for company acceptance',
+      offer,
+      terms: termsRecord
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function publishOffer(req, res, next) {
+  try {
+    const { id } = req.params;
+    const offer = await Offer.findById(id);
+    if (!offer) return res.status(404).json({ success: false, error: 'Offer not found' });
+
+    // PRD Section 5.2 C-6: "The company owner must accept the final terms before the admin can publish"
+    const latestTerms = await OfferTerms.findOne({ offerId: offer._id }).sort({ version: -1 });
+    if (!latestTerms || !latestTerms.acceptedByCompanyAt) {
+      // In single-admin dev / direct publish mode, we allow recording immediate owner acceptance if flagged
+      if (req.body.forceAccept) {
+        latestTerms.acceptedByCompanyAt = new Date();
+        await latestTerms.save();
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: 'Cannot publish offer until company owner accepts final terms (PRD Section 5.2 C-6)'
+        });
+      }
+    }
+
+    offer.status = Statuses.OFFER.OPEN;
+    if (!offer.windowStart) offer.windowStart = new Date();
+    if (!offer.windowEnd) offer.windowEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 day default window
+    await offer.save();
+
+    broadcastSyncEvent('OFFER', 'PUBLISHED', { offerId: offer._id, status: offer.status });
+
+    await logAction({
+      targetEntity: 'Offer',
+      targetId: offer._id,
+      after: { status: Statuses.OFFER.OPEN },
+      ipAddress: req.ip
+    });
+
+    return res.json({ success: true, message: 'Offer is now OPEN for investor funding', offer });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function activateOffer(req, res, next) {
+  try {
+    const { id } = req.params;
+    const offer = await Offer.findById(id).populate('companyId');
+    if (!offer) return res.status(404).json({ success: false, error: 'Offer not found' });
+
+    // Check minimum funding target met (PRD Section 3.3 rule 4)
+    if (offer.raisedPaise < offer.minTargetPaise) {
+      return res.status(400).json({
+        success: false,
+        error: `Cannot activate offer: raised amount (${formatINR(offer.raisedPaise)}) has not reached minimum target (${formatINR(offer.minTargetPaise)})`
+      });
+    }
+
+    const activationDate = new Date();
+    let maturityDate = null;
+    let maxTenure = 0;
+    if (offer.kind !== OfferKind.EQUITY && offer.tenures && offer.tenures.length > 0) {
+      maxTenure = Math.max(...offer.tenures);
+      maturityDate = new Date(activationDate);
+      maturityDate.setMonth(maturityDate.getMonth() + maxTenure);
+    }
+
+    offer.status = Statuses.OFFER.ACTIVE;
+    offer.activationDate = activationDate;
+    offer.maturityDate = maturityDate;
+    await offer.save();
+
+    broadcastSyncEvent('OFFER', 'ACTIVATED', { offerId: offer._id, status: Statuses.OFFER.ACTIVE });
+
+    // Activate all confirmed investments in this offer (PRD Section 5.4 F-2)
+    const confirmedInvestments = await Investment.find({
+      offerId: offer._id,
+      status: Statuses.INVESTMENT.CONFIRMED
+    });
+
+    for (const inv of confirmedInvestments) {
+      inv.status = Statuses.INVESTMENT.ACTIVE;
+      inv.activationDate = activationDate;
+
+      if (offer.kind === OfferKind.EQUITY) {
+        inv.maturityDate = null;
+        if (offer.sharePricePaise && offer.sharePricePaise > 0) {
+          inv.sharesAllotted = Math.floor(inv.amountPaise / offer.sharePricePaise);
+          inv.sharePricePaise = offer.sharePricePaise;
+          if (offer.totalSharesOffered && offer.totalSharesOffered > 0) {
+            inv.ownershipPercentage = Number(((inv.sharesAllotted / offer.totalSharesOffered) * (offer.equityOfferedPercentage || 100)).toFixed(3));
+          }
+        }
+        inv.allotmentStatus = 'Allotted';
+      } else {
+        const invMaturity = new Date(activationDate);
+        invMaturity.setMonth(invMaturity.getMonth() + (inv.tenureMonths || maxTenure));
+        inv.maturityDate = invMaturity;
+      }
+      await inv.save();
+    }
+
+    // Auto-create fund release record for company (prepared state)
+    const release = await Release.create({
+      offerId: offer._id,
+      companyId: offer.companyId._id,
+      amountPaise: offer.raisedPaise,
+      adminId: req.user._id,
+      status: Statuses.RELEASE_AND_REFUND.PREPARED,
+      bankAccountSnapshot: offer.companyId.bankAccount
+    });
+
+    // Only generate debt repayment schedule for project and company debt offers
+    if (offer.kind !== OfferKind.EQUITY && maxTenure > 0) {
+      // Monthly return repayment amount owed by company
+      const monthlyReturnRepayment = confirmedInvestments.reduce((acc, curr) => acc + curr.monthlyReturnPaise, 0);
+
+      for (let m = 1; m <= maxTenure; m++) {
+        const dueDate = new Date(activationDate);
+        dueDate.setMonth(dueDate.getMonth() + m);
+        dueDate.setDate(dueDate.getDate() - 5); // 5 days prior per PRD Section 3.5
+
+        const payoutDate = new Date(activationDate);
+        payoutDate.setMonth(payoutDate.getMonth() + m);
+
+        await Repayment.create({
+          offerId: offer._id,
+          dueDate,
+          payoutDate,
+          kind: 'return',
+          expectedPaise: monthlyReturnRepayment,
+          status: Statuses.REPAYMENT.UPCOMING
+        });
+      }
+
+      // Principal repayment at maturity
+      if (maturityDate) {
+        await Repayment.create({
+          offerId: offer._id,
+          dueDate: new Date(maturityDate.getTime() - 5 * 24 * 60 * 60 * 1000),
+          payoutDate: maturityDate,
+          kind: 'principal',
+          expectedPaise: offer.raisedPaise,
+          status: Statuses.REPAYMENT.UPCOMING
+        });
+      }
+    }
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: 'OFFER_ACTIVATED',
+      targetEntity: 'Offer',
+      targetId: offer._id,
+      after: { status: Statuses.OFFER.ACTIVE, activationDate, maturityDate, releaseId: release._id },
+      ipAddress: req.ip
+    });
+
+    return res.json({
+      success: true,
+      message: 'Offer activated! Investments are Active, schedule generated, and fund release is prepared.',
+      offer,
+      release
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function toggleOfferHold(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const offer = await Offer.findById(id);
+    if (!offer) return res.status(404).json({ success: false, error: 'Project not found' });
+
+    const isPaused = offer.status === Statuses.OFFER.PAUSED;
+    // Toggle between Active/Open and Paused
+    const nextStatus = isPaused ? Statuses.OFFER.ACTIVE : Statuses.OFFER.PAUSED;
+
+    const before = { status: offer.status };
+    offer.status = nextStatus;
+    await offer.save();
+
+    broadcastSyncEvent('OFFER', 'STATUS_CHANGED', { offerId: offer._id, status: nextStatus });
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: isPaused ? 'OFFER_UNHELD' : 'OFFER_HOLD_FUNDING',
+      targetEntity: 'Offer',
+      targetId: offer._id,
+      before,
+      after: { status: nextStatus },
+      reason: reason || (isPaused ? 'Resumed funding' : 'Funding placed on hold by Admin'),
+      ipAddress: req.ip
+    });
+
+    return res.json({
+      success: true,
+      message: isPaused ? 'Project funding resumed and set to Active' : 'Project funding placed on HOLD (Paused)',
+      offer
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function deleteOffer(req, res, next) {
+  try {
+    const { id } = req.params;
+    const offer = await Offer.findById(id);
+    if (!offer) return res.status(404).json({ success: false, error: 'Project not found' });
+
+    // Check if there are active paid investments
+    const paidInvestments = await Investment.countDocuments({
+      offerId: offer._id,
+      status: { $in: [Statuses.INVESTMENT.CONFIRMED, Statuses.INVESTMENT.ACTIVE] }
+    });
+
+    if (paidInvestments > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Cannot delete project with ${paidInvestments} confirmed investment(s). Refund or cancel investments first.`
+      });
+    }
+
+    await Investment.deleteMany({ offerId: offer._id });
+    await OfferTerms.deleteMany({ offerId: offer._id });
+    await Offer.findByIdAndDelete(id);
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: 'OFFER_DELETED',
+      targetEntity: 'Offer',
+      targetId: offer._id,
+      before: { title: offer.title, targetPaise: offer.targetPaise },
+      ipAddress: req.ip
+    });
+
+    return res.json({
+      success: true,
+      message: `Project "${offer.title}" has been deleted successfully.`
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+
+// ==========================================
+// 6. FUND RELEASES (PRD 5.4 F-3 & 6.3)
+// ==========================================
+export async function getReleases(req, res, next) {
+  try {
+    const releases = await Release.find()
+      .populate('companyId', 'name bankAccount status')
+      .populate('offerId', 'title raisedPaise targetPaise')
+      .sort({ createdAt: -1 });
+
+    const enriched = releases.map(r => {
+      const cooling = checkBankCoolingOff(r.companyId?.bankAccount?.effectiveFrom);
+      return {
+        ...r.toObject(),
+        bankCoolingOff: cooling
+      };
+    });
+
+    return res.json({ success: true, count: enriched.length, releases: enriched });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function approveRelease(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { reference } = req.body;
+
+    const release = await Release.findById(id).populate('companyId');
+    if (!release) return res.status(404).json({ success: false, error: 'Release record not found' });
+
+    if (release.status === Statuses.RELEASE_AND_REFUND.RELEASED) {
+      return res.status(400).json({ success: false, error: 'Funds have already been released' });
+    }
+
+    // PRD Section 5.4 F-3: Cooling-off check
+    const cooling = checkBankCoolingOff(release.companyId?.bankAccount?.effectiveFrom);
+    if (cooling.inCoolingOff) {
+      return res.status(400).json({
+        success: false,
+        code: ErrorCodes.BANK_IN_COOLING_OFF,
+        error: `Cannot release funds: Company bank account is in 3-day cooling-off period (${cooling.hoursRemaining} hours remaining)`
+      });
+    }
+
+    const before = { status: release.status };
+    release.status = Statuses.RELEASE_AND_REFUND.RELEASED;
+    release.reference = reference || `REL-${Date.now().toString().slice(-8)}`;
+    release.releasedAt = new Date();
+    await release.save();
+
+    // Write balancing entry to immutable ledger (PRD Section 8.1 & 10.3)
+    await Ledger.create({
+      account: 'COMPANY_DISBURSEMENT',
+      debitPaise: release.amountPaise,
+      creditPaise: 0,
+      refType: 'RELEASE',
+      refId: release._id,
+      description: `Disbursement of ${formatINR(release.amountPaise)} to ${release.companyId.name} Ref: ${release.reference}`
+    });
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: 'FUND_RELEASE_APPROVED',
+      targetEntity: 'Release',
+      targetId: release._id,
+      before,
+      after: { status: release.status, reference: release.reference },
+      ipAddress: req.ip
+    });
+
+    return res.json({
+      success: true,
+      message: `Funds of ${formatINR(release.amountPaise)} successfully released to company`,
+      release
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ==========================================
+// 7. REPAYMENTS MONITOR (PRD 5.4 F-6 & 6.3)
+// ==========================================
+export async function getRepayments(req, res, next) {
+  try {
+    const { status, offerId } = req.query;
+    const query = {};
+    if (status) query.status = status;
+    if (offerId) query.offerId = offerId;
+
+    const repayments = await Repayment.find(query)
+      .populate({
+        path: 'offerId',
+        select: 'title companyId targetPaise',
+        populate: { path: 'companyId', select: 'name bankAccount' }
+      })
+      .sort({ dueDate: 1 });
+
+    return res.json({ success: true, count: repayments.length, repayments });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function confirmRepaymentReceipt(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { reference, receivedPaise } = req.body;
+
+    const repayment = await Repayment.findById(id).populate('offerId');
+    if (!repayment) return res.status(404).json({ success: false, error: 'Repayment record not found' });
+
+    if (!reference) {
+      return res.status(400).json({ success: false, error: 'Bank transfer reference is required' });
+    }
+
+    const before = { status: repayment.status, receivedPaise: repayment.receivedPaise };
+    repayment.status = Statuses.REPAYMENT.RECEIVED;
+    repayment.receivedPaise = receivedPaise || repayment.expectedPaise;
+    repayment.reference = reference.trim();
+    repayment.receivedAt = new Date();
+    await repayment.save();
+
+    // Record ledger entry
+    await Ledger.create({
+      account: 'PLATFORM_ESCROW',
+      debitPaise: 0,
+      creditPaise: repayment.receivedPaise,
+      refType: 'REPAYMENT',
+      refId: repayment._id,
+      description: `Repayment received from company for offer ${repayment.offerId?.title} Ref: ${repayment.reference}`
+    });
+
+    // Create or update investor payout lines to 'Ready' (PRD Section 5.4 F-7: "maker builds payout batch only from lines whose company money is confirmed")
+    const activeInvestments = await Investment.find({
+      offerId: repayment.offerId._id,
+      status: Statuses.INVESTMENT.ACTIVE
+    });
+
+    for (const inv of activeInvestments) {
+      const payoutAmount = repayment.kind === 'return' ? inv.monthlyReturnPaise : inv.amountPaise;
+
+      let payout = await Payout.findOne({
+        investmentId: inv._id,
+        repaymentId: repayment._id
+      });
+
+      if (!payout) {
+        await Payout.create({
+          investmentId: inv._id,
+          repaymentId: repayment._id,
+          investorId: inv.investorId,
+          offerId: repayment.offerId._id,
+          amountPaise: payoutAmount,
+          status: Statuses.PAYOUT.READY
+        });
+      } else {
+        payout.status = Statuses.PAYOUT.READY;
+        await payout.save();
+      }
+    }
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: 'REPAYMENT_RECEIPT_CONFIRMED',
+      targetEntity: 'Repayment',
+      targetId: repayment._id,
+      before,
+      after: { status: repayment.status, receivedPaise: repayment.receivedPaise, reference },
+      ipAddress: req.ip
+    });
+
+    return res.json({
+      success: true,
+      message: 'Repayment receipt confirmed. Investor payouts are now marked READY for batching.',
+      repayment
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function markDefault(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const repayment = await Repayment.findById(id);
+    if (!repayment) return res.status(404).json({ success: false, error: 'Repayment record not found' });
+
+    repayment.status = Statuses.REPAYMENT.DEFAULTED;
+    repayment.defaultReportedAt = new Date();
+    await repayment.save();
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: 'REPAYMENT_DEFAULTED',
+      targetEntity: 'Repayment',
+      targetId: repayment._id,
+      reason: reason || 'Company has stayed late for over 30 days',
+      ipAddress: req.ip
+    });
+
+    return res.json({ success: true, message: 'Repayment marked as Defaulted', repayment });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ==========================================
+// 8. PAYOUT BATCHES (PRD 5.4 F-7, F-8 & 6.3)
+// ==========================================
+export async function getPayouts(req, res, next) {
+  try {
+    const { status, offerId } = req.query;
+    const query = {};
+    if (status) query.status = status;
+    if (offerId) query.offerId = offerId;
+
+    const payouts = await Payout.find(query)
+      .populate('investorId', 'name email mobile')
+      .populate('offerId', 'title')
+      .populate('repaymentId', 'dueDate kind reference status expectedPaise')
+      .populate('investmentId', 'amountPaise tenureMonths createdAt status')
+      .sort({ createdAt: -1 });
+
+    return res.json({ success: true, count: payouts.length, payouts });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function verifyPayout(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { remarks } = req.body || {};
+
+    const payout = await Payout.findById(id);
+    if (!payout) {
+      return res.status(404).json({ success: false, error: 'Return payout record not found' });
+    }
+
+    if (payout.status === Statuses.PAYOUT.PAID) {
+      return res.status(400).json({ success: false, error: 'Payout has already been executed and paid' });
+    }
+
+    // Set to Ready for batch disbursement
+    payout.status = Statuses.PAYOUT.READY;
+    payout.failureReason = remarks || null;
+    await payout.save();
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: 'RETURN_PAYOUT_VERIFIED',
+      targetEntity: 'Payout',
+      targetId: payout._id,
+      after: { status: Statuses.PAYOUT.READY, amountPaise: payout.amountPaise },
+      ipAddress: req.ip
+    });
+
+    broadcastSyncEvent('payout_verified', { payoutId: payout._id, status: payout.status });
+
+    return res.json({
+      success: true,
+      message: `Return payout of ${formatINR(payout.amountPaise)} successfully verified & marked READY.`,
+      payout
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function verifyAllPayouts(req, res, next) {
+  try {
+    const pendingPayouts = await Payout.find({
+      status: { $in: [Statuses.PAYOUT.CALCULATED, Statuses.PAYOUT.FAILED] }
+    });
+
+    if (pendingPayouts.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No return payouts currently pending admin verification'
+      });
+    }
+
+    const ids = pendingPayouts.map(p => p._id);
+    await Payout.updateMany(
+      { _id: { $in: ids } },
+      { $set: { status: Statuses.PAYOUT.READY, failureReason: null } }
+    );
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: 'ALL_RETURN_PAYOUTS_VERIFIED',
+      targetEntity: 'Payout',
+      count: ids.length,
+      ipAddress: req.ip
+    });
+
+    broadcastSyncEvent('payouts_all_verified', { count: ids.length });
+
+    return res.json({
+      success: true,
+      message: `Successfully verified all ${ids.length} pending investor returns. Marked READY for batch creation.`,
+      count: ids.length
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getBatches(req, res, next) {
+  try {
+    const batches = await Batch.find().populate('adminId', 'name email').sort({ createdAt: -1 });
+    return res.json({ success: true, count: batches.length, batches });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function createPayoutBatch(req, res, next) {
+  try {
+    // Find all payouts that are 'Ready' (i.e. company money is in)
+    const readyPayouts = await Payout.find({ status: Statuses.PAYOUT.READY });
+    if (readyPayouts.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No payouts currently in READY status. Company repayments must be confirmed first.'
+      });
+    }
+
+    const totalPaise = readyPayouts.reduce((sum, p) => sum + p.amountPaise, 0);
+
+    const batch = await Batch.create({
+      adminId: req.user._id,
+      status: 'Prepared',
+      totalPaise,
+      payoutCount: readyPayouts.length
+    });
+
+    // Move payouts to IN_BATCH
+    await Payout.updateMany(
+      { _id: { $in: readyPayouts.map(p => p._id) } },
+      { $set: { status: Statuses.PAYOUT.IN_BATCH, batchId: batch._id } }
+    );
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: 'PAYOUT_BATCH_PREPARED',
+      targetEntity: 'Batch',
+      targetId: batch._id,
+      after: { totalPaise, count: readyPayouts.length },
+      ipAddress: req.ip
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `Batch created with ${readyPayouts.length} payouts totaling ${formatINR(totalPaise)}`,
+      batch
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function approveAndSendBatch(req, res, next) {
+  try {
+    const { id } = req.params;
+    const batch = await Batch.findById(id);
+    if (!batch) return res.status(404).json({ success: false, error: 'Batch not found' });
+
+    if (batch.status === 'Paid') {
+      return res.status(400).json({ success: false, error: 'Batch has already been dispatched and paid' });
+    }
+
+    const batchPayouts = await Payout.find({ batchId: batch._id });
+
+    // Execute payouts (simulated bank execution with UTR numbers)
+    for (const payout of batchPayouts) {
+      payout.status = Statuses.PAYOUT.PAID;
+      payout.bankRef = `UTR-${Date.now().toString().slice(-8)}-${Math.floor(1000 + Math.random() * 9000)}`;
+      payout.paidAt = new Date();
+      await payout.save();
+
+      // Write ledger entry
+      await Ledger.create({
+        account: 'INVESTOR_WALLET',
+        debitPaise: 0,
+        creditPaise: payout.amountPaise,
+        refType: 'PAYOUT',
+        refId: payout._id,
+        description: `Payout of ${formatINR(payout.amountPaise)} sent to investor Ref: ${payout.bankRef}`
+      });
+    }
+
+    batch.status = 'Paid';
+    batch.reference = `BATCH-DISPATCH-${Date.now().toString().slice(-6)}`;
+    batch.executedAt = new Date();
+    await batch.save();
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: 'PAYOUT_BATCH_DISPATCHED',
+      targetEntity: 'Batch',
+      targetId: batch._id,
+      after: { status: 'Paid', reference: batch.reference },
+      ipAddress: req.ip
+    });
+
+    return res.json({
+      success: true,
+      message: `Batch ${batch._id} executed successfully. ${batchPayouts.length} payouts marked PAID.`,
+      batch
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function retryPayout(req, res, next) {
+  try {
+    const { id } = req.params;
+    const payout = await Payout.findById(id);
+    if (!payout) return res.status(404).json({ success: false, error: 'Payout not found' });
+
+    payout.status = Statuses.PAYOUT.READY;
+    payout.failureReason = null;
+    await payout.save();
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: 'PAYOUT_RETRY_INITIATED',
+      targetEntity: 'Payout',
+      targetId: payout._id,
+      ipAddress: req.ip
+    });
+
+    return res.json({ success: true, message: 'Payout status reset to READY for next batch run', payout });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getAllTransactions(req, res, next) {
+  try {
+    const { type, search, limit = 100 } = req.query;
+
+    const [investments, releases, repayments, payouts, subscriptions] = await Promise.all([
+      Investment.find()
+        .populate('investorId', 'name email mobile')
+        .populate('offerId', 'title kind')
+        .sort({ createdAt: -1 }),
+      Release.find()
+        .populate('companyId', 'name')
+        .populate('offerId', 'title')
+        .sort({ createdAt: -1 }),
+      Repayment.find()
+        .populate('offerId', 'title')
+        .sort({ createdAt: -1 }),
+      Payout.find()
+        .populate('investorId', 'name email mobile')
+        .populate('offerId', 'title')
+        .sort({ createdAt: -1 }),
+      Subscription.find()
+        .populate('userId', 'name email mobile')
+        .populate('companyId', 'name')
+        .sort({ createdAt: -1 })
+    ]);
+
+    const txs = [];
+
+    // 1. Investor Capital Inflows
+    investments.forEach(inv => {
+      txs.push({
+        id: inv._id,
+        txRef: `TX-INV-${inv._id.toString().slice(-6).toUpperCase()}`,
+        type: 'INVESTMENT',
+        category: 'Capital Inflow',
+        flow: 'CREDIT',
+        title: inv.offerId?.title || 'Investment Proposal',
+        party: inv.investorId?.name || 'Verified Investor',
+        partySub: inv.investorId?.email || 'Investor Capital',
+        amountPaise: inv.amountPaise,
+        status: inv.status === 'Active' || inv.status === 'Confirmed' ? 'Completed' : inv.status,
+        date: inv.createdAt,
+        gatewayRef: inv.certificateNo || `GW-${inv._id.toString().slice(-8)}`
+      });
+    });
+
+    // 2. Company Capital Releases
+    releases.forEach(rel => {
+      txs.push({
+        id: rel._id,
+        txRef: `TX-REL-${rel._id.toString().slice(-6).toUpperCase()}`,
+        type: 'RELEASE',
+        category: 'Company Disbursement',
+        flow: 'DEBIT',
+        title: rel.offerId?.title || 'Escrow Release',
+        party: rel.companyId?.name || 'Borrower Company',
+        partySub: 'Tranche Disbursement',
+        amountPaise: rel.amountPaise,
+        status: rel.status === 'Released' ? 'Completed' : rel.status,
+        date: rel.createdAt,
+        gatewayRef: rel.bankRef || 'ESCROW-TRANSFER'
+      });
+    });
+
+    // 3. Company Repayments
+    repayments.forEach(rep => {
+      const isRcvd = rep.status === 'Received';
+      txs.push({
+        id: rep._id,
+        txRef: `TX-REP-${rep._id.toString().slice(-6).toUpperCase()}`,
+        type: 'REPAYMENT',
+        category: 'Company Repayment',
+        flow: 'CREDIT',
+        title: rep.offerId?.title || 'Project Repayment Cycle',
+        party: 'Corporate Borrower',
+        partySub: rep.kind === 'principal' ? 'Principal Repayment' : 'Yield Collection',
+        amountPaise: rep.expectedPaise || rep.receivedPaise || 0,
+        status: isRcvd ? 'Completed' : rep.status,
+        date: rep.receivedAt || rep.dueDate || rep.createdAt,
+        gatewayRef: rep.reference || 'BANK-UTR-IN'
+      });
+    });
+
+    // 4. Investor Return Payouts
+    payouts.forEach(p => {
+      const isPaid = p.status === 'Paid';
+      txs.push({
+        id: p._id,
+        txRef: `TX-PAY-${p._id.toString().slice(-6).toUpperCase()}`,
+        type: 'PAYOUT',
+        category: 'Investor Return Distribution',
+        flow: 'DEBIT',
+        title: p.offerId?.title || 'Monthly Return Distribution',
+        party: p.investorId?.name || 'Verified Investor',
+        partySub: p.investorId?.email || 'Direct Bank Settlement',
+        amountPaise: p.amountPaise,
+        status: isPaid ? 'Completed' : p.status === 'Ready' ? 'Verified Ready' : p.status,
+        date: p.paidAt || p.createdAt,
+        gatewayRef: p.bankRef || 'BATCH-SETTLEMENT'
+      });
+    });
+
+    // 5. Monthly Subscriptions
+    subscriptions.forEach(sub => {
+      txs.push({
+        id: sub._id,
+        txRef: `TX-SUB-${sub._id.toString().slice(-6).toUpperCase()}`,
+        type: 'SUBSCRIPTION',
+        category: 'Platform Service Fee',
+        flow: 'CREDIT',
+        title: 'Platform Monthly Access Fee (₹500)',
+        party: sub.userId?.name || sub.companyId?.name || 'Active Member',
+        partySub: sub.userId?.email || 'Platform Maintenance',
+        amountPaise: sub.amountPaise || 50000,
+        status: sub.status === 'Paid' ? 'Completed' : sub.status,
+        date: sub.paymentDate || sub.createdAt,
+        gatewayRef: sub.paymentRef || 'RAZORPAY-SUB'
+      });
+    });
+
+    // Sort descending by date
+    txs.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    // Filter by type or search query
+    let filtered = txs;
+    if (type && type !== 'ALL') {
+      filtered = filtered.filter(t => t.type === type || t.flow === type);
+    }
+    if (search && search.trim()) {
+      const q = search.toLowerCase();
+      filtered = filtered.filter(
+        t =>
+          t.txRef.toLowerCase().includes(q) ||
+          t.title.toLowerCase().includes(q) ||
+          t.party.toLowerCase().includes(q) ||
+          t.partySub.toLowerCase().includes(q) ||
+          t.category.toLowerCase().includes(q)
+      );
+    }
+
+    const totalVolumePaise = txs.reduce((sum, t) => sum + t.amountPaise, 0);
+    const creditsTotalPaise = txs.filter(t => t.flow === 'CREDIT').reduce((sum, t) => sum + t.amountPaise, 0);
+    const debitsTotalPaise = txs.filter(t => t.flow === 'DEBIT').reduce((sum, t) => sum + t.amountPaise, 0);
+
+    return res.json({
+      success: true,
+      totalCount: txs.length,
+      filteredCount: filtered.length,
+      stats: {
+        totalVolumePaise,
+        creditsTotalPaise,
+        debitsTotalPaise
+      },
+      transactions: filtered.slice(0, Number(limit))
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ==========================================
+// 9. AUDIT LOG & EXPORTS (PRD 5.5 M-2, M-3)
+// ==========================================
+export async function getAuditLogs(req, res, next) {
+  try {
+    const { entity, action, limit = 50, page = 1 } = req.query;
+    const query = {};
+    if (entity) query.targetEntity = entity;
+    if (action) query.action = { $regex: action, $options: 'i' };
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const logs = await AuditLog.find(query)
+      .populate('actorId', 'name email role')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit));
+
+    const total = await AuditLog.countDocuments(query);
+
+    return res.json({
+      success: true,
+      total,
+      page: Number(page),
+      pages: Math.ceil(total / Number(limit)),
+      logs
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function exportReport(req, res, next) {
+  try {
+    const { name } = req.params; // 'investors', 'companies', 'offers', 'payouts'
+    let data = [];
+    let fields = [];
+
+    if (name === 'investors') {
+      const investors = await InvestorProfile.find().populate('userId', 'name email mobile status');
+      data = investors.map(i => ({
+        ID: i._id,
+        Name: i.userId?.name,
+        Email: i.userId?.email,
+        Mobile: i.userId?.mobile,
+        KYC_Status: i.kycStatus,
+        Reason: i.kycReason || '',
+        Account_Status: i.userId?.status
+      }));
+      fields = ['ID', 'Name', 'Email', 'Mobile', 'KYC_Status', 'Reason', 'Account_Status'];
+    } else if (name === 'companies') {
+      const companies = await Company.find().populate('ownerUserId', 'name email');
+      data = companies.map(c => ({
+        ID: c._id,
+        Name: c.name,
+        Registration_No: c.regNo,
+        Owner_Email: c.ownerUserId?.email,
+        Status: c.status,
+        Bank_Account: c.bankAccount?.accountNo || '',
+        Bank_Verified: c.bankAccount?.verified ? 'YES' : 'NO'
+      }));
+      fields = ['ID', 'Name', 'Registration_No', 'Owner_Email', 'Status', 'Bank_Account', 'Bank_Verified'];
+    } else if (name === 'offers') {
+      const offers = await Offer.find().populate('companyId', 'name');
+      data = offers.map(o => ({
+        ID: o._id,
+        Title: o.title,
+        Kind: o.kind,
+        Company: o.companyId?.name,
+        Target_INR: formatINR(o.targetPaise),
+        Raised_INR: formatINR(o.raisedPaise),
+        Rate_BPS: o.rateBps,
+        Status: o.status
+      }));
+      fields = ['ID', 'Title', 'Kind', 'Company', 'Target_INR', 'Raised_INR', 'Rate_BPS', 'Status'];
+    } else if (name === 'payouts') {
+      const payouts = await Payout.find().populate('investorId', 'name email').populate('offerId', 'title');
+      data = payouts.map(p => ({
+        ID: p._id,
+        Investor: p.investorId?.name,
+        Email: p.investorId?.email,
+        Offer: p.offerId?.title,
+        Amount_INR: formatINR(p.amountPaise),
+        Status: p.status,
+        Bank_Ref: p.bankRef || '',
+        Failure_Reason: p.failureReason || ''
+      }));
+      fields = ['ID', 'Investor', 'Email', 'Offer', 'Amount_INR', 'Status', 'Bank_Ref', 'Failure_Reason'];
+    } else {
+      return res.status(400).json({ success: false, error: 'Unknown report type' });
+    }
+
+    // Convert to CSV
+    const csvRows = [];
+    csvRows.push(fields.join(','));
+    for (const row of data) {
+      const values = fields.map(f => {
+        const val = row[f] === undefined || row[f] === null ? '' : String(row[f]);
+        return `"${val.replace(/"/g, '""')}"`;
+      });
+      csvRows.push(values.join(','));
+    }
+
+    const csvContent = csvRows.join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="connect_invest_${name}_${Date.now()}.csv"`);
+    return res.send(csvContent);
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ==========================================
+// 10. ADMIN CREDENTIALS & PROFILE SETTINGS
+// ==========================================
+export async function updateAdminCredentials(req, res, next) {
+  try {
+    const adminId = req.user._id;
+    const { name, email, currentPassword, newPassword } = req.body;
+
+    const user = await User.findById(adminId);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'Admin account not found' });
+    }
+
+    // Check current password
+    if (!currentPassword) {
+      return res.status(400).json({ success: false, error: 'Current password is required to save changes' });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, error: 'Incorrect current password' });
+    }
+
+    const changes = {};
+
+    // Update name
+    if (name && name.trim() && name.trim() !== user.name) {
+      changes.oldName = user.name;
+      changes.newName = name.trim();
+      user.name = name.trim();
+    }
+
+    // Update email (Admin Login ID)
+    if (email && email.trim() && email.trim().toLowerCase() !== user.email) {
+      const normalizedEmail = email.trim().toLowerCase();
+      const existing = await User.findOne({ email: normalizedEmail, _id: { $ne: user._id } });
+      if (existing) {
+        return res.status(409).json({ success: false, error: 'This email address is already in use by another account' });
+      }
+      changes.oldEmail = user.email;
+      changes.newEmail = normalizedEmail;
+      user.email = normalizedEmail;
+    }
+
+    // Update password
+    if (newPassword) {
+      if (newPassword.length < 8) {
+        return res.status(400).json({ success: false, error: 'New password must be at least 8 characters long' });
+      }
+      user.passwordHash = await bcrypt.hash(newPassword, 10);
+      changes.passwordChanged = true;
+    }
+
+    await user.save();
+
+    // Generate fresh JWT token with updated info
+    const newToken = jwt.sign(
+      {
+        userId: user._id,
+        role: user.role,
+        name: user.name,
+        email: user.email
+      },
+      process.env.JWT_SECRET || 'connect_invest_dev_secret',
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
+
+    // Audit log
+    await logAction({
+      actorId: user._id,
+      role: user.role,
+      action: 'ADMIN_CREDENTIALS_UPDATED',
+      targetEntity: 'User',
+      targetId: user._id,
+      stateDiff: {
+        before: { name: changes.oldName || user.name, email: changes.oldEmail || user.email },
+        after: { name: user.name, email: user.email, passwordUpdated: !!changes.passwordChanged }
+      },
+      ipAddress: req.ip
+    });
+
+    return res.json({
+      success: true,
+      message: 'Admin credentials updated successfully',
+      token: newToken,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ==========================================
+// 14. QUERIES & SUPPORT TICKETS MANAGEMENT
+// ==========================================
+
+export async function getQueries(req, res, next) {
+  try {
+    const { status, senderType, category, priority, search } = req.query;
+    const filter = {};
+
+    if (status && status !== 'all') {
+      filter.status = status;
+    }
+    if (senderType && senderType !== 'all') {
+      filter.senderType = senderType;
+    }
+    if (category && category !== 'all') {
+      filter.category = category;
+    }
+    if (priority && priority !== 'all') {
+      filter.priority = priority;
+    }
+    if (search && search.trim()) {
+      const q = search.trim();
+      filter.$or = [
+        { ticketId: { $regex: q, $options: 'i' } },
+        { subject: { $regex: q, $options: 'i' } },
+        { userName: { $regex: q, $options: 'i' } },
+        { userEmail: { $regex: q, $options: 'i' } },
+        { relatedTransactionRef: { $regex: q, $options: 'i' } }
+      ];
+    }
+
+    // Auto seed sample realistic queries if collection is empty
+    const count = await Query.countDocuments();
+    if (count === 0) {
+      await seedInitialQueries();
+    }
+
+    const queries = await Query.find(filter)
+      .sort({ updatedAt: -1 })
+      .populate('investorId', 'userId pan')
+      .populate('companyId', 'name regNo')
+      .populate('relatedOfferId', 'title code');
+
+    // Metrics for summary widgets
+    const [totalOpen, totalUrgent, paymentQueriesCount, totalResolved] = await Promise.all([
+      Query.countDocuments({ status: { $in: ['Open', 'In Progress'] } }),
+      Query.countDocuments({ priority: 'Urgent', status: { $ne: 'Closed' } }),
+      Query.countDocuments({ category: { $in: ['Payment & Payouts', 'Repayment & Dues'] } }),
+      Query.countDocuments({ status: 'Resolved' })
+    ]);
+
+    return res.json({
+      success: true,
+      queries,
+      summary: {
+        totalOpen,
+        totalUrgent,
+        paymentQueriesCount,
+        totalResolved,
+        total: queries.length
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function createQuery(req, res, next) {
+  try {
+    const {
+      senderType,
+      userName,
+      userEmail,
+      userPhone,
+      category,
+      priority,
+      subject,
+      description,
+      relatedTransactionRef,
+      investorId,
+      companyId,
+      relatedOfferId
+    } = req.body;
+
+    if (!subject || !description || !userName || !userEmail) {
+      return res.status(400).json({
+        success: false,
+        error: 'Subject, description, contact name and email are required'
+      });
+    }
+
+    const ticketId = `TKT-${Date.now().toString().slice(-6)}`;
+
+    const newQuery = await Query.create({
+      ticketId,
+      senderType: senderType || 'investor',
+      userName,
+      userEmail,
+      userPhone: userPhone || '',
+      category: category || 'Payment & Payouts',
+      priority: priority || 'Medium',
+      status: 'Open',
+      subject,
+      description,
+      relatedTransactionRef: relatedTransactionRef || '',
+      investorId: investorId || null,
+      companyId: companyId || null,
+      relatedOfferId: relatedOfferId || null,
+      messages: [
+        {
+          senderType: senderType || 'investor',
+          senderName: userName,
+          message: description,
+          sentAt: new Date()
+        }
+      ]
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `Query ticket ${ticketId} created successfully`,
+      query: newQuery
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function replyQuery(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { message, nextStatus } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({ success: false, error: 'Reply message cannot be empty' });
+    }
+
+    const query = await Query.findById(id);
+    if (!query) {
+      return res.status(404).json({ success: false, error: 'Query ticket not found' });
+    }
+
+    query.messages.push({
+      senderType: 'admin',
+      senderName: req.user?.name || 'Platform Administrator',
+      senderId: req.user?._id,
+      message: message.trim(),
+      sentAt: new Date()
+    });
+
+    if (nextStatus) {
+      query.status = nextStatus;
+      if (nextStatus === 'Resolved') {
+        query.resolvedAt = new Date();
+      }
+    } else if (query.status === 'Open') {
+      query.status = 'In Progress';
+    }
+
+    await query.save();
+
+    return res.json({
+      success: true,
+      message: 'Reply sent successfully',
+      query
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateQueryStatus(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { status, priority, resolutionNote } = req.body;
+
+    const query = await Query.findById(id);
+    if (!query) {
+      return res.status(404).json({ success: false, error: 'Query ticket not found' });
+    }
+
+    if (status) {
+      query.status = status;
+      if (status === 'Resolved') {
+        query.resolvedAt = new Date();
+      }
+    }
+    if (priority) {
+      query.priority = priority;
+    }
+    if (resolutionNote !== undefined) {
+      query.resolutionNote = resolutionNote;
+    }
+
+    await query.save();
+
+    return res.json({
+      success: true,
+      message: 'Query status updated successfully',
+      query
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function seedInitialQueries() {
+  try {
+    // Find a company and an investor if available to attach realistic links
+    const company = await Company.findOne();
+    const investor = await InvestorProfile.findOne();
+    const offer = await Offer.findOne();
+
+    const sampleQueries = [
+      {
+        ticketId: 'TKT-108421',
+        senderType: 'investor',
+        userName: 'Aarav Patel',
+        userEmail: 'aarav.patel@example.com',
+        userPhone: '9876543210',
+        category: 'Payment & Payouts',
+        priority: 'High',
+        status: 'Open',
+        subject: 'Monthly Payout Credit Delay for Apex Solar Farm',
+        description: 'My monthly return distribution of ₹14,250 for October has not been reflected in my ICICI Bank account yet. Could you check the transaction status?',
+        relatedTransactionRef: 'PAYOUT-2026-OCT-8821',
+        investorId: investor?._id || null,
+        relatedOfferId: offer?._id || null,
+        messages: [
+          {
+            senderType: 'investor',
+            senderName: 'Aarav Patel',
+            message: 'My monthly return distribution of ₹14,250 for October has not been reflected in my ICICI Bank account yet. Could you check the transaction status?',
+            sentAt: new Date(Date.now() - 3600000 * 5)
+          }
+        ]
+      },
+      {
+        ticketId: 'TKT-108390',
+        senderType: 'company',
+        userName: company?.name || 'Apex Renewable Energy Pvt Ltd',
+        userEmail: 'finance@apexsolar.in',
+        userPhone: '9123456780',
+        category: 'Repayment & Dues',
+        priority: 'Urgent',
+        status: 'In Progress',
+        subject: 'Disbursement Cooling-off Verification for Tranche 2',
+        description: 'We have updated our primary HDFC current account for receiving the second tranche disbursement. Requesting expedited admin review of cooling-off period.',
+        relatedTransactionRef: 'DISB-REL-9921',
+        companyId: company?._id || null,
+        relatedOfferId: offer?._id || null,
+        messages: [
+          {
+            senderType: 'company',
+            senderName: 'Finance Lead (Apex)',
+            message: 'We have updated our primary HDFC current account for receiving the second tranche disbursement. Requesting expedited admin review of cooling-off period.',
+            sentAt: new Date(Date.now() - 3600000 * 24)
+          },
+          {
+            senderType: 'admin',
+            senderName: 'Master Administrator',
+            message: 'Thank you for reaching out. We have verified your HDFC Bank account statement. 3-day cooling-off finishes tomorrow at 11:00 AM IST.',
+            sentAt: new Date(Date.now() - 3600000 * 18)
+          }
+        ]
+      },
+      {
+        ticketId: 'TKT-108254',
+        senderType: 'investor',
+        userName: 'Meera Sharma',
+        userEmail: 'meera.s@gmail.com',
+        userPhone: '9988776655',
+        category: 'KYC Verification',
+        priority: 'Medium',
+        status: 'Resolved',
+        subject: 'NSDL PAN Name Mismatch Assistance',
+        description: 'Uploaded my revised Aadhaar and PAN card copy as requested by the compliance team after initial rejection.',
+        investorId: investor?._id || null,
+        resolutionNote: 'Documents re-verified with NSDL database and approved.',
+        resolvedAt: new Date(Date.now() - 3600000 * 48),
+        messages: [
+          {
+            senderType: 'investor',
+            senderName: 'Meera Sharma',
+            message: 'Uploaded my revised Aadhaar and PAN card copy as requested by the compliance team after initial rejection.',
+            sentAt: new Date(Date.now() - 3600000 * 72)
+          },
+          {
+            senderType: 'admin',
+            senderName: 'Master Administrator',
+            message: 'Your revised PAN records matched successfully. Your KYC status is now APPROVED.',
+            sentAt: new Date(Date.now() - 3600000 * 48)
+          }
+        ]
+      },
+      {
+        ticketId: 'TKT-108112',
+        senderType: 'company',
+        userName: 'Zenith Agritech Solutions',
+        userEmail: 'accounts@zenithagri.io',
+        userPhone: '9845123456',
+        category: 'Payment & Payouts',
+        priority: 'Medium',
+        status: 'Open',
+        subject: 'Inward Repayment UTR Reference Confirmation',
+        description: 'We have remitted ₹4,50,000 via RTGS for our scheduled project repayment. Inward UTR: UTR-IN-20261027-44819.',
+        relatedTransactionRef: 'UTR-IN-20261027-44819',
+        companyId: company?._id || null,
+        relatedOfferId: offer?._id || null,
+        messages: [
+          {
+            senderType: 'company',
+            senderName: 'Accounts Officer',
+            message: 'We have remitted ₹4,50,000 via RTGS for our scheduled project repayment. Inward UTR: UTR-IN-20261027-44819.',
+            sentAt: new Date(Date.now() - 3600000 * 3)
+          }
+        ]
+      }
+    ];
+
+    await Query.insertMany(sampleQueries);
+  } catch (err) {
+    console.error('Error seeding initial queries:', err);
+  }
+}
+
+// ==========================================
+// 15. SUBSCRIPTIONS MANAGEMENT (₹500 / month SaaS Fee)
+// ==========================================
+
+export async function getSubscriptions(req, res, next) {
+  try {
+    const { status, subscriberType, billingMonth, search } = req.query;
+    const filter = {};
+
+    if (status && status !== 'all') {
+      filter.status = status;
+    }
+    if (subscriberType && subscriberType !== 'all') {
+      filter.subscriberType = subscriberType;
+    }
+    if (billingMonth && billingMonth !== 'all') {
+      filter.billingMonth = billingMonth;
+    }
+    if (search && search.trim()) {
+      const q = search.trim();
+      filter.$or = [
+        { subscriberName: { $regex: q, $options: 'i' } },
+        { subscriberEmail: { $regex: q, $options: 'i' } },
+        { invoiceNumber: { $regex: q, $options: 'i' } },
+        { transactionRef: { $regex: q, $options: 'i' } }
+      ];
+    }
+
+    // Auto-seed initial realistic active subscription records if empty
+    const count = await Subscription.countDocuments();
+    if (count === 0) {
+      await seedInitialSubscriptions();
+    }
+
+    const subscriptions = await Subscription.find(filter)
+      .sort({ paymentDate: -1, createdAt: -1 })
+      .populate('companyId', 'name regNo')
+      .populate('investorId', 'userId pan');
+
+    // Aggregate summary metrics
+    const [paidAgg, totalSubscribers, overdueCount, pendingCount] = await Promise.all([
+      Subscription.aggregate([
+        { $match: { status: 'Paid' } },
+        { $group: { _id: null, totalRupees: { $sum: '$amount' } } }
+      ]),
+      Subscription.countDocuments(),
+      Subscription.countDocuments({ status: 'Overdue' }),
+      Subscription.countDocuments({ status: 'Pending' })
+    ]);
+
+    const totalCollected = paidAgg[0]?.totalRupees || 0;
+    const activeSubscribers = await Subscription.countDocuments({ status: { $in: ['Paid', 'Pending'] } });
+    const mrr = 500 * (activeSubscribers || totalSubscribers || 0);
+
+    return res.json({
+      success: true,
+      subscriptions,
+      data: subscriptions,
+      stats: {
+        totalCollected,
+        mrr,
+        activeSubscribers: activeSubscribers || totalSubscribers || 0,
+        pendingPayments: pendingCount,
+        overduePayments: overdueCount
+      },
+      summary: {
+        totalCollected,
+        monthlyRecurring: mrr,
+        totalSubscribers,
+        overdueCount,
+        pendingCount,
+        feePerSubscriber: 500
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function recordSubscriptionPayment(req, res, next) {
+  try {
+    const {
+      subscriberType,
+      subscriberName,
+      subscriberEmail,
+      subscriberMobile,
+      amount,
+      billingCycle,
+      billingMonth,
+      paymentMethod,
+      transactionRef,
+      status,
+      notes
+    } = req.body;
+
+    if (!subscriberName || !subscriberEmail) {
+      return res.status(400).json({ success: false, error: 'Subscriber name and email are required' });
+    }
+
+    const feeAmount = Number(amount) || 500;
+    const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
+    const paymentDate = new Date();
+    const nextDueDate = new Date(paymentDate);
+    nextDueDate.setMonth(nextDueDate.getMonth() + 1);
+
+    const subscription = await Subscription.create({
+      subscriberType: subscriberType || 'investor',
+      subscriberName: subscriberName.trim(),
+      subscriberEmail: subscriberEmail.toLowerCase().trim(),
+      subscriberMobile: subscriberMobile || '',
+      planName: 'SaaS Platform License',
+      amount: feeAmount,
+      amountPaise: feeAmount * 100,
+      billingCycle: billingCycle || 'Monthly',
+      billingMonth: billingMonth || 'October 2026',
+      paymentDate,
+      nextDueDate,
+      status: status || 'Paid',
+      paymentMethod: paymentMethod || 'UPI',
+      transactionRef: transactionRef || `TXN-SUB-${Date.now().toString().slice(-6)}`,
+      invoiceNumber,
+      notes: notes || ''
+    });
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: 'SUBSCRIPTION_RECORDED',
+      targetEntity: 'Subscription',
+      targetId: subscription._id,
+      after: { invoiceNumber, subscriberName, amount: feeAmount },
+      ipAddress: req.ip
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `Subscription invoice ${invoiceNumber} created successfully`,
+      subscription
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateSubscriptionStatus(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { status, transactionRef, notes } = req.body;
+
+    const sub = await Subscription.findById(id);
+    if (!sub) return res.status(404).json({ success: false, error: 'Subscription invoice not found' });
+
+    if (status) sub.status = status;
+    if (transactionRef) sub.transactionRef = transactionRef;
+    if (notes !== undefined) sub.notes = notes;
+
+    await sub.save();
+
+    return res.json({
+      success: true,
+      message: 'Subscription updated successfully',
+      subscription: sub
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function seedInitialSubscriptions() {
+  try {
+    const companies = await Company.find().limit(4);
+    const investors = await InvestorProfile.find().populate('userId', 'name email mobile').limit(4);
+
+    const initial = [];
+
+    if (companies && companies.length > 0) {
+      companies.forEach((c, idx) => {
+        const pDate = new Date(Date.now() - 3600000 * 24 * (idx * 5 + 2));
+        const dueDate = new Date(pDate);
+        dueDate.setMonth(dueDate.getMonth() + 1);
+
+        initial.push({
+          subscriberType: 'company',
+          companyId: c._id,
+          subscriberName: c.name,
+          subscriberEmail: `billing@${(c.name || 'company').toLowerCase().replace(/[^a-z0-9]/g, '')}.com`,
+          subscriberMobile: '9873898766',
+          planName: 'Company SaaS Platform License',
+          amount: 500,
+          amountPaise: 50000,
+          billingCycle: 'Monthly',
+          billingMonth: 'October 2026',
+          paymentDate: pDate,
+          nextDueDate: dueDate,
+          status: idx === 3 ? 'Overdue' : 'Paid',
+          paymentMethod: idx % 2 === 0 ? 'Net Banking' : 'Bank Transfer (NEFT/RTGS)',
+          transactionRef: `UTR-SUB-${idx + 109283}`,
+          invoiceNumber: `INV-2026-OCT-C0${idx + 1}`,
+          notes: 'Monthly corporate portal and compliance software licensing fee.'
+        });
+      });
+    } else {
+      // Default sample companies
+      const defaultCompanies = [
+        { name: 'Apex Logistics India Ltd', email: 'accounts@apexlogistics.in', method: 'Net Banking', status: 'Paid' },
+        { name: 'Zenith Solar Energy Pvt Ltd', email: 'finance@zenithsolar.in', method: 'Bank Transfer (NEFT/RTGS)', status: 'Paid' },
+        { name: 'Vanguard Agri-Tech Pvt Ltd', email: 'admin@vanguardagri.com', method: 'UPI', status: 'Overdue' }
+      ];
+      defaultCompanies.forEach((c, idx) => {
+        const pDate = new Date(Date.now() - 3600000 * 24 * (idx * 6 + 1));
+        const dueDate = new Date(pDate);
+        dueDate.setMonth(dueDate.getMonth() + 1);
+        initial.push({
+          subscriberType: 'company',
+          subscriberName: c.name,
+          subscriberEmail: c.email,
+          subscriberMobile: '9876543210',
+          planName: 'Company SaaS Platform License',
+          amount: 500,
+          amountPaise: 50000,
+          billingCycle: 'Monthly',
+          billingMonth: 'October 2026',
+          paymentDate: pDate,
+          nextDueDate: dueDate,
+          status: c.status,
+          paymentMethod: c.method,
+          transactionRef: `UTR-2026-${idx + 893241}`,
+          invoiceNumber: `INV-2026-OCT-C0${idx + 1}`,
+          notes: 'Monthly corporate portal licensing fee.'
+        });
+      });
+    }
+
+    if (investors && investors.length > 0) {
+      investors.forEach((inv, idx) => {
+        const pDate = new Date(Date.now() - 3600000 * 24 * (idx * 4 + 1));
+        const dueDate = new Date(pDate);
+        dueDate.setMonth(dueDate.getMonth() + 1);
+
+        initial.push({
+          subscriberType: 'investor',
+          investorId: inv._id,
+          userId: inv.userId?._id,
+          subscriberName: inv.userId?.name || `Verified Investor ${idx + 1}`,
+          subscriberEmail: inv.userId?.email || `investor${idx + 1}@connectinvest.io`,
+          subscriberMobile: inv.userId?.mobile || '9988776655',
+          planName: 'Investor SaaS Analytics & Yield Dashboard',
+          amount: 500,
+          amountPaise: 50000,
+          billingCycle: 'Monthly',
+          billingMonth: 'October 2026',
+          paymentDate: pDate,
+          nextDueDate: dueDate,
+          status: idx === 3 ? 'Pending' : 'Paid',
+          paymentMethod: 'UPI',
+          transactionRef: `UPI-RR-${idx + 884712}`,
+          invoiceNumber: `INV-2026-OCT-I0${idx + 1}`,
+          notes: 'Monthly platform tools and automated returns reconciliation access fee.'
+        });
+      });
+    } else {
+      // Default sample investors
+      const defaultInvestors = [
+        { name: 'Dr. Anand Verma', email: 'anand.verma@example.com', method: 'UPI', status: 'Paid' },
+        { name: 'Pooja Deshmukh', email: 'pooja.deshmukh@example.com', method: 'UPI', status: 'Paid' },
+        { name: 'Rohan Mehra', email: 'rohan.mehra@example.com', method: 'Credit/Debit Card', status: 'Pending' }
+      ];
+      defaultInvestors.forEach((inv, idx) => {
+        const pDate = new Date(Date.now() - 3600000 * 24 * (idx * 3 + 2));
+        const dueDate = new Date(pDate);
+        dueDate.setMonth(dueDate.getMonth() + 1);
+        initial.push({
+          subscriberType: 'investor',
+          subscriberName: inv.name,
+          subscriberEmail: inv.email,
+          subscriberMobile: '9988776655',
+          planName: 'Investor SaaS Analytics & Yield Dashboard',
+          amount: 500,
+          amountPaise: 50000,
+          billingCycle: 'Monthly',
+          billingMonth: 'October 2026',
+          paymentDate: pDate,
+          nextDueDate: dueDate,
+          status: inv.status,
+          paymentMethod: inv.method,
+          transactionRef: `UPI-RR-${idx + 991283}`,
+          invoiceNumber: `INV-2026-OCT-I0${idx + 1}`,
+          notes: 'Monthly investor software access fee.'
+        });
+      });
+    }
+
+    if (initial.length > 0) {
+      await Subscription.insertMany(initial);
+    }
+  } catch (err) {
+    console.error('Error seeding subscriptions:', err);
+  }
+}
+
+// ==========================================
+// 12. CAP TABLE & EQUITY SHAREHOLDINGS
+// ==========================================
+export async function getCompanyCapTable(req, res, next) {
+  try {
+    const { id } = req.params; // Company ID
+    const company = await Company.findById(id);
+    if (!company) return res.status(404).json({ success: false, error: 'Company not found' });
+
+    // Find all equity offers for this company
+    const equityOffers = await Offer.find({ companyId: id, kind: OfferKind.EQUITY });
+    const offerIds = equityOffers.map(o => o._id);
+
+    // Find all active/confirmed equity investments
+    const investments = await Investment.find({
+      offerId: { $in: offerIds },
+      status: { $in: [Statuses.INVESTMENT.ACTIVE, Statuses.INVESTMENT.CONFIRMED, Statuses.INVESTMENT.COMPLETED] }
+    }).populate('investorId', 'name email mobile');
+
+    // Aggregate holdings
+    const shareholders = investments.map(inv => ({
+      investmentId: inv._id,
+      offerId: inv.offerId,
+      investor: inv.investorId,
+      sharesAllotted: inv.sharesAllotted || Math.floor(inv.amountPaise / (inv.sharePricePaise || 10000)),
+      sharePricePaise: inv.sharePricePaise,
+      amountInvestedPaise: inv.amountPaise,
+      ownershipPercentage: inv.ownershipPercentage,
+      certificateNo: inv.certificateNo,
+      dematFolioNumber: inv.dematFolioNumber,
+      allotmentStatus: inv.allotmentStatus,
+      activationDate: inv.activationDate
+    }));
+
+    const totalSharesIssued = shareholders.reduce((sum, s) => sum + (s.sharesAllotted || 0), 0);
+    const totalEquityCapitalRaisedPaise = shareholders.reduce((sum, s) => sum + (s.amountInvestedPaise || 0), 0);
+
+    return res.json({
+      success: true,
+      company: {
+        _id: company._id,
+        name: company.name,
+        regNo: company.regNo
+      },
+      summary: {
+        totalSharesIssued,
+        totalEquityCapitalRaisedPaise,
+        shareholderCount: shareholders.length,
+        equityCampaignsCount: equityOffers.length
+      },
+      shareholders
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ==========================================
+// 13. DIVIDEND DISTRIBUTIONS
+// ==========================================
+export async function getDividends(req, res, next) {
+  try {
+    const { companyId, offerId } = req.query;
+    const query = {};
+    if (companyId) query.companyId = companyId;
+    if (offerId) query.offerId = offerId;
+
+    const dividends = await Dividend.find(query)
+      .populate('companyId', 'name regNo bankAccount')
+      .populate('offerId', 'title targetPaise sharePricePaise totalSharesOffered')
+      .sort({ createdAt: -1 });
+
+    return res.json({ success: true, count: dividends.length, dividends });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function declareDividend(req, res, next) {
+  try {
+    const {
+      companyId,
+      offerId,
+      financialYear,
+      recordDate,
+      dividendPerSharePaise,
+      totalPoolPaise,
+      bankRef,
+      notes
+    } = req.body;
+
+    if (!companyId || !offerId || !financialYear || !recordDate || !dividendPerSharePaise || !totalPoolPaise) {
+      return res.status(400).json({ success: false, error: 'Missing required dividend fields' });
+    }
+
+    const offer = await Offer.findById(offerId);
+    if (!offer) return res.status(404).json({ success: false, error: 'Offer not found' });
+
+    const dividend = await Dividend.create({
+      companyId,
+      offerId,
+      financialYear,
+      recordDate: new Date(recordDate),
+      dividendPerSharePaise,
+      totalPoolPaise,
+      bankRef,
+      notes,
+      status: Statuses.DIVIDEND?.DECLARED || 'Declared'
+    });
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: 'DIVIDEND_DECLARED',
+      targetEntity: 'Dividend',
+      targetId: dividend._id,
+      after: { companyId, offerId, dividendPerSharePaise, totalPoolPaise, financialYear },
+      ipAddress: req.ip
+    });
+
+    return res.status(201).json({ success: true, message: 'Dividend declared successfully', dividend });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function distributeDividend(req, res, next) {
+  try {
+    const { id } = req.params; // Dividend ID
+    const dividend = await Dividend.findById(id).populate('offerId');
+    if (!dividend) return res.status(404).json({ success: false, error: 'Dividend record not found' });
+
+    // Find all active equity investments in this offer
+    const investments = await Investment.find({
+      offerId: dividend.offerId._id,
+      status: { $in: [Statuses.INVESTMENT.ACTIVE, Statuses.INVESTMENT.COMPLETED] }
+    });
+
+    if (investments.length === 0) {
+      return res.status(400).json({ success: false, error: 'No active equity shareholders found for this offer' });
+    }
+
+    const createdPayouts = [];
+    for (const inv of investments) {
+      const shares = inv.sharesAllotted || Math.floor(inv.amountPaise / (dividend.offerId.sharePricePaise || 10000));
+      const amountPaise = shares * dividend.dividendPerSharePaise;
+
+      if (amountPaise > 0) {
+        const payout = await Payout.create({
+          investmentId: inv._id,
+          dividendId: dividend._id,
+          investorId: inv.investorId,
+          offerId: dividend.offerId._id,
+          amountPaise,
+          payoutType: 'dividend',
+          status: Statuses.PAYOUT.READY
+        });
+        createdPayouts.push(payout);
+      }
+    }
+
+    dividend.status = Statuses.DIVIDEND?.BATCHED || 'Batched';
+    dividend.payoutDate = new Date();
+    await dividend.save();
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: 'DIVIDEND_DISTRIBUTED',
+      targetEntity: 'Dividend',
+      targetId: dividend._id,
+      after: { payoutsCreated: createdPayouts.length, totalPoolPaise: dividend.totalPoolPaise },
+      ipAddress: req.ip
+    });
+
+    return res.json({
+      success: true,
+      message: `Dividend distributed into ${createdPayouts.length} ready investor payout lines`,
+      payoutsCount: createdPayouts.length,
+      dividend
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ==========================================
+// 14. SHAREHOLDER MANAGEMENT
+// ==========================================
+export async function getShareholders(req, res, next) {
+  try {
+    const { companyId, offerId, search, allotmentStatus } = req.query;
+
+    // 1. Find all equity offers matching companyId / offerId
+    const offerQuery = { kind: OfferKind.EQUITY };
+    if (companyId) offerQuery.companyId = companyId;
+    if (offerId) offerQuery._id = offerId;
+
+    const equityOffers = await Offer.find(offerQuery).populate('companyId', 'name regNo profile');
+    const offerMap = new Map();
+    equityOffers.forEach(o => offerMap.set(o._id.toString(), o));
+
+    const offerIds = equityOffers.map(o => o._id);
+
+    // 2. Find all investments in these equity offers
+    const invQuery = {
+      offerId: { $in: offerIds },
+      status: { $in: [Statuses.INVESTMENT.ACTIVE, Statuses.INVESTMENT.CONFIRMED, Statuses.INVESTMENT.COMPLETED] }
+    };
+    if (allotmentStatus) invQuery.allotmentStatus = allotmentStatus;
+
+    const investments = await Investment.find(invQuery)
+      .populate('investorId', 'name email mobile status')
+      .sort({ createdAt: -1 });
+
+    // 3. Format shareholder items & calculate holding percentages
+    let shareholders = investments.map(inv => {
+      const offer = offerMap.get(inv.offerId.toString());
+      const company = offer?.companyId;
+
+      const sharesAllotted = inv.sharesAllotted || Math.floor(inv.amountPaise / (offer?.sharePricePaise || 10000));
+      const sharePricePaise = inv.sharePricePaise || offer?.sharePricePaise || 0;
+
+      // Calculate shareholding percentage (%)
+      let ownershipPercentage = inv.ownershipPercentage;
+      if (!ownershipPercentage && offer) {
+        if (offer.totalSharesOffered && offer.totalSharesOffered > 0) {
+          ownershipPercentage = Number(((sharesAllotted / offer.totalSharesOffered) * (offer.equityOfferedPercentage || 100)).toFixed(2));
+        } else if (offer.targetPaise && offer.targetPaise > 0) {
+          ownershipPercentage = Number(((inv.amountPaise / offer.targetPaise) * (offer.equityOfferedPercentage || 100)).toFixed(2));
+        } else {
+          ownershipPercentage = 0;
+        }
+      }
+
+      return {
+        id: inv._id,
+        investmentId: inv._id,
+        investor: {
+          id: inv.investorId?._id,
+          name: inv.investorId?.name || 'Shareholder',
+          email: inv.investorId?.email || 'N/A',
+          mobile: inv.investorId?.mobile || 'N/A'
+        },
+        company: {
+          id: company?._id,
+          name: company?.name || 'Company',
+          regNo: company?.regNo || 'N/A',
+          sector: company?.profile?.sector || 'General'
+        },
+        offer: {
+          id: offer?._id,
+          title: offer?.title || 'Equity Round',
+          instrument: offer?.equityInstrument || 'equity_shares',
+          equityOfferedPercentage: offer?.equityOfferedPercentage || 10,
+          totalSharesOffered: offer?.totalSharesOffered || 0,
+          preMoneyValuationPaise: offer?.preMoneyValuationPaise || 0,
+          postMoneyValuationPaise: offer?.postMoneyValuationPaise || 0
+        },
+        sharesAllotted,
+        sharePricePaise,
+        amountInvestedPaise: inv.amountPaise,
+        ownershipPercentage: Number(ownershipPercentage || 0),
+        allotmentStatus: inv.allotmentStatus || 'Allotted',
+        certificateNo: inv.certificateNo || 'PENDING',
+        dematFolioNumber: inv.dematFolioNumber || null,
+        activationDate: inv.activationDate,
+        createdAt: inv.createdAt
+      };
+    });
+
+    // 4. Search filter
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      shareholders = shareholders.filter(s =>
+        s.investor.name.toLowerCase().includes(q) ||
+        s.investor.email.toLowerCase().includes(q) ||
+        s.company.name.toLowerCase().includes(q) ||
+        s.company.regNo.toLowerCase().includes(q)
+      );
+    }
+
+    // 5. Aggregate summary stats
+    const totalSharesIssued = shareholders.reduce((acc, s) => acc + s.sharesAllotted, 0);
+    const totalEquityCapitalRaisedPaise = shareholders.reduce((acc, s) => acc + s.amountInvestedPaise, 0);
+    const uniqueShareholdersCount = new Set(shareholders.map(s => s.investor.id?.toString())).size;
+    const avgOwnershipPct = shareholders.length > 0
+      ? Number((shareholders.reduce((acc, s) => acc + s.ownershipPercentage, 0) / shareholders.length).toFixed(2))
+      : 0;
+
+    return res.json({
+      success: true,
+      count: shareholders.length,
+      summary: {
+        totalShareholdersCount: uniqueShareholdersCount,
+        totalSharesIssued,
+        totalEquityCapitalRaisedPaise,
+        avgOwnershipPct
+      },
+      shareholders
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateShareholderAllotment(req, res, next) {
+  try {
+    const { id } = req.params; // Investment ID
+    const { certificateNo, dematFolioNumber, allotmentStatus, ownershipPercentage } = req.body;
+
+    const investment = await Investment.findById(id);
+    if (!investment) return res.status(404).json({ success: false, error: 'Shareholder investment record not found' });
+
+    if (certificateNo !== undefined) investment.certificateNo = certificateNo;
+    if (dematFolioNumber !== undefined) investment.dematFolioNumber = dematFolioNumber;
+    if (allotmentStatus !== undefined) investment.allotmentStatus = allotmentStatus;
+    if (ownershipPercentage !== undefined) investment.ownershipPercentage = Number(ownershipPercentage);
+
+    await investment.save();
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: 'SHAREHOLDER_ALLOTMENT_UPDATED',
+      targetEntity: 'Investment',
+      targetId: investment._id,
+      after: { certificateNo, dematFolioNumber, allotmentStatus, ownershipPercentage },
+      ipAddress: req.ip
+    });
+
+    return res.json({ success: true, message: 'Shareholder allotment details updated', investment });
+  } catch (error) {
+    next(error);
+  }
+}
+

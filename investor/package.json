@@ -1,0 +1,13 @@
+{
+  "name": "connect-invest-investor",
+  "version": "1.0.0",
+  "description": "Connect Invest - Investor Platform (MERN Stack)",
+  "private": true,
+  "scripts": {
+    "backend": "cd backend && npm run dev",
+    "backend:seed": "cd backend && npm run seed",
+    "frontend": "cd website && npm run dev",
+    "start": "npm run backend"
+  },
+  "keywords": ["investment", "mern", "investor-portal", "react", "mongodb", "express"]
+}

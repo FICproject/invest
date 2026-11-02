@@ -1,0 +1,1392 @@
+/* Connect Invest - Bright Corporate Theme (Royal Blue & Vibrant Gold) */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  --cl-blue-dark: #072979;
+  --cl-blue-primary: #0F3EB4;
+  --cl-blue-light: #1D56E2;
+  --cl-blue-card: #0A3297;
+  --cl-gold: #F5B014;
+  --cl-gold-hover: #E29F0B;
+  --cl-gold-light: #FFF4D9;
+  --cl-bg-light: #F8FAFD;
+  --cl-text-dark: #0D1E3A;
+  --cl-text-muted: #5A6D88;
+  --cl-border: #E2E8F0;
+}
+
+.cl-page {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  color: var(--cl-text-dark);
+  background-color: #FFFFFF;
+  line-height: 1.5;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.cl-container {
+  width: 100%;
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* ======================================================== */
+/* 1. NAVBAR                                                */
+/* ======================================================== */
+.cl-header {
+  background: #FFFFFF;
+  border-bottom: 1px solid #EEF2F7;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.cl-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 80px;
+}
+
+.cl-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+
+.cl-logo-img {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: contain;
+  display: block;
+  border: 1px solid #ECE6E0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.cl-logo-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.cl-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  line-height: 1;
+}
+
+.cl-brand-blue {
+  font-family: 'Outfit', sans-serif;
+  font-size: 21px;
+  font-weight: 800;
+  color: var(--cl-blue-dark);
+}
+
+.cl-brand-gold {
+  font-family: 'Outfit', sans-serif;
+  font-size: 21px;
+  font-weight: 800;
+  color: var(--cl-gold);
+}
+
+.cl-tagline {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: #718096;
+  margin-top: 4px;
+}
+
+.cl-nav {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.cl-nav-link {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4A5568;
+  text-decoration: none;
+  transition: color 0.2s ease;
+  position: relative;
+}
+
+.cl-nav-link:hover,
+.cl-nav-link.active {
+  color: var(--cl-blue-primary);
+}
+
+.cl-nav-link.active::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 0;
+  width: 100%;
+  height: 2.5px;
+  background-color: var(--cl-gold);
+  border-radius: 2px;
+}
+
+.cl-auth-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.cl-btn-login {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cl-blue-dark);
+  border: 1.5px solid #CBD5E1;
+  padding: 8px 24px;
+  border-radius: 9999px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.cl-btn-login:hover {
+  border-color: var(--cl-blue-primary);
+  color: var(--cl-blue-primary);
+}
+
+.cl-btn-getstarted {
+  font-size: 14px;
+  font-weight: 700;
+  color: #061A40;
+  background-color: var(--cl-gold);
+  padding: 9px 24px;
+  border-radius: 9999px;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(245, 176, 20, 0.3);
+  transition: all 0.2s ease;
+}
+
+.cl-btn-getstarted:hover {
+  background-color: var(--cl-gold-hover);
+  transform: translateY(-1px);
+}
+
+/* ======================================================== */
+/* 2. HERO SECTION                                          */
+/* ======================================================== */
+.cl-hero-section {
+  position: relative;
+  background: #FFFFFF;
+  padding: 16px 0 40px;
+  overflow: hidden;
+}
+
+.cl-hero-grid {
+  display: grid;
+  grid-template-columns: 0.95fr 1.05fr;
+  gap: 36px;
+  align-items: center;
+  position: relative;
+  z-index: 2;
+}
+
+.cl-hero-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 10px 0;
+}
+
+.cl-badge-growth {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #FFF8E6;
+  border: 1px solid #FEE5A5;
+  color: #B47303;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 9999px;
+  margin-bottom: 20px;
+  width: fit-content;
+}
+
+.cl-badge-icon {
+  color: #D98205;
+}
+
+.cl-hero-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 44px;
+  font-weight: 800;
+  color: var(--cl-blue-dark);
+  line-height: 1.18;
+  letter-spacing: -0.025em;
+  margin-bottom: 18px;
+}
+
+.cl-title-gold {
+  color: var(--cl-gold);
+}
+
+.cl-hero-subtitle {
+  font-size: 15px;
+  color: var(--cl-text-muted);
+  line-height: 1.65;
+  max-width: 500px;
+  margin-bottom: 28px;
+}
+
+.cl-hero-buttons {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 0;
+}
+
+.cl-btn-hero-investor {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--cl-blue-dark);
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 13px 24px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(7, 41, 121, 0.25);
+}
+
+.cl-btn-hero-investor:hover {
+  background: var(--cl-blue-primary);
+  transform: translateY(-2px);
+}
+
+.cl-btn-hero-company {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: #FFFFFF;
+  color: var(--cl-blue-dark);
+  border: 1.5px solid #CBD5E1;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 12px 24px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.cl-btn-hero-company:hover {
+  border-color: var(--cl-blue-dark);
+  background: #F8FAFC;
+}
+
+.cl-hero-visual-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cl-hero-art {
+  position: relative;
+  width: 100%;
+  max-width: 650px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cl-hero-img {
+  width: 100%;
+  height: auto;
+  max-height: 520px;
+  object-fit: contain;
+  display: block;
+  border: none;
+  outline: none;
+  transform: scale(1.08);
+  transform-origin: center right;
+}
+
+/* Hero blue wave graphic - Removed as requested */
+.cl-hero-blue-wave {
+  display: none !important;
+}
+
+/* ======================================================== */
+/* 3. COMMON SECTION STYLING & PILLS                        */
+/* ======================================================== */
+.cl-section {
+  padding: 56px 0;
+}
+
+.cl-pill-category {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #B47303;
+  background-color: #FFF6DE;
+  padding: 4px 14px;
+  border-radius: 20px;
+  margin-bottom: 12px;
+}
+
+.cl-section-h2 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--cl-blue-dark);
+  line-height: 1.25;
+  margin-bottom: 14px;
+}
+
+.cl-section-body {
+  font-size: 14px;
+  color: var(--cl-text-muted);
+  line-height: 1.6;
+}
+
+/* About & How It Works Grid */
+.cl-about-how-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  align-items: stretch;
+}
+
+.cl-about-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+}
+
+.cl-how-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+}
+
+/* About Pillars - 4 Feature Cards Grid across Full Width */
+.cl-pillars-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  width: 100%;
+  margin-top: 28px;
+}
+
+.cl-pillar-item {
+  background: #FFFFFF;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 16px;
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 16px rgba(6, 26, 64, 0.03);
+}
+
+.cl-pillar-item:hover {
+  transform: translateY(-4px);
+  border-color: #CBD5E1;
+  box-shadow: 0 12px 28px rgba(6, 26, 64, 0.08);
+}
+
+.cl-pillar-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background-color: #FFF6DE;
+  border: 1.5px solid #FDE69E;
+  color: #B47303;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+  transition: all 0.2s ease;
+}
+
+.cl-pillar-item:hover .cl-pillar-circle {
+  transform: scale(1.05);
+  background-color: var(--cl-gold);
+  color: #FFFFFF;
+}
+
+.cl-pillar-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--cl-blue-dark);
+  margin-bottom: 6px;
+  line-height: 1.3;
+}
+
+.cl-pillar-desc {
+  font-size: 12.5px;
+  color: var(--cl-text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* How It Works Steps - Full Width Step Cards */
+.cl-steps-horizontal {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 24px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  position: relative;
+}
+
+.cl-step-card {
+  display: flex;
+  flex-direction: column;
+  background: #FFFFFF;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 18px;
+  padding: 28px 24px;
+  box-shadow: 0 8px 24px rgba(6, 26, 64, 0.04);
+  position: relative;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.cl-step-card:hover {
+  transform: translateY(-4px);
+  border-color: #CBD5E1;
+  box-shadow: 0 14px 32px rgba(6, 26, 64, 0.09);
+}
+
+.cl-step-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.cl-step-num-badge {
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  color: #B47303;
+  background: #FFF6DE;
+  padding: 4px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.05em;
+}
+
+.cl-step-circle {
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
+}
+
+.cl-step-blue {
+  background: linear-gradient(135deg, var(--cl-blue-dark) 0%, #0C2E85 100%);
+}
+
+.cl-step-gold {
+  background: linear-gradient(135deg, #DE8E0A 0%, #B47303 100%);
+}
+
+.cl-step-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--cl-blue-dark);
+  margin-bottom: 8px;
+}
+
+.cl-step-text {
+  font-size: 13.5px;
+  color: var(--cl-text-muted);
+  line-height: 1.55;
+  margin-bottom: 16px;
+}
+
+.cl-step-points {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px dashed #E2E8F0;
+  padding-top: 14px;
+}
+
+.cl-step-points li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #4A5568;
+  font-weight: 600;
+}
+
+.cl-step-points li svg {
+  color: #10B981;
+  flex-shrink: 0;
+}
+
+/* ======================================================== */
+/* 4. DUAL PORTAL CARDS (FOR INVESTORS & FOR COMPANIES)     */
+/* ======================================================== */
+.cl-dual-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+}
+
+.cl-pill-tag-yellow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--cl-gold);
+  color: #0B2253;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  margin-bottom: 16px;
+}
+
+/* Left Card: Royal Blue */
+.cl-card-investor-blue {
+  background: linear-gradient(135deg, var(--cl-blue-dark) 0%, #0C2E85 100%);
+  color: #FFFFFF;
+  border-radius: 18px;
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  overflow: hidden;
+  box-shadow: 0 14px 30px rgba(7, 41, 121, 0.2);
+}
+
+.cl-card-blue-content {
+  padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.cl-card-blue-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.25;
+  margin-bottom: 10px;
+  color: #FFFFFF;
+}
+
+.cl-card-blue-sub {
+  font-size: 12px;
+  color: #D3E0FB;
+  line-height: 1.5;
+  margin-bottom: 18px;
+}
+
+.cl-check-list-white {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cl-check-list-white li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #EEF4FE;
+  font-weight: 500;
+}
+
+.cl-check-icon {
+  color: var(--cl-gold);
+  flex-shrink: 0;
+}
+
+.cl-card-blue-image {
+  height: 100%;
+}
+
+.cl-card-blue-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Right Card: Clean White */
+.cl-card-company-white {
+  background: #FFFFFF;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 18px;
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  overflow: hidden;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.04);
+  position: relative;
+}
+
+.cl-card-white-content {
+  padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.cl-card-white-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.25;
+  margin-bottom: 10px;
+  color: var(--cl-blue-dark);
+}
+
+.cl-card-white-sub {
+  font-size: 12px;
+  color: var(--cl-text-muted);
+  line-height: 1.5;
+  margin-bottom: 18px;
+}
+
+.cl-check-list-blue {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cl-check-list-blue li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #2D3748;
+  font-weight: 500;
+}
+
+.cl-check-icon-blue {
+  color: var(--cl-blue-primary);
+  flex-shrink: 0;
+}
+
+.cl-card-white-image {
+  position: relative;
+  height: 100%;
+}
+
+.cl-card-white-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cl-card-wave-corner {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 80px;
+  height: 60px;
+  background: linear-gradient(135deg, var(--cl-gold) 0%, var(--cl-blue-primary) 60%);
+  clip-path: polygon(100% 0, 0% 100%, 100% 100%);
+}
+
+.cl-btn-yellow-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--cl-gold);
+  color: #061A40;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 10px 18px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 10px rgba(245, 176, 20, 0.25);
+  margin-top: auto;
+}
+
+.cl-btn-yellow-cta:hover {
+  background: var(--cl-gold-hover);
+  transform: translateY(-1px);
+}
+
+/* ======================================================== */
+/* 5. INVESTMENT OPPORTUNITIES                              */
+/* ======================================================== */
+.cl-opps-box {
+  background: #F9FBFE;
+  border: 1px solid #E5EBF5;
+  border-radius: 20px;
+  padding: 36px;
+  display: grid;
+  grid-template-columns: 1fr 1.25fr;
+  gap: 36px;
+  align-items: center;
+}
+
+.cl-opps-cards-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.cl-opp-type-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+  transition: all 0.25s ease;
+}
+
+.cl-opp-type-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 22px rgba(15, 62, 180, 0.08);
+}
+
+.cl-opp-thumb {
+  height: 120px;
+  overflow: hidden;
+}
+
+.cl-opp-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.cl-opp-type-card:hover .cl-opp-thumb img {
+  transform: scale(1.04);
+}
+
+.cl-opp-info {
+  padding: 16px;
+}
+
+.cl-opp-info h4 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--cl-blue-dark);
+  margin-bottom: 6px;
+}
+
+.cl-opp-info p {
+  font-size: 11px;
+  color: var(--cl-text-muted);
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+
+.cl-link-arrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cl-blue-primary);
+  text-decoration: none;
+}
+
+.cl-link-arrow:hover {
+  text-decoration: underline;
+}
+
+/* ======================================================== */
+/* 6. WHY CHOOSE CONNECT INVEST                             */
+/* ======================================================== */
+.cl-why-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.cl-why-pill-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cl-why-pill {
+  flex: 1;
+  min-width: 200px;
+  background: #FFFFFF;
+  border: 1px solid #E8EEF7;
+  border-radius: 9999px;
+  padding: 8px 16px 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.03);
+}
+
+.cl-why-icon-round {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cl-bg-darkblue {
+  background-color: var(--cl-blue-dark);
+}
+
+.cl-bg-gold {
+  background-color: var(--cl-gold);
+}
+
+.cl-why-text h5 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--cl-blue-dark);
+  line-height: 1.2;
+}
+
+.cl-why-text p {
+  font-size: 10px;
+  color: var(--cl-text-muted);
+  line-height: 1.3;
+}
+
+/* ======================================================== */
+/* 7. FREQUENTLY ASKED QUESTIONS                            */
+/* ======================================================== */
+.cl-faq-box {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 32px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+}
+
+.cl-faq-banner {
+  background: linear-gradient(rgba(10, 36, 99, 0.82), rgba(6, 21, 60, 0.88)),
+              url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80') center/cover no-repeat;
+  padding: 40px 32px;
+  display: flex;
+  align-items: center;
+  color: #FFFFFF;
+}
+
+.cl-faq-banner-content h3 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.3;
+  margin-bottom: 12px;
+}
+
+.cl-faq-banner-content p {
+  font-size: 13px;
+  color: #CBD5E1;
+  line-height: 1.5;
+  margin-bottom: 24px;
+}
+
+.cl-btn-banner-faq {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--cl-blue-dark);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 10px 20px;
+  border-radius: 8px;
+  text-decoration: none;
+}
+
+.cl-faq-accordion-col {
+  padding: 32px 32px 32px 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+}
+
+.cl-faq-row {
+  border-bottom: 1px solid #EEF2F7;
+  padding-bottom: 12px;
+  cursor: pointer;
+}
+
+.cl-faq-question-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cl-blue-dark);
+}
+
+.cl-faq-toggle-btn {
+  background: none;
+  border: none;
+  color: var(--cl-blue-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.cl-faq-answer-body {
+  font-size: 12px;
+  color: var(--cl-text-muted);
+  line-height: 1.5;
+  margin-top: 8px;
+  padding-right: 20px;
+}
+
+/* ======================================================== */
+/* 8. BOTTOM CALL-TO-ACTION BANNER                          */
+/* ======================================================== */
+.cl-bottom-cta-section {
+  padding: 20px 0 50px;
+}
+
+.cl-cta-banner-row {
+  background: linear-gradient(135deg, var(--cl-blue-dark) 0%, #0D379E 100%);
+  color: #FFFFFF;
+  border-radius: 18px;
+  padding: 28px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  box-shadow: 0 12px 30px rgba(7, 41, 121, 0.25);
+}
+
+.cl-cta-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.cl-cta-leaves-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(245, 176, 20, 0.15);
+  border: 1.5px solid var(--cl-gold);
+  color: var(--cl-gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cl-cta-banner-left h3 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.cl-cta-banner-left p {
+  font-size: 12px;
+  color: #CBD5E1;
+  max-width: 480px;
+}
+
+.cl-cta-banner-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.cl-btn-blue-outline-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: #FFFFFF;
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 10px 18px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.cl-btn-blue-outline-cta:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #FFFFFF;
+}
+
+/* ======================================================== */
+/* 9. FOOTER                                                */
+/* ======================================================== */
+.cl-footer {
+  background: #FFFFFF;
+  border-top: 1px solid #EEF2F7;
+  padding: 24px 0;
+}
+
+.cl-footer-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cl-footer-links {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748B;
+}
+
+.cl-footer-links a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.cl-footer-links a:hover {
+  color: var(--cl-blue-primary);
+}
+
+.cl-sep {
+  color: #CBD5E1;
+}
+
+/* Responsive adjustments */
+@media (max-width: 960px) {
+  .cl-hero-grid,
+  .cl-about-how-grid,
+  .cl-dual-grid,
+  .cl-opps-box,
+  .cl-faq-box {
+    grid-template-columns: 1fr;
+  }
+
+  .cl-hero-title {
+    font-size: 34px;
+  }
+
+  .cl-cta-banner-row {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .cl-cta-banner-left {
+    flex-direction: column;
+  }
+
+  .cl-why-pill {
+    min-width: 100%;
+  }
+
+  .cl-card-investor-blue,
+  .cl-card-company-white {
+    grid-template-columns: 1fr;
+  }
+
+  .cl-card-blue-image,
+  .cl-card-white-image {
+    height: 220px;
+  }
+}
+
+/* ======================================================== */
+/* ROLE SELECTION MODAL                                     */
+/* ======================================================== */
+.cl-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(6, 26, 64, 0.72);
+  backdrop-filter: blur(6px);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: clFadeIn 0.2s ease-out;
+}
+
+@keyframes clFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes clScaleUp {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.cl-modal-card {
+  background: #FFFFFF;
+  border-radius: 24px;
+  max-width: 680px;
+  width: 100%;
+  box-shadow: 0 25px 60px rgba(6, 26, 64, 0.25);
+  border: 1px solid rgba(245, 176, 20, 0.35);
+  position: relative;
+  overflow: hidden;
+  animation: clScaleUp 0.25s ease-out;
+}
+
+.cl-modal-top-accent {
+  height: 4px;
+  background: linear-gradient(90deg, #F5B014 0%, #D4900A 100%);
+}
+
+.cl-modal-body {
+  padding: 32px 36px 36px 36px;
+}
+
+.cl-modal-close-btn {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid #E5E7EB;
+  background: #F9FAFB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6B7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cl-modal-close-btn:hover {
+  background: #F3F4F6;
+  color: #111827;
+  transform: rotate(90deg);
+}
+
+.cl-modal-header {
+  text-align: center;
+  margin-bottom: 26px;
+}
+
+.cl-modal-tag {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: rgba(245, 176, 20, 0.15);
+  color: #B37400;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+
+.cl-modal-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 26px;
+  font-weight: 800;
+  color: #061A40;
+  margin-bottom: 6px;
+}
+
+.cl-modal-subtitle {
+  font-size: 14px;
+  color: #6B7280;
+}
+
+.cl-modal-cards-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.cl-modal-role-card {
+  border: 2px solid #E5E7EB;
+  border-radius: 16px;
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-decoration: none;
+  background: #FFFFFF;
+  transition: all 0.25s ease;
+  position: relative;
+}
+
+.cl-modal-role-card:hover {
+  border-color: #F5B014;
+  box-shadow: 0 12px 30px rgba(245, 176, 20, 0.18);
+  transform: translateY(-3px);
+}
+
+.cl-modal-role-badge {
+  align-self: flex-start;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+.cl-modal-role-badge.investor {
+  background: rgba(7, 41, 121, 0.1);
+  color: #072979;
+}
+
+.cl-modal-role-badge.company {
+  background: rgba(245, 176, 20, 0.15);
+  color: #B37400;
+}
+
+.cl-modal-icon-circle {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.cl-modal-icon-circle.investor {
+  background: linear-gradient(135deg, #072979 0%, #0C2E85 100%);
+  color: #F5B014;
+}
+
+.cl-modal-icon-circle.company {
+  background: linear-gradient(135deg, #F5B014 0%, #DE8E0A 100%);
+  color: #061A40;
+}
+
+.cl-modal-role-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  color: #061A40;
+  margin-bottom: 6px;
+}
+
+.cl-modal-role-desc {
+  font-size: 12.5px;
+  color: #6B7280;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.cl-modal-role-perks {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 18px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cl-modal-role-perks li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.cl-modal-role-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.cl-modal-role-btn.investor {
+  background: #072979;
+  color: #FFFFFF;
+}
+
+.cl-modal-role-card:hover .cl-modal-role-btn.investor {
+  background: #061A40;
+  box-shadow: 0 4px 12px rgba(7, 41, 121, 0.3);
+}
+
+.cl-modal-role-btn.company {
+  background: #F5B014;
+  color: #061A40;
+}
+
+.cl-modal-role-card:hover .cl-modal-role-btn.company {
+  background: #E8A51D;
+  box-shadow: 0 4px 12px rgba(245, 176, 20, 0.4);
+}
+
+.cl-modal-footer {
+  text-align: center;
+  padding-top: 16px;
+  border-top: 1px solid #F3F4F6;
+  font-size: 13px;
+  color: #6B7280;
+}
+
+.cl-modal-footer a {
+  color: #072979;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.cl-modal-footer a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .cl-modal-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .cl-modal-body {
+    padding: 24px 20px;
+  }
+}

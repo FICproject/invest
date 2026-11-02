@@ -1,0 +1,275 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+:root {
+  /* Brand Core Palette - Deep Burgundy & Warm Gold */
+  --color-primary: #3B0A11;
+  --color-primary-dark: #27040A;
+  --color-primary-light: #4F131C;
+  --color-primary-hover: #5D1923;
+  --color-primary-subtle: rgba(59, 10, 17, 0.05);
+
+  --color-gold: #C8963E;
+  --color-gold-light: #E2B96D;
+  --color-gold-hover: #B28330;
+  --color-gold-subtle: rgba(200, 150, 62, 0.12);
+
+  /* Light / Warm Surfaces */
+  --bg-app: #F8F5F0;
+  --bg-surface: #FFFFFF;
+  --bg-surface-subtle: #FAF7F2;
+  --bg-surface-elevated: #FFFFFF;
+  --border-color: #E8E2D9;
+  --border-color-focus: #C8963E;
+
+  /* Typography */
+  --text-main: #1F2421;
+  --text-muted: #6B7280;
+  --text-light: #9CA3AF;
+  --text-on-dark: #FFFFFF;
+  --text-gold: #D4AF37;
+
+  /* Status Colors */
+  --status-confirmed: #10B981;
+  --status-confirmed-bg: #ECFDF5;
+  --status-pending: #F59E0B;
+  --status-pending-bg: #FEF3C7;
+  --status-failed: #EF4444;
+  --status-failed-bg: #FEE2E2;
+  --status-completed: #10B981;
+  --status-completed-bg: #ECFDF5;
+
+  /* Shadows & Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 3px rgba(59, 10, 17, 0.04);
+  --shadow-md: 0 4px 12px rgba(59, 10, 17, 0.06);
+  --shadow-lg: 0 10px 25px rgba(59, 10, 17, 0.09);
+  --shadow-glow: 0 0 20px rgba(200, 150, 62, 0.25);
+
+  --sidebar-width: 260px;
+  --topbar-height: 72px;
+
+  /* Sidebar Active Highlight Tokens */
+  --sidebar-active-bg: #200307;
+  --sidebar-active-border: #D4AF37;
+  --sidebar-active-text: #FFFFFF;
+}
+
+[data-theme='dark'] {
+  --bg-app: #15090C;
+  --bg-surface: #1E0F14;
+  --bg-surface-subtle: #29151C;
+  --bg-surface-elevated: #2E1820;
+  --border-color: #3D222A;
+  --border-color-focus: #E2B96D;
+
+  --text-main: #F3EEEC;
+  --text-muted: #A39699;
+  --text-light: #7E7074;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.6);
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Outfit', sans-serif;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-app);
+}
+::-webkit-scrollbar-thumb {
+  background: #C4B9AD;
+  border-radius: 4px;
+}
+
+/* Common Layout Utilities */
+.container {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* Badge Styles */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  text-transform: capitalize;
+}
+.badge-gold {
+  background: var(--color-gold-subtle);
+  color: var(--color-gold-hover);
+  border: 1px solid rgba(200, 150, 62, 0.3);
+}
+.badge-burgundy {
+  background: rgba(59, 10, 17, 0.08);
+  color: var(--color-primary);
+  border: 1px solid rgba(59, 10, 17, 0.2);
+}
+.badge-confirmed, .badge-completed {
+  background: var(--status-confirmed-bg);
+  color: var(--status-confirmed);
+}
+.badge-pending {
+  background: var(--status-pending-bg);
+  color: var(--status-pending);
+}
+.badge-failed {
+  background: var(--status-failed-bg);
+  color: var(--status-failed);
+}
+
+/* Marquee Track */
+.rolling-track-wrapper {
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+  padding: 8px 0;
+}
+.rolling-track {
+  display: flex;
+  width: max-content;
+  animation: rollRightToLeft 28s linear infinite;
+}
+.rolling-track:hover {
+  animation-play-state: paused;
+}
+.rolling-group {
+  display: flex;
+  gap: 22px;
+  padding-right: 22px;
+  flex-shrink: 0;
+}
+@keyframes rollRightToLeft {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* Stacked Carousel for FAQs */
+.faq-carousel-outer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 290px;
+  max-width: 780px;
+  margin: 0 auto;
+}
+.faq-stacked-wrapper {
+  perspective: 1000px;
+  width: 100%;
+  height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.faq-stacked-track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.faq-stacked-card {
+  position: absolute;
+  width: 90%;
+  max-width: 520px;
+  min-height: 200px;
+  transition: transform 0.6s cubic-bezier(0.2, 0.9, 0.3, 1), opacity 0.5s ease, box-shadow 0.5s ease;
+  transform-style: preserve-3d;
+}
+.faq-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 20;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background-color: #FFFFFF;
+  border: 1px solid #FBCFE8;
+  color: #E11D5A;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(225, 29, 90, 0.15);
+  transition: all 0.2s ease;
+}
+.faq-nav-btn:hover {
+  background-color: #E11D5A;
+  color: #FFFFFF;
+}
+.faq-nav-btn-prev { left: -20px; }
+.faq-nav-btn-next { right: -20px; }
+
+/* Continuous floating up and down animation for cards */
+@keyframes floatGentleUpDown1 {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-16px);
+  }
+}
+
+@keyframes floatGentleUpDown2 {
+  0%, 100% {
+    transform: translateY(-50%);
+  }
+  50% {
+    transform: translateY(calc(-50% + 16px));
+  }
+}
+
+@keyframes floatGentleUpDown3 {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-14px);
+  }
+}
+
+.animate-float-card-1 {
+  animation: floatGentleUpDown1 3.2s ease-in-out infinite !important;
+  will-change: transform;
+}
+
+.animate-float-card-2 {
+  animation: floatGentleUpDown2 3.8s ease-in-out infinite !important;
+  will-change: transform;
+}
+
+.animate-float-card-3 {
+  animation: floatGentleUpDown3 3.4s ease-in-out infinite !important;
+  will-change: transform;
+}
+
+

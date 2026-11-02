@@ -1,0 +1,12 @@
+rootProject.name = 'ConnectInvestAdminMobile'
+include ':app'
+
+def subprojects = [
+    ':react-native-async-storage_async-storage': '../node_modules/@react-native-async-storage/async-storage/android',
+    ':react-native-safe-area-context': '../node_modules/react-native-safe-area-context/android'
+]
+
+subprojects.each { name, path ->
+    include name
+    project(name).projectDir = new File(rootProject.projectDir, path)
+}
