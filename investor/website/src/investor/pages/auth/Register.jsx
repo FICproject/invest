@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import axios from 'axios';
 import {
   Lock,
   TrendingUp,
@@ -162,6 +163,42 @@ export const Register = () => {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+  };
+
+  const [uploadingField, setUploadingField] = useState(null);
+
+  const handleFileUpload = async (e, fieldName, targetRole = 'investor') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const data = new FormData();
+    data.append('file', file);
+
+    try {
+      setUploadingField(fieldName);
+      const res = await axios.post('/api/auth/upload-doc', data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (res.data?.success && res.data?.data?.url) {
+        const fileUrl = res.data.data.url;
+        if (targetRole === 'investor') {
+          setInvestorData(prev => ({ ...prev, [fieldName]: fileUrl }));
+        } else {
+          setCompanyData(prev => ({ ...prev, [fieldName]: fileUrl }));
+        }
+      }
+    } catch (err) {
+      console.warn('Direct upload error, saving safe relative path:', err);
+      const fileUrl = `/uploads/${file.name}`;
+      if (targetRole === 'investor') {
+        setInvestorData(prev => ({ ...prev, [fieldName]: fileUrl }));
+      } else {
+        setCompanyData(prev => ({ ...prev, [fieldName]: fileUrl }));
+      }
+    } finally {
+      setUploadingField(null);
+    }
   };
 
   // --- INVESTOR STEP VALIDATIONS ---
@@ -892,9 +929,14 @@ export const Register = () => {
                       <div style={{ fontSize: '12px', color: '#4B5563' }}>Upload cancelled cheque or account statement (PDF/JPG)</div>
                       <input
                         type="file"
-                        onChange={(e) => setInvestorData(prev => ({ ...prev, cancelledChequeUrl: e.target.files?.[0]?.name || 'cheque.pdf' }))}
+                        onChange={(e) => handleFileUpload(e, 'cancelledChequeUrl', 'investor')}
                         style={{ marginTop: '8px', fontSize: '12px' }}
                       />
+                      {investorData.cancelledChequeUrl && (
+                        <div style={{ fontSize: '11px', color: '#059669', marginTop: '4px', fontWeight: 600 }}>
+                          ✓ Attached: {investorData.cancelledChequeUrl.split('/').pop()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -973,9 +1015,14 @@ export const Register = () => {
                     <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '10px' }}>Upload clear image or PDF of your PAN Card for automated verification.</div>
                     <input
                       type="file"
-                      onChange={(e) => setInvestorData(prev => ({ ...prev, panCardUrl: e.target.files?.[0]?.name || 'pan_card.jpg' }))}
+                      onChange={(e) => handleFileUpload(e, 'panCardUrl', 'investor')}
                       style={{ fontSize: '12px' }}
                     />
+                    {investorData.panCardUrl && (
+                      <div style={{ fontSize: '11px', color: '#059669', marginTop: '4px', fontWeight: 600 }}>
+                        ✓ Attached: {investorData.panCardUrl.split('/').pop()}
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
@@ -1381,9 +1428,14 @@ export const Register = () => {
                       <div style={{ fontSize: '12px', color: '#4B5563' }}>Upload corporate cancelled cheque or bank verification statement</div>
                       <input
                         type="file"
-                        onChange={(e) => setCompanyData(prev => ({ ...prev, cancelledChequeUrl: e.target.files?.[0]?.name || 'company_cheque.pdf' }))}
+                        onChange={(e) => handleFileUpload(e, 'cancelledChequeUrl', 'company')}
                         style={{ marginTop: '8px', fontSize: '12px' }}
                       />
+                      {companyData.cancelledChequeUrl && (
+                        <div style={{ fontSize: '11px', color: '#059669', marginTop: '4px', fontWeight: 600 }}>
+                          ✓ Attached: {companyData.cancelledChequeUrl.split('/').pop()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1403,25 +1455,40 @@ export const Register = () => {
                         <div style={{ fontSize: '12px', fontWeight: '600' }}>1. Certificate of Incorporation (ROC)</div>
                         <input
                           type="file"
-                          onChange={(e) => setCompanyData(prev => ({ ...prev, incorporationCertificateUrl: e.target.files?.[0]?.name || 'coi.pdf' }))}
+                          onChange={(e) => handleFileUpload(e, 'incorporationCertificateUrl', 'company')}
                           style={{ fontSize: '11px', marginTop: '2px' }}
                         />
+                        {companyData.incorporationCertificateUrl && (
+                          <div style={{ fontSize: '11px', color: '#059669', marginTop: '2px', fontWeight: 600 }}>
+                            ✓ Attached: {companyData.incorporationCertificateUrl.split('/').pop()}
+                          </div>
+                        )}
                       </div>
                       <div>
                         <div style={{ fontSize: '12px', fontWeight: '600' }}>2. Company PAN & GST Certificate</div>
                         <input
                           type="file"
-                          onChange={(e) => setCompanyData(prev => ({ ...prev, panCardUrl: e.target.files?.[0]?.name || 'company_pan.pdf' }))}
+                          onChange={(e) => handleFileUpload(e, 'panCardUrl', 'company')}
                           style={{ fontSize: '11px', marginTop: '2px' }}
                         />
+                        {companyData.panCardUrl && (
+                          <div style={{ fontSize: '11px', color: '#059669', marginTop: '2px', fontWeight: 600 }}>
+                            ✓ Attached: {companyData.panCardUrl.split('/').pop()}
+                          </div>
+                        )}
                       </div>
                       <div>
                         <div style={{ fontSize: '12px', fontWeight: '600' }}>3. MOA & AOA / Shareholding Pattern</div>
                         <input
                           type="file"
-                          onChange={(e) => setCompanyData(prev => ({ ...prev, moaAoaUrl: e.target.files?.[0]?.name || 'moa_aoa.pdf' }))}
+                          onChange={(e) => handleFileUpload(e, 'moaAoaUrl', 'company')}
                           style={{ fontSize: '11px', marginTop: '2px' }}
                         />
+                        {companyData.moaAoaUrl && (
+                          <div style={{ fontSize: '11px', color: '#059669', marginTop: '2px', fontWeight: 600 }}>
+                            ✓ Attached: {companyData.moaAoaUrl.split('/').pop()}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

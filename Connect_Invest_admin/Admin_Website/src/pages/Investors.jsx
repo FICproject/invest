@@ -13,10 +13,13 @@ import {
   Briefcase,
   Calendar,
   Percent,
-  X
+  X,
+  Eye,
+  Download
 } from 'lucide-react';
 import { adminApi, formatINR } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import DocumentPreviewModal from '../components/DocumentPreviewModal';
 
 export default function Investors() {
   const toast = useToast();
@@ -28,6 +31,7 @@ export default function Investors() {
   // Modals
   const [reviewInvestor, setReviewInvestor] = useState(null);
   const [decisionReason, setDecisionReason] = useState('');
+  const [previewDoc, setPreviewDoc] = useState(null);
   const [blockUser, setBlockUser] = useState(null);
   const [blockReason, setBlockReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -379,6 +383,85 @@ export default function Investors() {
               <div><strong>Date of Birth:</strong> {reviewInvestor.dob ? new Date(reviewInvestor.dob).toLocaleDateString() : 'N/A'}</div>
               <div style={{ gridColumn: 'span 2' }}>
                 <strong>Address:</strong> {reviewInvestor.address ? `${reviewInvestor.address.line1}, ${reviewInvestor.address.city}, ${reviewInvestor.address.state} - ${reviewInvestor.address.pincode}` : 'N/A'}
+              </div>
+            </div>
+
+            {/* Uploaded Compliance Documents */}
+            <div style={{ marginBottom: '18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                  COMPLIANCE DOCUMENTS ({reviewInvestor.documents?.length || 0})
+                </span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Click to preview or download</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '8px' }}>
+                {(reviewInvestor.documents || []).map((doc, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-color)',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: '8px'
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {doc.name}
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                        {doc.url?.split('/').pop()}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewDoc(doc)}
+                        style={{
+                          flex: 1,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          padding: '5px 8px',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          background: 'rgba(0, 71, 186, 0.15)',
+                          color: '#3B82F6',
+                          border: 'none',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Eye size={12} />
+                        Preview
+                      </button>
+                      <a
+                        href={`/api/v1/admin/documents/${doc.url?.split('/').pop()}/download`}
+                        download
+                        style={{
+                          padding: '5px 8px',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          background: 'rgba(255, 255, 255, 0.08)',
+                          color: 'var(--text-secondary)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: 'none',
+                          textDecoration: 'none'
+                        }}
+                        title="Download Document"
+                      >
+                        <Download size={12} />
+                      </a>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -900,6 +983,16 @@ export default function Investors() {
             </div>
           </div>
         </div>
+      )}
+      {/* Embedded Document Preview Modal */}
+      {previewDoc && (
+        <DocumentPreviewModal
+          isOpen={Boolean(previewDoc)}
+          onClose={() => setPreviewDoc(null)}
+          documentUrl={previewDoc.url}
+          title={previewDoc.name}
+          documentType={previewDoc.type}
+        />
       )}
     </div>
   );

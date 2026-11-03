@@ -9,16 +9,22 @@ import {
   ExternalLink,
   Layers,
   Trash2,
-  PieChart
+  PieChart,
+  Eye,
+  Download,
+  FileText,
+  X
 } from 'lucide-react';
 import { adminApi, formatINR } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import DocumentPreviewModal from '../components/DocumentPreviewModal';
 
 export default function Companies() {
   const toast = useToast();
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [previewDoc, setPreviewDoc] = useState(null);
 
   // Create Company Modal
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -542,6 +548,85 @@ export default function Companies() {
               <div><strong>Cooling-Off:</strong> {reviewCompany.bankCoolingOff?.inCoolingOff ? `ACTIVE (${reviewCompany.bankCoolingOff.hoursRemaining} hours left)` : 'Completed / Ready'}</div>
             </div>
 
+            {/* Corporate Compliance Documents */}
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                  CORPORATE DOCUMENTS ({reviewCompany.documents?.length || 0})
+                </span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Click to preview or download</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '8px' }}>
+                {(reviewCompany.documents || []).map((doc, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-color)',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: '8px'
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {doc.name}
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                        {doc.url?.split('/').pop()}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewDoc(doc)}
+                        style={{
+                          flex: 1,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          padding: '5px 8px',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          background: 'rgba(0, 71, 186, 0.15)',
+                          color: '#3B82F6',
+                          border: 'none',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Eye size={12} />
+                        Preview
+                      </button>
+                      <a
+                        href={`/api/v1/admin/documents/${doc.url?.split('/').pop()}/download`}
+                        download
+                        style={{
+                          padding: '5px 8px',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          background: 'rgba(255, 255, 255, 0.08)',
+                          color: 'var(--text-secondary)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: 'none',
+                          textDecoration: 'none'
+                        }}
+                        title="Download Document"
+                      >
+                        <Download size={12} />
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div style={{ marginBottom: '18px' }}>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>
                 Written Reason (Required per PRD Section 5.1 A-6):
@@ -768,6 +853,16 @@ export default function Companies() {
             </div>
           </div>
         </div>
+      )}
+      {/* Embedded Document Preview Modal */}
+      {previewDoc && (
+        <DocumentPreviewModal
+          isOpen={Boolean(previewDoc)}
+          onClose={() => setPreviewDoc(null)}
+          documentUrl={previewDoc.url}
+          title={previewDoc.name}
+          documentType={previewDoc.type}
+        />
       )}
     </div>
   );

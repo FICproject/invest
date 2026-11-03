@@ -7,14 +7,15 @@ export default function DocumentPreviewModal({ isOpen, onClose, documentUrl, tit
 
   if (!isOpen || !documentUrl) return null;
 
-  // Determine full preview URL
+  const filename = documentUrl.split('/').pop()?.split('?')[0] || '';
+  const isPdf = filename.toLowerCase().endsWith('.pdf');
+
+  // Relative paths ensure seamless preview & download across localhost and LAN networks via Vite proxy
   const normalizedUrl = documentUrl.startsWith('http')
     ? documentUrl
-    : `http://localhost:5000${documentUrl.startsWith('/') ? '' : '/'}${documentUrl}`;
+    : (documentUrl.startsWith('/') ? documentUrl : `/uploads/${documentUrl}`);
 
-  const isPdf = documentUrl.toLowerCase().endsWith('.pdf');
-  const filename = documentUrl.split('/').pop();
-  const downloadUrl = `http://localhost:5000/api/v1/admin/documents/${filename}/download`;
+  const downloadUrl = `/api/v1/admin/documents/${filename}/download`;
 
   const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.25, 3));
   const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.25, 0.5));

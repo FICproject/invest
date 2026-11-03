@@ -870,7 +870,7 @@ export default function RegistrationApprovals() {
                     {selectedApp.documents.map((doc, idx) => {
                       const isDocPdf = (doc.url || '').toLowerCase().endsWith('.pdf');
                       const docFilename = (doc.url || '').split('/').pop();
-                      const directDownloadUrl = `http://localhost:5000/api/v1/admin/documents/${docFilename}/download`;
+                      const directDownloadUrl = `/api/v1/admin/documents/${docFilename}/download`;
 
                       return (
                         <div

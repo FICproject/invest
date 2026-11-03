@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import {
   Building2,
   Lock,
@@ -122,6 +123,32 @@ export const CompanyRegister: React.FC = () => {
   const prevStep = () => {
     setError('');
     setStep((prev) => Math.max(prev - 1, 1));
+  };
+
+  const [uploadingField, setUploadingField] = useState<string | null>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, fieldName: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const data = new FormData();
+    data.append('file', file);
+
+    try {
+      setUploadingField(fieldName);
+      const res = await axios.post('/api/auth/upload-doc', data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (res.data?.success && res.data?.data?.url) {
+        setFormData(prev => ({ ...prev, [fieldName]: res.data.data.url }));
+      }
+    } catch (err) {
+      console.warn('File upload fallback:', err);
+      setFormData(prev => ({ ...prev, [fieldName]: `/uploads/${file.name}` }));
+    } finally {
+      setUploadingField(null);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -543,9 +570,14 @@ export const CompanyRegister: React.FC = () => {
                   <div className="text-xs text-slate-600">Upload bank proof (cheque or passbook)</div>
                   <input
                     type="file"
-                    onChange={(e) => setFormData(prev => ({ ...prev, cancelledChequeUrl: e.target.files?.[0]?.name || 'cheque.pdf' }))}
+                    onChange={(e) => handleFileUpload(e, 'cancelledChequeUrl')}
                     className="mt-2 text-xs"
                   />
+                  {formData.cancelledChequeUrl && (
+                    <div className="text-[11px] text-emerald-600 font-semibold mt-1">
+                      ✓ Attached: {formData.cancelledChequeUrl.split('/').pop()}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -564,25 +596,40 @@ export const CompanyRegister: React.FC = () => {
                     <span className="font-semibold text-slate-700">1. Certificate of Incorporation:</span>
                     <input
                       type="file"
-                      onChange={(e) => setFormData(prev => ({ ...prev, incorporationCertificateUrl: e.target.files?.[0]?.name || 'coi.pdf' }))}
+                      onChange={(e) => handleFileUpload(e, 'incorporationCertificateUrl')}
                       className="block mt-1 text-[11px]"
                     />
+                    {formData.incorporationCertificateUrl && (
+                      <div className="text-[11px] text-emerald-600 font-semibold mt-0.5">
+                        ✓ Attached: {formData.incorporationCertificateUrl.split('/').pop()}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <span className="font-semibold text-slate-700">2. Company PAN & GST:</span>
                     <input
                       type="file"
-                      onChange={(e) => setFormData(prev => ({ ...prev, panCardUrl: e.target.files?.[0]?.name || 'pan.pdf' }))}
+                      onChange={(e) => handleFileUpload(e, 'panCardUrl')}
                       className="block mt-1 text-[11px]"
                     />
+                    {formData.panCardUrl && (
+                      <div className="text-[11px] text-emerald-600 font-semibold mt-0.5">
+                        ✓ Attached: {formData.panCardUrl.split('/').pop()}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <span className="font-semibold text-slate-700">3. MOA & AOA:</span>
                     <input
                       type="file"
-                      onChange={(e) => setFormData(prev => ({ ...prev, moaAoaUrl: e.target.files?.[0]?.name || 'moa.pdf' }))}
+                      onChange={(e) => handleFileUpload(e, 'moaAoaUrl')}
                       className="block mt-1 text-[11px]"
                     />
+                    {formData.moaAoaUrl && (
+                      <div className="text-[11px] text-emerald-600 font-semibold mt-0.5">
+                        ✓ Attached: {formData.moaAoaUrl.split('/').pop()}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

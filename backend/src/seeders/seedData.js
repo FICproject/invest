@@ -124,6 +124,22 @@ export async function seedDatabase(isDirectRun = false) {
         verified: true,
         effectiveFrom: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
       },
+      bankDetails: {
+        accountHolderName: 'Apex Renewable Energy Private Limited',
+        bankName: 'HDFC Bank, Connaught Place',
+        accountNumber: '918273645012',
+        ifscCode: 'HDFC0000128',
+        chequeUrl: '/uploads/sample-cheque.png',
+        isVerified: true
+      },
+      documents: {
+        incorporationCertificateUrl: '/uploads/sample-incorporation.pdf',
+        panCardUrl: '/uploads/sample-company-pan.png',
+        gstCertificateUrl: '/uploads/sample-gst.pdf',
+        moaAoaUrl: '/uploads/sample-moa.pdf',
+        shareholdingPatternUrl: '/uploads/sample-shareholding.pdf',
+        financialStatementsUrl: '/uploads/sample-financials.pdf'
+      },
       directors: [
         {
           name: 'Arjun Mehta',
@@ -175,6 +191,22 @@ export async function seedDatabase(isDirectRun = false) {
         bankName: 'ICICI Bank, MG Road Bengaluru',
         verified: true,
         effectiveFrom: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
+      },
+      bankDetails: {
+        accountHolderName: 'Zenith Agri Harvest Limited',
+        bankName: 'ICICI Bank, MG Road Bengaluru',
+        accountNumber: '112233445566',
+        ifscCode: 'ICIC0000002',
+        chequeUrl: '/uploads/sample-cheque.png',
+        isVerified: true
+      },
+      documents: {
+        incorporationCertificateUrl: '/uploads/sample-incorporation.pdf',
+        panCardUrl: '/uploads/sample-company-pan.png',
+        gstCertificateUrl: '/uploads/sample-gst.pdf',
+        moaAoaUrl: '/uploads/sample-moa.pdf',
+        shareholdingPatternUrl: '/uploads/sample-shareholding.pdf',
+        financialStatementsUrl: '/uploads/sample-financials.pdf'
       }
     });
     companyOwner2.companyId = company2._id;
@@ -230,6 +262,22 @@ export async function seedDatabase(isDirectRun = false) {
         verified: true,
         effectiveFrom: new Date()
       },
+      bankDetails: {
+        accountHolderName: 'Nexus Technologies Private Limited',
+        bankName: 'HDFC Bank, Indiranagar Bengaluru',
+        accountNumber: '987654321098',
+        ifscCode: 'HDFC0000240',
+        chequeUrl: '/uploads/sample-cheque.png',
+        isVerified: true
+      },
+      documents: {
+        incorporationCertificateUrl: '/uploads/sample-incorporation.pdf',
+        panCardUrl: '/uploads/sample-company-pan.png',
+        gstCertificateUrl: '/uploads/sample-gst.pdf',
+        moaAoaUrl: '/uploads/sample-moa.pdf',
+        shareholdingPatternUrl: '/uploads/sample-shareholding.pdf',
+        financialStatementsUrl: '/uploads/sample-financials.pdf'
+      },
       directors: [
         {
           name: 'Rajesh Sharma',
@@ -276,6 +324,9 @@ export async function seedDatabase(isDirectRun = false) {
       userId: investor1._id,
       pan: 'ABCDE1234F',
       panNumber: 'ABCDE1234F',
+      panCardUrl: '/uploads/sample-pan.png',
+      identityProofUrl: '/uploads/sample-aadhaar.png',
+      cancelledChequeUrl: '/uploads/sample-cheque.png',
       aadhaarNumber: 'XXXX-XXXX-8921',
       aadhaarVerified: true,
       dob: new Date('1990-05-15'),
@@ -299,6 +350,7 @@ export async function seedDatabase(isDirectRun = false) {
         accountNumber: '50100482934210',
         ifscCode: 'HDFC0001234',
         accountHolderName: 'Rahul Sharma',
+        chequeUrl: '/uploads/sample-cheque.png',
         isVerified: true
       }
     });
@@ -307,11 +359,15 @@ export async function seedDatabase(isDirectRun = false) {
       investorId: investor1._id,
       fullName: 'Rahul Sharma',
       panNumber: 'ABCDE1234F',
+      panDocumentUrl: '/uploads/sample-pan.png',
       addressProofType: 'Aadhaar Card',
       addressProofNumber: 'XXXX-XXXX-8921',
+      addressProofUrl: '/uploads/sample-aadhaar.png',
       bankName: 'HDFC Bank Ltd',
       accountNumber: '50100482934210',
       ifscCode: 'HDFC0001234',
+      bankProofUrl: '/uploads/sample-cheque.png',
+      selfieUrl: '/uploads/logo.jpg.jpeg',
       status: 'APPROVED',
       submittedAt: new Date(),
       reviewedAt: new Date()
@@ -334,6 +390,9 @@ export async function seedDatabase(isDirectRun = false) {
       userId: investorDemo._id,
       pan: 'ABCDE1234F',
       panNumber: 'ABCDE1234F',
+      panCardUrl: '/uploads/sample-pan.png',
+      identityProofUrl: '/uploads/sample-aadhaar.png',
+      cancelledChequeUrl: '/uploads/sample-cheque.png',
       aadhaarNumber: 'XXXX-XXXX-8921',
       aadhaarVerified: true,
       dob: new Date('1990-05-15'),
@@ -351,6 +410,7 @@ export async function seedDatabase(isDirectRun = false) {
         accountNumber: '50100482934210',
         ifscCode: 'HDFC0001234',
         accountHolderName: 'Rahul Sharma',
+        chequeUrl: '/uploads/sample-cheque.png',
         isVerified: true
       }
     });
@@ -359,6 +419,15 @@ export async function seedDatabase(isDirectRun = false) {
       investorId: investorDemo._id,
       fullName: 'Rahul Sharma',
       panNumber: 'ABCDE1234F',
+      panDocumentUrl: '/uploads/sample-pan.png',
+      addressProofType: 'Aadhaar Card',
+      addressProofNumber: 'XXXX-XXXX-8921',
+      addressProofUrl: '/uploads/sample-aadhaar.png',
+      bankName: 'HDFC Bank Ltd',
+      accountNumber: '50100482934210',
+      ifscCode: 'HDFC0001234',
+      bankProofUrl: '/uploads/sample-cheque.png',
+      selfieUrl: '/uploads/logo.jpg.jpeg',
       status: 'APPROVED',
       submittedAt: new Date(),
       reviewedAt: new Date()
@@ -368,6 +437,9 @@ export async function seedDatabase(isDirectRun = false) {
       userId: investor2._id,
       pan: 'ABCDE5678G',
       panNumber: 'ABCDE5678G',
+      panCardUrl: '/uploads/sample-pan.png',
+      identityProofUrl: '/uploads/sample-aadhaar.png',
+      cancelledChequeUrl: '/uploads/sample-cheque.png',
       aadhaarNumber: 'XXXX-XXXX-1122',
       aadhaarVerified: true,
       dob: new Date('1988-11-20'),
@@ -392,11 +464,15 @@ export async function seedDatabase(isDirectRun = false) {
       investorId: investor2._id,
       fullName: 'Vikram Sharma',
       panNumber: 'ABCDE5678G',
+      panDocumentUrl: '/uploads/sample-pan.png',
       addressProofType: 'Aadhaar Card',
       addressProofNumber: 'XXXX-XXXX-1122',
+      addressProofUrl: '/uploads/sample-aadhaar.png',
       bankName: 'State Bank of India',
       accountNumber: '987654321098',
       ifscCode: 'SBIN0000456',
+      bankProofUrl: '/uploads/sample-cheque.png',
+      selfieUrl: '/uploads/logo.jpg.jpeg',
       status: 'APPROVED',
       submittedAt: new Date(),
       reviewedAt: new Date()
