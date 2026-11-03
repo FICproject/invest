@@ -11,3 +11,4 @@ echo Web Portal: http://localhost:5174
 echo API Server: http://localhost:5000
 timeout /t 5 >nul
 start http://localhost:5174
+
