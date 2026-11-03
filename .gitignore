@@ -35,6 +35,7 @@ desktop.ini
 # Java & Android compiled binaries
 *.class
 *.dex
+*.jar
 com/facebook/
 
 # Build / Output folders
