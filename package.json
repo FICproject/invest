@@ -21,6 +21,12 @@
     "Connect_Invest_admin/mobile",
     "investor/website",
     "investor/mobile"
-  ]
+  ],
+  "devDependencies": {
+    "caniuse-lite": "^1.0.30001820"
+  },
+  "dependencies": {
+    "lodash": "^4.18.1",
+    "victory-vendor": "^37.4.1"
+  }
 }
-
