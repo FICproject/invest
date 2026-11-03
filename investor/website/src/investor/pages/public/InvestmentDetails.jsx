@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
+  ArrowLeft,
   Building2,
   Layers,
   TrendingUp,
@@ -9,7 +10,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   AlertCircle,
-  ArrowLeft,
   Lock,
   Download
 } from 'lucide-react';
@@ -104,26 +104,6 @@ export const InvestmentDetails = () => {
 
       <main style={{ flex: 1, padding: '36px 0 64px' }}>
         <div className="container">
-          {/* Back Button */}
-          <button
-            onClick={() => navigate('/opportunities')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: 'none',
-              border: 'none',
-              color: 'var(--color-primary)',
-              fontWeight: '600',
-              fontSize: '13.5px',
-              cursor: 'pointer',
-              marginBottom: '20px'
-            }}
-          >
-            <ArrowLeft size={16} />
-            <span>Back to Opportunities</span>
-          </button>
-
           {/* Main Grid: Left Details & Right Action Sidebar */}
           <div
             style={{
@@ -137,7 +117,39 @@ export const InvestmentDetails = () => {
             <div>
               {/* Header Info */}
               <div style={{ marginBottom: '20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => navigate(-1)}
+                    aria-label="Go back"
+                    title="Go back"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      border: '1px solid #E2D9D2',
+                      backgroundColor: '#FFFFFF',
+                      color: '#4A0E17',
+                      cursor: 'pointer',
+                      transition: 'all 0.18s ease',
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.06)'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.backgroundColor = '#4A0E17';
+                      e.currentTarget.style.color = '#FFFFFF';
+                      e.currentTarget.style.borderColor = '#4A0E17';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.backgroundColor = '#FFFFFF';
+                      e.currentTarget.style.color = '#4A0E17';
+                      e.currentTarget.style.borderColor = '#E2D9D2';
+                    }}
+                  >
+                    <ArrowLeft size={15} />
+                  </button>
                   <span
                     style={{
                       display: 'inline-flex',
@@ -170,7 +182,7 @@ export const InvestmentDetails = () => {
               {/* Cover Image */}
               <div
                 style={{
-                  height: '320px',
+                  height: '280px',
                   borderRadius: '16px',
                   overflow: 'hidden',
                   marginBottom: '28px',
@@ -255,7 +267,7 @@ export const InvestmentDetails = () => {
                 style={{
                   backgroundColor: 'var(--bg-surface)',
                   borderRadius: '16px',
-                  padding: '28px',
+                  padding: '22px 24px',
                   border: '1px solid var(--border-color)',
                   boxShadow: '0 8px 30px rgba(59, 10, 17, 0.06)'
                 }}
@@ -285,28 +297,14 @@ export const InvestmentDetails = () => {
                   </div>
                 </div>
 
-                {/* Funding Progress Bar */}
-                <div style={{ marginBottom: '20px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Progress</span>
-                    <span style={{ color: 'var(--color-primary)', fontWeight: '700' }}>{progress}% Funded</span>
-                  </div>
-                  <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ width: `${progress}%`, height: '100%', backgroundColor: 'var(--color-primary)', borderRadius: '4px' }} />
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginTop: '8px', color: 'var(--text-muted)' }}>
-                    <span>Target: {formatCurrency(offer.targetAmount)}</span>
-                    <span>Raised: {formatCurrency(offer.raisedAmount)}</span>
-                  </div>
-                </div>
 
                 {/* Investment Limits */}
                 <div
                   style={{
                     backgroundColor: 'var(--bg-surface-subtle)',
-                    padding: '14px',
+                    padding: '12px 14px',
                     borderRadius: '10px',
-                    marginBottom: '24px',
+                    marginBottom: '16px',
                     display: 'flex',
                     justifyContent: 'space-between',
                     fontSize: '13px'

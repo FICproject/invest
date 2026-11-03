@@ -1096,32 +1096,12 @@ export const Home = () => {
                   fontSize: '13px',
                   color: '#FFFFFF',
                   opacity: 0.95,
-                  marginBottom: '16px',
+                  marginBottom: '0',
                   fontWeight: '400'
                 }}
               >
                 Track your investments, returns and payouts — all in one place.
               </p>
-              <button
-                type="button"
-                onClick={() => navigate('/login')}
-                style={{
-                  backgroundColor: '#4A0E17',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  borderRadius: '24px',
-                  padding: '9px 24px',
-                  fontSize: '12.5px',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(74, 14, 23, 0.35)',
-                  transition: 'background-color 0.15s ease'
-                }}
-                onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#621320')}
-                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#4A0E17')}
-              >
-                View Dashboard Demo
-              </button>
             </div>
 
             {/* Right: Laptop Graph Mini Illustration */}

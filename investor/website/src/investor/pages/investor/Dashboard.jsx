@@ -12,8 +12,7 @@ import {
   Search,
   CheckCircle2,
   Clock,
-  Building2,
-  FileText
+  Building2
 } from 'lucide-react';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { Button } from '../../components/common/Button';
@@ -97,14 +96,6 @@ export const Dashboard = () => {
 
           <div style={{ display: 'flex', gap: '10px' }}>
             <Button
-              variant="outline"
-              size="sm"
-              icon={FileText}
-              onClick={() => navigate('/investor/statements')}
-            >
-              Download Statement
-            </Button>
-            <Button
               variant="primary"
               size="sm"
               onClick={() => navigate('/opportunities')}
@@ -149,12 +140,13 @@ export const Dashboard = () => {
           </div>
         )}
 
-        {/* 1. Top 5 Metric Cards matching Image 1 */}
+        {/* 1. Top 5 Metric Cards matching Image 1 - Single Row */}
         <div
+          className="dashboard-metrics-row"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-            gap: '16px'
+            gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+            gap: '14px'
           }}
         >
           {[
@@ -196,12 +188,13 @@ export const Dashboard = () => {
                 style={{
                   backgroundColor: 'var(--bg-surface)',
                   borderRadius: '12px',
-                  padding: '18px 20px',
+                  padding: '16px 14px',
                   border: '1px solid var(--border-color)',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '14px'
+                  gap: '12px',
+                  minWidth: 0
                 }}
               >
                 <div
@@ -468,6 +461,21 @@ export const Dashboard = () => {
       </div>
 
       <style>{`
+        @media (max-width: 1280px) {
+          .dashboard-metrics-row {
+            grid-template-columns: repeat(3, 1fr) !important;
+          }
+        }
+        @media (max-width: 768px) {
+          .dashboard-metrics-row {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .dashboard-metrics-row {
+            grid-template-columns: 1fr !important;
+          }
+        }
         @media (max-width: 1200px) {
           .dashboard-charts-grid,
           .dashboard-status-grid {

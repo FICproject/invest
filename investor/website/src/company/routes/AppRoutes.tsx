@@ -31,6 +31,7 @@ import { TransactionList } from '../pages/Transactions/TransactionList';
 import { DocumentManagement } from '../pages/Documents/DocumentManagement';
 import { Notifications } from '../pages/Notifications/Notifications';
 import { Settings } from '../pages/Settings/Settings';
+import { CompanySubscription } from '../pages/Settings/CompanySubscription';
 
 export const AppRoutes: React.FC = () => {
   return (
@@ -68,6 +69,7 @@ export const AppRoutes: React.FC = () => {
         <Route path="transactions" element={<TransactionList />} />
         <Route path="documents" element={<DocumentManagement />} />
         <Route path="notifications" element={<Notifications />} />
+        <Route path="subscription" element={<CompanySubscription />} />
         <Route path="settings" element={<Settings />} />
       </Route>
 

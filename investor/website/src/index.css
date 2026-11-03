@@ -176,9 +176,12 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 290px;
-  max-width: 780px;
+  min-height: 310px;
+  max-width: 100%;
+  width: 100%;
   margin: 0 auto;
+  padding: 0 54px;
+  box-sizing: border-box;
 }
 .faq-stacked-wrapper {
   perspective: 1000px;
@@ -209,26 +212,35 @@ h1, h2, h3, h4, h5, h6 {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 20;
+  z-index: 30;
   width: 44px;
   height: 44px;
   border-radius: 50%;
   background-color: #FFFFFF;
-  border: 1px solid #FBCFE8;
-  color: #E11D5A;
+  border: 1.5px solid #E2D9D2;
+  color: #4A0E17;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(225, 29, 90, 0.15);
+  box-shadow: 0 4px 14px rgba(74, 14, 23, 0.12);
   transition: all 0.2s ease;
 }
 .faq-nav-btn:hover {
-  background-color: #E11D5A;
+  background-color: #4A0E17;
+  border-color: #4A0E17;
   color: #FFFFFF;
+  box-shadow: 0 6px 18px rgba(74, 14, 23, 0.25);
+  transform: translateY(-50%) scale(1.06);
 }
-.faq-nav-btn-prev { left: -20px; }
-.faq-nav-btn-next { right: -20px; }
+.faq-nav-btn-prev { left: 0px; }
+.faq-nav-btn-next { right: 0px; }
+
+@media (max-width: 768px) {
+  .faq-nav-btn-prev { left: 4px; }
+  .faq-nav-btn-next { right: 4px; }
+  .faq-carousel-outer { padding: 0 44px; }
+}
 
 /* Continuous floating up and down animation for cards */
 @keyframes floatGentleUpDown1 {

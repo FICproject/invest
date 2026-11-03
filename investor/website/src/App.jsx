@@ -69,6 +69,7 @@ import { TransactionList as CompanyTransactionList } from './company/pages/Trans
 import { DocumentManagement } from './company/pages/Documents/DocumentManagement';
 import { Notifications as CompanyNotifications } from './company/pages/Notifications/Notifications';
 import { Settings as CompanySettings } from './company/pages/Settings/Settings';
+import { CompanySubscription } from './company/pages/Settings/CompanySubscription';
 
 export default function App() {
   return (
@@ -217,6 +218,7 @@ export default function App() {
               <Route path="transactions" element={<CompanyTransactionList />} />
               <Route path="documents" element={<DocumentManagement />} />
               <Route path="notifications" element={<CompanyNotifications />} />
+              <Route path="subscription" element={<CompanySubscription />} />
               <Route path="settings" element={<CompanySettings />} />
             </Route>
 

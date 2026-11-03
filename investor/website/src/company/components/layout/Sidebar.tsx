@@ -3,8 +3,9 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   FilePlus2,
+  Briefcase,
   Building2,
-  BarChart3,
+  CreditCard,
   Coins,
   Receipt,
   FileCheck2,
@@ -19,10 +20,11 @@ import logoImg from '../../assets/logo.png';
 const menuItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/dashboard/requests', label: 'Request', icon: FilePlus2 },
-  { path: '/dashboard/financials', label: 'Financial Reports', icon: BarChart3 },
+  { path: '/dashboard/investments', label: 'Investments', icon: Briefcase },
   { path: '/dashboard/returns', label: 'Returns and Dividends', icon: Coins },
   { path: '/dashboard/transactions', label: 'Transactions', icon: Receipt },
-  { path: '/dashboard/documents', label: 'Documents & Compliance', icon: FileCheck2 },
+  { path: '/dashboard/documents', label: 'Documents', icon: FileCheck2 },
+  { path: '/dashboard/subscription', label: 'Subscription', icon: CreditCard },
   { path: '/dashboard/notifications', label: 'Notifications', icon: Bell },
   { path: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];

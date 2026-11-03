@@ -222,17 +222,6 @@ export const FixedTermReturns: React.FC = () => {
           <span>Payment History ({repaymentHistory.length})</span>
         </button>
 
-        <button
-          onClick={() => setActiveTab('dividends')}
-          className={`flex items-center space-x-2 pb-3 text-xs sm:text-sm font-bold border-b-2 transition ${
-            activeTab === 'dividends'
-              ? 'border-[#DE8E0A] text-[#DE8E0A]'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <TrendingUp className="w-4 h-4" />
-          <span>Equity Dividends ({dividends.length})</span>
-        </button>
       </div>
 
       {/* TAB 1 & 2: Company or Project Investments */}

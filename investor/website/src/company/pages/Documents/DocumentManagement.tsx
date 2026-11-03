@@ -103,7 +103,7 @@ export const DocumentManagement: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 font-display">
-            Documents & Compliance
+            Documents
           </h1>
           <p className="text-xs text-slate-500">
             Upload company documents, project documents, manage financial statements, view agreements, verification status and download files.

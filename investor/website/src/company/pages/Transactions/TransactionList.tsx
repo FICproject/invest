@@ -10,6 +10,7 @@ import {
   ArrowDownLeft,
   Calendar,
   Download,
+  FileText,
   Wallet,
   Coins
 } from 'lucide-react';
@@ -70,6 +71,10 @@ export const TransactionList: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  const handleGenerateReport = () => {
+    window.print();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -82,10 +87,16 @@ export const TransactionList: React.FC = () => {
           </p>
         </div>
 
-        <Button variant="outline" onClick={handleExportCSV} className="text-xs font-bold">
-          <Download className="w-3.5 h-3.5 mr-1.5" />
-          Export Statement
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleExportCSV} className="text-xs font-bold">
+            <Download className="w-3.5 h-3.5 mr-1.5" />
+            Export Statement
+          </Button>
+          <Button variant="primary" onClick={handleGenerateReport} className="text-xs font-bold">
+            <FileText className="w-3.5 h-3.5 mr-1.5" />
+            Generate Report
+          </Button>
+        </div>
       </div>
 
       {/* KPI Cards */}
