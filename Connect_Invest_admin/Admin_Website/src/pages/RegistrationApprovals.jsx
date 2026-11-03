@@ -1104,3 +1104,4 @@ export default function RegistrationApprovals() {
     </div>
   );
 }
+

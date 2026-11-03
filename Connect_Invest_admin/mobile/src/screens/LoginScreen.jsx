@@ -18,8 +18,8 @@ import { ForgeIndiaLogoCircle, ForgeIndiaLogoEmblem } from '../components/ForgeI
 
 export default function LoginScreen() {
   const { login } = useAuth();
-  const [email, setEmail] = useState('admin@connectinvest.com');
-  const [password, setPassword] = useState('AdminPassword123!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [serverUrl, setServerUrl] = useState('');

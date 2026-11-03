@@ -77,3 +77,4 @@ function scheduleReconnect() {
     connect();
   }, 4000);
 }
+

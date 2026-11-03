@@ -35,10 +35,18 @@ export const VerifyOTP = () => {
       if (res.success && res.data) {
         localStorage.setItem('ci_investor_token', res.data.token);
         await refreshMe();
-        setSuccess('Account verified successfully! Your application is pending compliance verification.');
-        setTimeout(() => {
-          navigate('/approval-status');
-        }, 1200);
+        const regStatus = res.data.user?.registrationStatus || res.data.registrationStatus || 'Pending Approval';
+        if (regStatus === 'Approved') {
+          setSuccess('Account verified successfully! Welcome to your dashboard.');
+          setTimeout(() => {
+            navigate('/investor/dashboard');
+          }, 1000);
+        } else {
+          setSuccess('Account verified successfully! Your application is pending compliance verification.');
+          setTimeout(() => {
+            navigate('/approval-status');
+          }, 1200);
+        }
       }
     } catch (err) {
       setError(err.message || 'Verification failed. Please check the code.');

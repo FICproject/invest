@@ -78,13 +78,7 @@ export const submitKyc = asyncHandler(async (req, res) => {
   kyc.ifscCode = ifscCode ? ifscCode.toUpperCase().trim() : '';
   kyc.submittedAt = new Date();
 
-  // If autoApprove flag is set or dev environment instant validation
-  const shouldApprove = autoApprove === 'true' || autoApprove === true;
-  kyc.status = shouldApprove ? 'APPROVED' : 'PENDING';
-  if (shouldApprove) {
-    kyc.reviewedAt = new Date();
-  }
-
+  kyc.status = 'PENDING';
   await kyc.save();
 
   // Also sync profile with verified bank details and PAN

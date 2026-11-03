@@ -2135,12 +2135,6 @@ export async function getQueries(req, res, next) {
       ];
     }
 
-    // Auto seed sample realistic queries if collection is empty
-    const count = await Query.countDocuments();
-    if (count === 0) {
-      await seedInitialQueries();
-    }
-
     const queries = await Query.find(filter)
       .sort({ updatedAt: -1 })
       .populate('investorId', 'userId pan')
@@ -2456,12 +2450,6 @@ export async function getSubscriptions(req, res, next) {
         { invoiceNumber: { $regex: q, $options: 'i' } },
         { transactionRef: { $regex: q, $options: 'i' } }
       ];
-    }
-
-    // Auto-seed initial realistic active subscription records if empty
-    const count = await Subscription.countDocuments();
-    if (count === 0) {
-      await seedInitialSubscriptions();
     }
 
     const subscriptions = await Subscription.find(filter)
@@ -3278,14 +3266,20 @@ export async function getAllApprovals(req, res, next) {
       success: true,
       stats: {
         totalPending,
+        pending: totalPending,
         pendingInvestors,
         pendingCompanies,
         totalApproved,
+        approved: totalApproved,
         totalRejected,
+        rejected: totalRejected,
         resubmissionsNeeded,
-        totalApplications: allProfiles.length + allCompanies.length
+        resubmission: resubmissionsNeeded,
+        totalApplications: allProfiles.length + allCompanies.length,
+        total: allProfiles.length + allCompanies.length
       },
-      applications
+      applications,
+      approvals: applications
     });
   } catch (error) {
     next(error);

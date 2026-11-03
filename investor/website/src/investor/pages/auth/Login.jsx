@@ -18,12 +18,8 @@ export const Login = () => {
   const initialRole = searchParams.get('role') === 'company' ? 'company' : 'investor';
 
   const [activeRole, setActiveRole] = useState(initialRole);
-  const [identifier, setIdentifier] = useState(() => {
-    return initialRole === 'company'
-      ? 'contact@nexustech.in'
-      : (localStorage.getItem('ci_remember_identifier') || 'rahul.sharma@investor.com');
-  });
-  const [password, setPassword] = useState(() => (initialRole === 'company' ? 'Password123!' : 'Password@123'));
+  const [identifier, setIdentifier] = useState(() => localStorage.getItem('ci_remember_identifier') || '');
+  const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -33,13 +29,9 @@ export const Login = () => {
     const roleParam = searchParams.get('role');
     if (roleParam === 'company' && activeRole !== 'company') {
       setActiveRole('company');
-      setIdentifier('contact@nexustech.in');
-      setPassword('Password123!');
       setError('');
     } else if (roleParam === 'investor' && activeRole !== 'investor') {
       setActiveRole('investor');
-      setIdentifier(localStorage.getItem('ci_remember_identifier') || 'rahul.sharma@investor.com');
-      setPassword('Password@123');
       setError('');
     }
   }, [location.search]);
@@ -81,7 +73,7 @@ export const Login = () => {
           });
           if (compRes && compRes.token) {
             companyAuth.login(compRes.token, compRes.user, compRes.company);
-            const status = compRes.company?.registrationStatus || compRes.user?.registrationStatus || 'Approved';
+            const status = compRes.company?.registrationStatus || compRes.user?.registrationStatus || 'Pending Approval';
             if (status !== 'Approved') {
               navigate('/company/approval-status');
             } else {
@@ -93,7 +85,7 @@ export const Login = () => {
           // If company login returned invalid, attempt unified investor check in case it's an investor
           try {
             const invRes = await investorAuth.login(identifier.trim(), password, rememberMe);
-            const regStatus = invRes.data?.user?.registrationStatus || 'Approved';
+            const regStatus = invRes.data?.user?.registrationStatus || 'Pending Approval';
             if (invRes.data?.user?.role === 'company_admin' || invRes.data?.user?.role === 'company_member') {
               companyAuth.login(invRes.data.token, invRes.data.user, invRes.data.company);
               if (regStatus !== 'Approved') {
@@ -119,7 +111,7 @@ export const Login = () => {
       // 2. Default: Unified Login with Smart Role-Based Access
       const res = await investorAuth.login(identifier.trim(), password, rememberMe);
       const userRole = res.data?.user?.role;
-      const regStatus = res.data?.user?.registrationStatus || 'Approved';
+      const regStatus = res.data?.user?.registrationStatus || 'Pending Approval';
 
       if (userRole === 'company_admin' || userRole === 'company_member') {
         // Log into company portal session & route to corporate dashboard

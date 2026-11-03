@@ -620,3 +620,4 @@ export const CompanyApprovalStatus: React.FC = () => {
     </div>
   );
 };
+

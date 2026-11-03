@@ -9,8 +9,8 @@ import logoImg from '../../assets/logo.png';
 export const CompanyLogin: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const [email, setEmail] = useState('contact@nexustech.in');
-  const [password, setPassword] = useState('Password123!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -22,7 +22,7 @@ export const CompanyLogin: React.FC = () => {
     try {
       const data = await authService.login({ email, password });
       login(data.token, data.user, data.company);
-      const status = data.company?.registrationStatus || data.user?.registrationStatus || 'Approved';
+      const status = data.company?.registrationStatus || data.user?.registrationStatus || 'Pending Approval';
       if (status !== 'Approved') {
         navigate('/company/approval-status');
       } else {

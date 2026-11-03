@@ -242,6 +242,8 @@ export const login = asyncHandler(async (req, res) => {
     company = await Company.findById(user.companyId);
   }
 
+  const currentRegistrationStatus = user.registrationStatus || (user.role === 'admin' ? 'Approved' : 'Pending Approval');
+
   res.status(200).json({
     success: true,
     message: 'Signed in successfully.',
@@ -255,12 +257,12 @@ export const login = asyncHandler(async (req, res) => {
         role: user.role,
         isVerified: user.isVerified,
         companyId: user.companyId,
-        registrationStatus: user.registrationStatus || 'Approved',
+        registrationStatus: currentRegistrationStatus,
         rejectionReason: user.rejectionReason || null,
         adminRemarks: user.adminRemarks || null
       },
       company,
-      registrationStatus: user.registrationStatus || 'Approved',
+      registrationStatus: currentRegistrationStatus,
       kycStatus: kyc ? kyc.status : 'NOT_STARTED'
     }
   });
@@ -289,6 +291,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
 
     const token = generateToken(user._id);
     const kyc = await KYC.findOne({ investorId: user._id });
+    const verifiedRegistrationStatus = user.registrationStatus || (user.role === 'admin' ? 'Approved' : 'Pending Approval');
 
     return res.status(200).json({
       success: true,
@@ -302,11 +305,11 @@ export const verifyOTP = asyncHandler(async (req, res) => {
           mobile: user.mobile,
           role: user.role,
           isVerified: user.isVerified,
-          registrationStatus: user.registrationStatus || 'Approved',
+          registrationStatus: verifiedRegistrationStatus,
           rejectionReason: user.rejectionReason || null,
           adminRemarks: user.adminRemarks || null
         },
-        registrationStatus: user.registrationStatus || 'Approved',
+        registrationStatus: verifiedRegistrationStatus,
         kycStatus: kyc ? kyc.status : 'NOT_STARTED'
       }
     });
@@ -322,6 +325,8 @@ export const getMe = asyncHandler(async (req, res) => {
   const profile = await InvestorProfile.findOne({ userId: req.user._id });
   const kyc = await KYC.findOne({ investorId: req.user._id });
 
+  const activeRegistrationStatus = user.registrationStatus || (user.role === 'admin' ? 'Approved' : 'Pending Approval');
+
   res.status(200).json({
     success: true,
     data: {
@@ -333,12 +338,12 @@ export const getMe = asyncHandler(async (req, res) => {
         role: user.role,
         isVerified: user.isVerified,
         companyId: user.companyId,
-        registrationStatus: user.registrationStatus || 'Approved',
+        registrationStatus: activeRegistrationStatus,
         rejectionReason: user.rejectionReason || null,
         adminRemarks: user.adminRemarks || null
       },
       profile,
-      registrationStatus: user.registrationStatus || 'Approved',
+      registrationStatus: activeRegistrationStatus,
       kycStatus: kyc ? kyc.status : 'NOT_STARTED'
     }
   });

@@ -19,7 +19,7 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
   }
 
   // Intercept company users whose registration is not approved yet
-  const status = company?.registrationStatus || user?.registrationStatus || 'Approved';
+  const status = company?.registrationStatus || user?.registrationStatus || 'Pending Approval';
   if (status !== 'Approved') {
     return <Navigate to="/company/approval-status" replace />;
   }

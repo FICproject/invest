@@ -48,7 +48,7 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
     }
   });
 
-  // Calculate sector percentages
+  // Calculate sector percentages directly from database investments
   const portfolioOverview = Object.keys(sectorMap).map((category) => {
     const amount = sectorMap[category];
     const percentage = totalInvested > 0 ? Math.round((amount / totalInvested) * 100) : 0;
@@ -59,17 +59,7 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
     };
   });
 
-  // Fallback if user is new and has no investments yet
-  if (portfolioOverview.length === 0) {
-    portfolioOverview.push(
-      { category: 'Renewable Energy', amount: 0, percentage: 40 },
-      { category: 'Real Estate', amount: 0, percentage: 25 },
-      { category: 'Technology', amount: 0, percentage: 20 },
-      { category: 'Others', amount: 0, percentage: 15 }
-    );
-  }
-
-  // 2. Fetch upcoming payout
+  // 2. Fetch upcoming payout from DB
   const nextPayout = await Payout.findOne({
     investorId,
     status: 'Scheduled'
@@ -100,15 +90,30 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
     status: inv.status
   }));
 
-  // 6. Monthly returns progression (last 6 months)
-  const monthlyReturns = [
-    { month: 'Oct', amount: Math.round(actualReturnsReceived * 0.15) },
-    { month: 'Nov', amount: Math.round(actualReturnsReceived * 0.25) },
-    { month: 'Dec', amount: Math.round(actualReturnsReceived * 0.45) },
-    { month: 'Jan', amount: Math.round(actualReturnsReceived * 0.65) },
-    { month: 'Feb', amount: Math.round(actualReturnsReceived * 0.85) },
-    { month: 'Mar', amount: actualReturnsReceived }
-  ];
+  // 6. Monthly returns progression dynamically aggregated from database completed payouts
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthlyMap = new Map();
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    const mKey = monthNames[d.getMonth()];
+    monthlyMap.set(mKey, 0);
+  }
+
+  completedPayouts.forEach((p) => {
+    const pDate = p.payoutDate || p.createdAt || p.scheduledDate;
+    if (pDate) {
+      const m = monthNames[new Date(pDate).getMonth()];
+      if (monthlyMap.has(m)) {
+        monthlyMap.set(m, monthlyMap.get(m) + (p.amount || 0));
+      }
+    }
+  });
+
+  const monthlyReturns = Array.from(monthlyMap.entries()).map(([month, amount]) => ({
+    month,
+    amount
+  }));
 
   // 7. KYC status
   const kyc = await KYC.findOne({ investorId });

@@ -65,7 +65,7 @@ export default function WorkListScreen({ onOpenSidebar }) {
         search: search.trim()
       });
       if (res.data?.success) {
-        setApprovals(res.data.approvals || []);
+        setApprovals(res.data.approvals || res.data.applications || []);
         if (res.data.stats) {
           setStats(res.data.stats);
         }

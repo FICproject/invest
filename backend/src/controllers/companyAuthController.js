@@ -207,7 +207,7 @@ export const loginCompany = asyncHandler(async (req, res) => {
     company = await Company.findById(user.companyId);
   }
 
-  const currentStatus = company?.registrationStatus || user.registrationStatus || 'Approved';
+  const currentStatus = company?.registrationStatus || user.registrationStatus || 'Pending Approval';
   const currentReason = company?.rejectionReason || user.rejectionReason || null;
   const token = generateToken(user._id);
 

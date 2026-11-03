@@ -63,3 +63,4 @@ export function initRealTimeSync(onEventCallback) {
     listeners.delete(onEventCallback);
   };
 }
+

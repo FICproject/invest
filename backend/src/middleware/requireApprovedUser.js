@@ -15,7 +15,7 @@ export const requireApprovedUser = (req, res, next) => {
     return next();
   }
 
-  const status = req.user.registrationStatus || 'Approved';
+  const status = req.user.registrationStatus || 'Pending Approval';
 
   if (status !== 'Approved') {
     return res.status(403).json({
@@ -30,3 +30,4 @@ export const requireApprovedUser = (req, res, next) => {
 
   next();
 };
+
