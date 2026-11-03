@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   CheckCircle2,
   AlertTriangle,
+  AlertCircle,
   ArrowLeft,
   Lock,
   Download
@@ -25,7 +26,7 @@ import { useAuth } from '../../context/AuthContext';
 export const InvestmentDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated, kycStatus } = useAuth();
+  const { user, isAuthenticated, kycStatus } = useAuth();
 
   const [offer, setOffer] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -59,7 +60,7 @@ export const InvestmentDetails = () => {
       return;
     }
     if (isFundingSuspended) {
-      alert(`Funding Privileges ${user.fundingStatus}: ${user.fundingSuspendedReason || 'Your ability to execute investments has been temporarily suspended by Platform Administration.'}`);
+      alert(`Funding Privileges ${user?.fundingStatus}: ${user?.fundingSuspendedReason || 'Your ability to execute investments has been temporarily suspended by Platform Administration.'}`);
       return;
     }
     setIsModalOpen(true);
@@ -332,10 +333,10 @@ export const InvestmentDetails = () => {
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#B91C1C', fontWeight: 600, fontSize: '14px' }}>
                       <AlertCircle size={16} />
-                      Funding Privileges {user.fundingStatus}
+                      Funding Privileges {user?.fundingStatus}
                     </div>
                     <p style={{ fontSize: '12px', color: '#7F1D1D', marginTop: '4px', lineHeight: 1.4 }}>
-                      {user.fundingSuspendedReason || 'Your ability to execute investments is suspended by Platform Administration.'}
+                      {user?.fundingSuspendedReason || 'Your ability to execute investments is suspended by Platform Administration.'}
                     </p>
                     <div style={{ fontSize: '11px', color: '#991B1B', marginTop: '6px' }}>
                       Contact compliance@connectinvest.in for assistance.
