@@ -28,13 +28,8 @@ export const kycService = {
     bankName?: string;
     accountNumber?: string;
     ifscCode?: string;
-    autoApprove?: boolean;
   }): Promise<{ success: boolean; message: string; data: KYC }> {
     return (await api.post('/kyc/submit', data)) as any;
-  },
-
-  async toggleStatus(status: KycStatus): Promise<{ success: boolean; message: string; data: KYC }> {
-    return (await api.post('/kyc/toggle-status', { status })) as any;
   },
 };
 

@@ -16,8 +16,8 @@ import {
 
 const Tab = createBottomTabNavigator();
 
-// Dummy empty component for More Tab since it triggers drawer
-const DummyMoreScreen = () => <View style={{ flex: 1, backgroundColor: '#FFFDF7' }} />;
+// Placeholder screen for More Tab which intercepts press to open drawer
+const DrawerTriggerScreen = () => <View style={{ flex: 1, backgroundColor: '#FFFDF7' }} />;
 
 export const CompanyTabNavigator = () => {
   const [drawerVisible, setDrawerVisible] = useState(false);
@@ -120,7 +120,7 @@ export const CompanyTabNavigator = () => {
         />
         <Tab.Screen
           name="CompanyMore"
-          component={DummyMoreScreen}
+          component={DrawerTriggerScreen}
           options={{ tabBarLabel: 'More' }}
           listeners={() => ({
             tabPress: (e) => {

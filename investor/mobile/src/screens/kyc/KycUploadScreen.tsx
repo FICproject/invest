@@ -31,7 +31,6 @@ export const KycUploadScreen = ({ route, navigation }: any) => {
   const [bankName, setBankName] = useState<string>(kycData?.bankName || '');
   const [accountNumber, setAccountNumber] = useState<string>(kycData?.accountNumber || '');
   const [ifscCode, setIfscCode] = useState<string>(kycData?.ifscCode || '');
-  const [instantApproval, setInstantApproval] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
@@ -60,15 +59,14 @@ export const KycUploadScreen = ({ route, navigation }: any) => {
         bankName: bankName.trim(),
         accountNumber: accountNumber.trim(),
         ifscCode: ifscCode.trim().toUpperCase(),
-        autoApprove: instantApproval,
       });
 
       if (res.success && res.data) {
         setKycStatusDirectly(res.data.status);
         await refreshKycStatus();
         Alert.alert(
-          instantApproval ? 'KYC Approved!' : 'KYC Submitted',
-          res.message || 'Your documents have been processed.',
+          'KYC Submitted',
+          res.message || 'Your documents have been submitted and are pending compliance verification.',
           [{ text: 'Continue', onPress: () => navigation.goBack() }]
         );
       }
@@ -191,22 +189,6 @@ export const KycUploadScreen = ({ route, navigation }: any) => {
               leftIcon={<Icon name="lock" size={18} color={COLORS.gold} />}
             />
           </View>
-
-          {/* Instant Verification Checkbox */}
-          <TouchableOpacity
-            style={styles.instantBox}
-            onPress={() => setInstantApproval(!instantApproval)}
-          >
-            <View style={[styles.checkbox, instantApproval && styles.checkboxActive]}>
-              {instantApproval && <Icon name="check-circle" size={16} color={COLORS.white} />}
-            </View>
-            <View style={styles.instantTextCol}>
-              <Text style={styles.instantTitle}>Simulate Instant AI Approval (Testing Mode)</Text>
-              <Text style={styles.instantDesc}>
-                Automatically verifies and marks KYC as APPROVED immediately upon submission.
-              </Text>
-            </View>
-          </TouchableOpacity>
 
           <CustomButton
             title="Submit Verification"

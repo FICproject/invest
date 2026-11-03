@@ -6,17 +6,19 @@ import { View, Text, StyleSheet } from 'react-native';
  * 100% Native Views - Zero compilation issues
  */
 export default function InvestmentOverviewChart({
-  trends = [
-    { month: 'Jan', invested: 0.52, returnVal: 0.28 },
-    { month: 'Feb', invested: 0.68, returnVal: 0.45 },
-    { month: 'Mar', invested: 0.85, returnVal: 0.52 },
-    { month: 'Apr', invested: 1.05, returnVal: 0.65 },
-    { month: 'May', invested: 1.25, returnVal: 0.82 },
-    { month: 'Jun', invested: 1.35, returnVal: 0.95 },
-    { month: 'Jul', invested: 1.45, returnVal: 1.30 }
-  ]
+  trends = []
 }) {
-  const maxVal = 2.0;
+  const maxVal = trends.length > 0 ? Math.max(...trends.map(t => Math.max(t.invested || 0, t.returnVal || 0)), 1.0) : 1.0;
+
+  if (!trends || trends.length === 0) {
+    return (
+      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center', paddingVertical: 24 }]}>
+        <Text style={{ fontSize: 11, color: '#94A3B8', fontStyle: 'italic' }}>
+          No historical investment transactions available yet
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

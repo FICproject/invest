@@ -282,7 +282,7 @@ export const RegisterScreen = ({ navigation, route }: any) => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFDF7" />
+      <StatusBar barStyle="dark-content" />
 
       {/* Top Header */}
       <View style={styles.topHeader}>

@@ -1,7 +1,7 @@
 // realTimeSync.ts - Real-Time Sync Client for Connect Invest Mobile (iOS & Android)
-import { API_CONFIG } from '../constants/api';
+import { APP_CONFIG } from '../constants/config';
 
-const SSE_URL = `${API_CONFIG.BASE_URL}/events`;
+const SSE_URL = `${APP_CONFIG.DEFAULT_API_URL}/events`;
 
 type EventCallback = (event: any) => void;
 const listeners = new Set<EventCallback>();
@@ -23,8 +23,8 @@ export function initMobileRealTimeSync(onEventCallback: EventCallback): () => vo
 function connect() {
   try {
     // If EventSource is available via global polyfill
-    if (typeof (global as any).EventSource !== 'undefined') {
-      const ES = (global as any).EventSource;
+    if (typeof (globalThis as any).EventSource !== 'undefined') {
+      const ES = (globalThis as any).EventSource;
       activeConnection = new ES(SSE_URL);
 
       activeConnection.onmessage = (event: any) => {
@@ -77,4 +77,3 @@ function scheduleReconnect() {
     connect();
   }, 4000);
 }
-

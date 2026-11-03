@@ -1,5 +1,5 @@
 import express from 'express';
-import { getKycStatus, submitKyc, toggleKycStatus } from '../controllers/kycController.js';
+import { getKycStatus, submitKyc } from '../controllers/kycController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { uploadKycDocs } from '../middleware/uploadMiddleware.js';
 
@@ -18,6 +18,5 @@ router.post(
   ]),
   submitKyc
 );
-router.post('/toggle-status', toggleKycStatus);
 
 export default router;

@@ -8,7 +8,6 @@ import {
   RefreshControl,
   TouchableOpacity,
   StatusBar,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../../constants/colors';
@@ -30,40 +29,13 @@ export const FinancialReportsScreen: React.FC<ScreenProps> = ({ onBack }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const defaultReports = [
-    {
-      _id: 'rep-q1-26',
-      periodName: 'Q1 FY26 Financial Statement',
-      financialYear: 'FY 2025-26',
-      periodType: 'Quarterly',
-      revenue: 21000000,
-      operatingExpenses: 15500000,
-      netProfitOrLoss: 5500000,
-      auditStatus: 'Audited',
-    },
-    {
-      _id: 'rep-q4-25',
-      periodName: 'Q4 FY25 Annual Review',
-      financialYear: 'FY 2024-25',
-      periodType: 'Quarterly',
-      revenue: 18500000,
-      operatingExpenses: 13900000,
-      netProfitOrLoss: 4600000,
-      auditStatus: 'Audited',
-    },
-  ];
-
   const fetchReports = useCallback(async () => {
     try {
       const res: any = await api.get('/company/financials/reports');
-      if (res.reports && res.reports.length > 0) {
-        setReports(res.reports);
-      } else {
-        setReports(defaultReports);
-      }
+      setReports(res.reports || []);
     } catch (e) {
-      console.error(e);
-      setReports(defaultReports);
+      console.error('Failed to fetch financial reports', e);
+      setReports([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -75,8 +47,6 @@ export const FinancialReportsScreen: React.FC<ScreenProps> = ({ onBack }) => {
   }, [fetchReports]);
 
   if (loading) return <Loader fullScreen message="Loading Financial Reports..." />;
-
-  const displayList = reports.length > 0 ? reports : defaultReports;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -93,50 +63,60 @@ export const FinancialReportsScreen: React.FC<ScreenProps> = ({ onBack }) => {
         </View>
       </View>
 
-      <FlatList
-        data={displayList}
-        keyExtractor={(item) => item._id || Math.random().toString()}
-        contentContainerStyle={styles.listPadding}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              fetchReports();
-            }}
-            tintColor="#B37400"
-          />
-        }
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={styles.rowBetween}>
-              <View>
-                <Text style={styles.itemTitle}>{item.periodName || item.financialYear || 'FY 2025-26'}</Text>
-                <Text style={styles.itemSub}>{item.financialYear} • {item.periodType || 'Quarterly'}</Text>
+      {reports.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Icon name="file-text" size={40} color="#94A3B8" />
+          <Text style={styles.emptyTitle}>No Financial Filings</Text>
+          <Text style={styles.emptySub}>
+            Your corporate entity has not published any financial reports or audit filings yet.
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={reports}
+          keyExtractor={(item) => item._id || Math.random().toString()}
+          contentContainerStyle={styles.listPadding}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                fetchReports();
+              }}
+              tintColor="#B37400"
+            />
+          }
+          renderItem={({ item }) => (
+            <View style={styles.card}>
+              <View style={styles.rowBetween}>
+                <View>
+                  <Text style={styles.itemTitle}>{item.periodName || item.financialYear || 'FY Financial Statement'}</Text>
+                  <Text style={styles.itemSub}>{item.financialYear} • {item.periodType || 'Quarterly'}</Text>
+                </View>
+                <View style={styles.badgeGreen}>
+                  <Text style={styles.badgeGreenText}>{item.auditStatus || 'Audited'}</Text>
+                </View>
               </View>
-              <View style={styles.badgeGreen}>
-                <Text style={styles.badgeGreenText}>{item.auditStatus || 'Audited'}</Text>
-              </View>
-            </View>
 
-            <View style={styles.metricsBox}>
-              <View style={styles.metricCol}>
-                <Text style={styles.metricLabel}>Revenue</Text>
-                <Text style={[styles.metricVal, { color: '#059669' }]}>{formatCurrency(item.revenue || 0)}</Text>
-              </View>
-              <View style={styles.metricCol}>
-                <Text style={styles.metricLabel}>Expenses</Text>
-                <Text style={[styles.metricVal, { color: '#DC2626' }]}>{formatCurrency(item.operatingExpenses || 0)}</Text>
-              </View>
-              <View style={styles.metricCol}>
-                <Text style={styles.metricLabel}>Net Profit</Text>
-                <Text style={[styles.metricVal, { color: '#B37400' }]}>{formatCurrency(item.netProfitOrLoss || 0)}</Text>
+              <View style={styles.metricsBox}>
+                <View style={styles.metricCol}>
+                  <Text style={styles.metricLabel}>Revenue</Text>
+                  <Text style={[styles.metricVal, { color: '#059669' }]}>{formatCurrency(item.revenue || 0)}</Text>
+                </View>
+                <View style={styles.metricCol}>
+                  <Text style={styles.metricLabel}>Expenses</Text>
+                  <Text style={[styles.metricVal, { color: '#DC2626' }]}>{formatCurrency(item.operatingExpenses || 0)}</Text>
+                </View>
+                <View style={styles.metricCol}>
+                  <Text style={styles.metricLabel}>Net Profit</Text>
+                  <Text style={[styles.metricVal, { color: '#B37400' }]}>{formatCurrency(item.netProfitOrLoss || 0)}</Text>
+                </View>
               </View>
             </View>
-          </View>
-        )}
-      />
+          )}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -145,19 +125,29 @@ export const FinancialReportsScreen: React.FC<ScreenProps> = ({ onBack }) => {
 export const ReturnsAndDividendsScreen: React.FC<ScreenProps> = ({ onBack }) => {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const res: any = await api.get('/company/financials/returns-and-dividends');
+      setData(res);
+    } catch (err) {
+      console.error('Failed to load returns and dividends', err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    api
-      .get('/company/financials/returns-and-dividends')
-      .then((res: any) => setData(res))
-      .catch((err) => console.error(err))
-      .finally(() => setLoading(false));
-  }, []);
+    fetchData();
+  }, [fetchData]);
 
   if (loading) return <Loader fullScreen message="Loading Dividends & Returns..." />;
 
-  const returns = data?.fixedTermReturns || [];
-  const dividends = data?.dividends || [];
+  const companyInvestments = data?.companyInvestments || [];
+  const projectInvestments = data?.projectInvestments || [];
+  const allObligations = [...companyInvestments, ...projectInvestments];
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -170,52 +160,65 @@ export const ReturnsAndDividendsScreen: React.FC<ScreenProps> = ({ onBack }) => 
         )}
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Returns and Dividends</Text>
-          <Text style={styles.headerSub}>Investor payouts, monthly yield & dividend declarations</Text>
+          <Text style={styles.headerSub}>Investor payouts, monthly yield & scheduled obligations</Text>
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.listPadding} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.listPadding}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              fetchData();
+            }}
+            tintColor="#B37400"
+          />
+        }
+      >
         {/* Summary Card */}
         <View style={styles.heroCard}>
-          <Text style={styles.heroLabel}>TOTAL DIVIDENDS & YIELD DISBURSED</Text>
-          <Text style={styles.heroAmount}>{formatCurrency(data?.totalDisbursed || 3500000)}</Text>
-          <Text style={styles.heroSub}>Next Scheduled Payout Date: 15 Nov 2026</Text>
+          <Text style={styles.heroLabel}>TOTAL CAPITAL RETURNED / DISBURSED</Text>
+          <Text style={styles.heroAmount}>{formatCurrency(data?.totalRepaid || 0)}</Text>
+          <Text style={styles.heroSub}>
+            Total Outstanding Obligations: {formatCurrency(data?.totalObligations || 0)}
+          </Text>
         </View>
 
-        <Text style={styles.sectionHeading}>Fixed-Term Return Obligations</Text>
-        <View style={styles.card}>
-          <View style={styles.rowBetween}>
-            <View>
-              <Text style={styles.itemTitle}>Fixed-Term R&D Expansion</Text>
-              <Text style={styles.itemSub}>Payout cycle: Monthly • 14% p.a.</Text>
-            </View>
-            <View style={styles.badgeGreen}>
-              <Text style={styles.badgeGreenText}>On Schedule</Text>
-            </View>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.rowBetween}>
-            <Text style={styles.metaLabel}>Monthly Obligation</Text>
-            <Text style={styles.metaValGold}>₹1,75,000 / mo</Text>
-          </View>
-        </View>
+        <Text style={styles.sectionHeading}>Active Scheduled Return Obligations</Text>
 
-        <View style={styles.card}>
-          <View style={styles.rowBetween}>
-            <View>
-              <Text style={styles.itemTitle}>Series-A Platform Scale-up</Text>
-              <Text style={styles.itemSub}>Payout cycle: Quarterly • 14% p.a.</Text>
-            </View>
-            <View style={styles.badgeGreen}>
-              <Text style={styles.badgeGreenText}>Active</Text>
-            </View>
+        {allObligations.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Icon name="trending-up" size={40} color="#94A3B8" />
+            <Text style={styles.emptyTitle}>No Active Obligations</Text>
+            <Text style={styles.emptySub}>
+              No capital raises require scheduled payout distributions at this time.
+            </Text>
           </View>
-          <View style={styles.divider} />
-          <View style={styles.rowBetween}>
-            <Text style={styles.metaLabel}>Quarterly Obligation</Text>
-            <Text style={styles.metaValGold}>₹6,47,500 / qtr</Text>
-          </View>
-        </View>
+        ) : (
+          allObligations.map((item, idx) => (
+            <View key={item._id || idx} style={styles.card}>
+              <View style={styles.rowBetween}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.itemTitle}>{item.title || item.name || 'Capital Allocation'}</Text>
+                  <Text style={styles.itemSub}>
+                    Model: {item.investmentModel || 'Fixed-Term'} • Return: {item.agreedReturnRate || item.returnRate || 0}% p.a.
+                  </Text>
+                </View>
+                <View style={styles.badgeGreen}>
+                  <Text style={styles.badgeGreenText}>{item.status || 'Active'}</Text>
+                </View>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.rowBetween}>
+                <Text style={styles.metaLabel}>Total Raised</Text>
+                <Text style={styles.metaValGold}>{formatCurrency(item.raisedAmount || item.amountInvested || 0)}</Text>
+              </View>
+            </View>
+          ))
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -225,26 +228,26 @@ export const ReturnsAndDividendsScreen: React.FC<ScreenProps> = ({ onBack }) => 
 export const DocumentsComplianceScreen: React.FC<ScreenProps> = ({ onBack }) => {
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    api
-      .get('/company/documents')
-      .then((res: any) => setDocuments(res.documents || []))
-      .catch((err) => console.error(err))
-      .finally(() => setLoading(false));
+  const fetchDocs = useCallback(async () => {
+    try {
+      const res: any = await api.get('/company/documents');
+      setDocuments(res.documents || []);
+    } catch (err) {
+      console.error('Failed to load documents', err);
+      setDocuments([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
+  useEffect(() => {
+    fetchDocs();
+  }, [fetchDocs]);
+
   if (loading) return <Loader fullScreen message="Loading Compliance Documents..." />;
-
-  const dummyDocs = [
-    { title: 'Certificate of Incorporation (ROC)', type: 'Legal', status: 'Verified', date: '15 Apr 2021' },
-    { title: 'Memorandum of Association (MoA)', type: 'Corporate', status: 'Verified', date: '15 Apr 2021' },
-    { title: 'Articles of Association (AoA)', type: 'Corporate', status: 'Verified', date: '15 Apr 2021' },
-    { title: 'Company PAN & GST Registration', type: 'Tax Identification', status: 'Verified', date: '02 May 2021' },
-    { title: 'Audited Financial Statements (FY 2024-25)', type: 'Audit', status: 'Verified', date: '30 Sep 2025' },
-  ];
-
-  const list = documents.length > 0 ? documents : dummyDocs;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -261,39 +264,78 @@ export const DocumentsComplianceScreen: React.FC<ScreenProps> = ({ onBack }) => 
         </View>
       </View>
 
-      <FlatList
-        data={list}
-        keyExtractor={(_, i) => i.toString()}
-        contentContainerStyle={styles.listPadding}
-        showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={styles.rowBetween}>
-              <View style={styles.iconCircle}>
-                <Icon name="file-text" size={18} color="#B37400" />
-              </View>
-              <View style={{ flex: 1, marginHorizontal: 10 }}>
-                <Text style={styles.itemTitle}>{item.title || item.name}</Text>
-                <Text style={styles.itemSub}>{item.type || 'Statutory Filing'} • {item.date || 'Active'}</Text>
-              </View>
-              <View style={styles.badgeGreen}>
-                <Text style={styles.badgeGreenText}>{item.status || 'Verified'}</Text>
+      {documents.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Icon name="file-text" size={40} color="#94A3B8" />
+          <Text style={styles.emptyTitle}>No Documents Uploaded</Text>
+          <Text style={styles.emptySub}>
+            No corporate compliance filings or statutory documents recorded in database.
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={documents}
+          keyExtractor={(item, i) => item._id || i.toString()}
+          contentContainerStyle={styles.listPadding}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                fetchDocs();
+              }}
+              tintColor="#B37400"
+            />
+          }
+          renderItem={({ item }) => (
+            <View style={styles.card}>
+              <View style={styles.rowBetween}>
+                <View style={styles.iconCircle}>
+                  <Icon name="file-text" size={18} color="#B37400" />
+                </View>
+                <View style={{ flex: 1, marginHorizontal: 10 }}>
+                  <Text style={styles.itemTitle}>{item.title || item.name || item.documentType}</Text>
+                  <Text style={styles.itemSub}>
+                    {item.type || item.documentType || 'Statutory Filing'} • {item.createdAt ? formatDate(item.createdAt) : 'Active'}
+                  </Text>
+                </View>
+                <View style={styles.badgeGreen}>
+                  <Text style={styles.badgeGreenText}>{item.status || 'Verified'}</Text>
+                </View>
               </View>
             </View>
-          </View>
-        )}
-      />
+          )}
+        />
+      )}
     </SafeAreaView>
   );
 };
 
 // 4. Notifications Screen
 export const NotificationsScreen: React.FC<ScreenProps> = ({ onBack }) => {
-  const dummyNotifs = [
-    { title: 'Welcome to Connect Invest Company Portal!', desc: 'Your company profile Nexus Tech Innovations has been fully verified.', time: '2h ago' },
-    { title: 'New Investor Subscription', desc: 'Investor Rahul Sharma subscribed to Fixed-Term R&D Expansion round.', time: '1d ago' },
-    { title: 'ROC Compliance Verified', desc: 'MCA filings and director KYC approved by administrator.', time: '3d ago' },
-  ];
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchNotifs = useCallback(async () => {
+    try {
+      const res: any = await api.get('/investor/notifications');
+      setNotifications(res.data || res.notifications || []);
+    } catch (err) {
+      console.error('Failed to load notifications', err);
+      setNotifications([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchNotifs();
+  }, [fetchNotifs]);
+
+  if (loading) return <Loader fullScreen message="Loading Notifications..." />;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -310,25 +352,45 @@ export const NotificationsScreen: React.FC<ScreenProps> = ({ onBack }) => {
         </View>
       </View>
 
-      <FlatList
-        data={dummyNotifs}
-        keyExtractor={(_, i) => i.toString()}
-        contentContainerStyle={styles.listPadding}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={{ flexDirection: 'row' }}>
-              <View style={[styles.iconCircle, { backgroundColor: '#FFF9ED' }]}>
-                <Icon name="bell" size={18} color="#DE8E0A" />
-              </View>
-              <View style={{ flex: 1, marginLeft: 10 }}>
-                <Text style={styles.itemTitle}>{item.title}</Text>
-                <Text style={styles.itemSub}>{item.desc}</Text>
-                <Text style={styles.notifTime}>{item.time}</Text>
+      {notifications.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Icon name="bell" size={40} color="#94A3B8" />
+          <Text style={styles.emptyTitle}>No Notifications</Text>
+          <Text style={styles.emptySub}>
+            You have no notifications or compliance alerts at this time.
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={notifications}
+          keyExtractor={(item, i) => item._id || i.toString()}
+          contentContainerStyle={styles.listPadding}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                fetchNotifs();
+              }}
+              tintColor="#B37400"
+            />
+          }
+          renderItem={({ item }) => (
+            <View style={styles.card}>
+              <View style={{ flexDirection: 'row' }}>
+                <View style={[styles.iconCircle, { backgroundColor: '#FFF9ED' }]}>
+                  <Icon name="bell" size={18} color="#DE8E0A" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={styles.itemTitle}>{item.title}</Text>
+                  <Text style={styles.itemSub}>{item.message || item.desc}</Text>
+                  <Text style={styles.notifTime}>{item.createdAt ? formatDate(item.createdAt) : ''}</Text>
+                </View>
               </View>
             </View>
-          </View>
-        )}
-      />
+          )}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -353,23 +415,23 @@ export const SettingsScreen: React.FC<ScreenProps> = ({ onBack }) => {
       <ScrollView contentContainerStyle={styles.listPadding} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
           <Text style={styles.itemTitle}>Security & Access</Text>
-          <Text style={styles.itemSub}>Two-factor authentication, authorized signers & session controls</Text>
+          <Text style={styles.itemSub}>Role authentication and session parameters</Text>
           <View style={styles.divider} />
           <View style={styles.rowBetween}>
-            <Text style={styles.metaLabel}>2-Factor Authentication (2FA)</Text>
+            <Text style={styles.metaLabel}>Session Security</Text>
             <View style={styles.badgeGreen}>
-              <Text style={styles.badgeGreenText}>Enabled</Text>
+              <Text style={styles.badgeGreenText}>Active</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.itemTitle}>API & Integrations</Text>
-          <Text style={styles.itemSub}>Webhook endpoints for banking and ERP synchronization</Text>
+          <Text style={styles.itemTitle}>Backend & Database Connection</Text>
+          <Text style={styles.itemSub}>MongoDB persistent transaction ledger</Text>
           <View style={styles.divider} />
           <View style={styles.rowBetween}>
-            <Text style={styles.metaLabel}>Sync Status</Text>
-            <Text style={styles.metaValGold}>Real-time Connected</Text>
+            <Text style={styles.metaLabel}>Data Source</Text>
+            <Text style={styles.metaValGold}>Live MongoDB Replica</Text>
           </View>
         </View>
       </ScrollView>
@@ -530,6 +592,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#EFE8D8',
     marginTop: 20,
+    marginHorizontal: SPACING.md,
   },
   emptyTitle: {
     fontSize: 15,
@@ -544,4 +607,3 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 });
-

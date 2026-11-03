@@ -18,6 +18,34 @@ export default function InteractivePieChart({
 }) {
   const [selectedIdx, setSelectedIdx] = useState(null);
 
+  const thickness = 24;
+  const innerSize = size - thickness * 2;
+
+  if (!data || data.length === 0) {
+    return (
+      <View style={[styles.container, { paddingVertical: 14, alignItems: 'center', justifyContent: 'center' }]}>
+        <View
+          style={{
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            borderWidth: 10,
+            borderColor: '#E2E8F0',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#FFFFFF'
+          }}
+        >
+          <Text style={[styles.centerLabelText, { color: '#64748B', fontSize: 13 }]}>{centerLabel}</Text>
+          <Text style={styles.centerSublabel}>{centerSublabel}</Text>
+        </View>
+        <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 10, fontStyle: 'italic' }}>
+          No active investment distributions recorded
+        </Text>
+      </View>
+    );
+  }
+
   const total = useMemo(() => {
     return data.reduce((acc, d) => acc + (d.value || 0), 0) || 1;
   }, [data]);

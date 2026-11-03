@@ -13,31 +13,11 @@ export interface AuthResponse {
 }
 
 export const authService = {
-  async register(data: {
-    name: string;
-    email: string;
-    mobile: string;
-    password: string;
-    termsAccepted?: boolean;
-  }): Promise<AuthResponse> {
+  async register(data: Record<string, any>): Promise<AuthResponse> {
     return (await api.post('/auth/register', data)) as any;
   },
 
-  async registerCompany(data: {
-    name: string;
-    email: string;
-    mobile: string;
-    password: string;
-    companyLegalName: string;
-    companyType?: string;
-    industry: string;
-    pan: string;
-    cin?: string;
-    city?: string;
-    state?: string;
-    pincode?: string;
-    description?: string;
-  }): Promise<{
+  async registerCompany(data: Record<string, any>): Promise<{
     success: boolean;
     message: string;
     token?: string;

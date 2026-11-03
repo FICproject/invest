@@ -36,7 +36,13 @@ export type IconName =
   | 'dashboard'
   | 'help-circle'
   | 'settings'
-  | 'layers';
+  | 'layers'
+  | 'x-circle'
+  | 'alert-triangle'
+  | 'clock'
+  | 'circle'
+  | 'arrow-left'
+  | 'arrow-right';
 
 interface IconProps {
   name: IconName;
@@ -286,6 +292,45 @@ export const Icon: React.FC<IconProps> = ({ name, size = 22, color = COLORS.prim
           <Path d="M12 2L2 7l10 5 10-5-10-5z" />
           <Path d="M2 17l10 5 10-5" />
           <Path d="M2 12l10 5 10-5" />
+        </Svg>
+      );
+    case 'x-circle':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <Circle cx="12" cy="12" r="10" />
+          <Path d="m15 9-6 6M9 9l6 6" />
+        </Svg>
+      );
+    case 'alert-triangle':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <Path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+          <Path d="M12 9v4M12 17h.01" />
+        </Svg>
+      );
+    case 'clock':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <Circle cx="12" cy="12" r="10" />
+          <Path d="M12 6v6l4 2" />
+        </Svg>
+      );
+    case 'circle':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <Circle cx="12" cy="12" r="10" />
+        </Svg>
+      );
+    case 'arrow-left':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <Path d="m12 19-7-7 7-7M19 12H5" />
+        </Svg>
+      );
+    case 'arrow-right':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M5 12h14M12 5l7 7-7 7" />
         </Svg>
       );
     default:

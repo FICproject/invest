@@ -33,12 +33,7 @@ import { initMobileRealTimeSync } from '../services/realTimeSync';
 
 export default function DashboardScreen({ setActiveTab, onOpenSidebar }) {
   const [stats, setStats] = useState(null);
-  const defaultDistribution = [
-    { label: 'Solar Rooftop Grid Expansion Phase II', value: 34, color: '#0047BA' },
-    { label: 'Commercial EV Charging Hub Network', value: 8, color: '#10B981' },
-    { label: 'Automated Hydroponics Farming Facility', value: 24, color: '#FAB800' }
-  ];
-  const [distribution, setDistribution] = useState(defaultDistribution);
+  const [distribution, setDistribution] = useState([]);
   const [recentData, setRecentData] = useState({
     recentInvestors: [],
     recentCompanies: []
@@ -91,9 +86,7 @@ export default function DashboardScreen({ setActiveTab, onOpenSidebar }) {
       const res = await adminApi.getDashboard();
       if (res.data.success) {
         setStats(res.data.stats);
-        if (res.data.distribution && res.data.distribution.length > 0) {
-          setDistribution(res.data.distribution);
-        }
+        setDistribution(res.data.distribution || []);
         setRecentData({
           recentInvestors: res.data.recentInvestors || [],
           recentCompanies: res.data.recentCompanies || []

@@ -22,10 +22,9 @@ import { KYC, KycStatus } from '../../types';
 import { formatDate, maskPan } from '../../utils/formatters';
 
 export const KycStatusScreen = ({ navigation }: any) => {
-  const { kycStatus, refreshKycStatus, setKycStatusDirectly } = useAuthContext();
+  const { kycStatus } = useAuthContext();
   const [kycData, setKycData] = useState<KYC | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [toggling, setToggling] = useState<boolean>(false);
 
   const fetchKyc = async () => {
     try {
@@ -44,21 +43,6 @@ export const KycStatusScreen = ({ navigation }: any) => {
   useEffect(() => {
     fetchKyc();
   }, [kycStatus]);
-
-  const handleDevToggle = async (status: KycStatus) => {
-    try {
-      setToggling(true);
-      const res = await kycService.toggleStatus(status);
-      if (res.success && res.data) {
-        setKycData(res.data);
-        setKycStatusDirectly(res.data.status);
-      }
-    } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to toggle status');
-    } finally {
-      setToggling(false);
-    }
-  };
 
   const getStatusCard = () => {
     switch (kycStatus) {
@@ -184,36 +168,6 @@ export const KycStatusScreen = ({ navigation }: any) => {
             style={styles.actionBtn}
           />
         )}
-
-        {/* Developer Instant Test Switcher */}
-        <View style={styles.devBox}>
-          <Text style={styles.devTitle}>DEV ENVIRONMENT TEST TOGGLES</Text>
-          <Text style={styles.devSub}>
-            Instantly switch KYC state to test investment restrictions or approval gates:
-          </Text>
-          <View style={styles.devButtonsRow}>
-            {(['APPROVED', 'PENDING', 'NOT_STARTED', 'REJECTED'] as KycStatus[]).map((st) => (
-              <TouchableOpacity
-                key={st}
-                style={[
-                  styles.devBtn,
-                  kycStatus === st && styles.devBtnActive,
-                ]}
-                disabled={toggling}
-                onPress={() => handleDevToggle(st)}
-              >
-                <Text
-                  style={[
-                    styles.devBtnText,
-                    kycStatus === st && styles.devBtnTextActive,
-                  ]}
-                >
-                  {st.replace('_', ' ')}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );

@@ -62,7 +62,7 @@ export const ApprovalStatusScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.primaryDark} />
+      <StatusBar barStyle="light-content" />
 
       {/* Top Header */}
       <View style={styles.header}>

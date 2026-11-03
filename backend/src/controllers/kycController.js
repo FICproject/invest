@@ -34,8 +34,7 @@ export const submitKyc = asyncHandler(async (req, res) => {
     addressProofNumber,
     bankName,
     accountNumber,
-    ifscCode,
-    autoApprove
+    ifscCode
   } = req.body;
 
   if (!panNumber || !fullName) {
@@ -100,51 +99,15 @@ export const submitKyc = asyncHandler(async (req, res) => {
   // Create status notification
   await Notification.create({
     investorId,
-    title: shouldApprove ? 'KYC Approved Successfully!' : 'KYC Submitted for Verification',
-    message: shouldApprove
-      ? 'Your identity documents have been approved. You are now eligible to execute investments.'
-      : 'Your KYC documents have been submitted and are currently being reviewed by our compliance team.',
+    title: 'KYC Submitted for Verification',
+    message: 'Your KYC documents have been submitted and are currently being reviewed by our compliance team.',
     type: 'kyc',
     link: '/investor/kyc'
   });
 
   res.status(200).json({
     success: true,
-    message: shouldApprove
-      ? 'KYC verified and approved. You can now invest!'
-      : 'KYC documents submitted successfully. Verification in progress.',
-    data: kyc
-  });
-});
-
-// @route   POST /api/kyc/instant-approve (Development convenience endpoint)
-// @desc    Allows toggling approval state for testing investment flows
-export const toggleKycStatus = asyncHandler(async (req, res) => {
-  const { status } = req.body;
-  const validStatuses = ['NOT_STARTED', 'PENDING', 'APPROVED', 'REJECTED'];
-
-  if (!validStatuses.includes(status)) {
-    throw new ApiError(400, 'Invalid status. Choose from: ' + validStatuses.join(', '));
-  }
-
-  let kyc = await KYC.findOne({ investorId: req.user._id });
-  if (!kyc) {
-    kyc = new KYC({ investorId: req.user._id, fullName: req.user.name });
-  }
-
-  kyc.status = status;
-  if (status === 'APPROVED') {
-    kyc.reviewedAt = new Date();
-    kyc.rejectionReason = '';
-  } else if (status === 'REJECTED') {
-    kyc.rejectionReason = 'Document image was blurry or unreadable. Please re-upload clear photos.';
-  }
-
-  await kyc.save();
-
-  res.status(200).json({
-    success: true,
-    message: `KYC status updated to ${status}.`,
+    message: 'KYC documents submitted successfully. Verification in progress by platform compliance.',
     data: kyc
   });
 });

@@ -138,11 +138,7 @@ export async function getDashboardStats(req, res, next) {
         };
       });
     } else {
-      // Clean fallback if no projects exist
-      distributionData = [
-        { label: 'Apex Solar Farm (Project)', projectName: 'Apex Solar Farm', value: 65, color: '#0047BA', amount: formatINR(totalRaisedPaise ? totalRaisedPaise * 0.65 : 32500000) },
-        { label: 'Zenith Agri Harvest (Project)', projectName: 'Zenith Agri Harvest', value: 35, color: '#10B981', amount: formatINR(totalRaisedPaise ? totalRaisedPaise * 0.35 : 17500000) }
-      ];
+      distributionData = [];
     }
 
     // 6. Recent Real Investors with cumulative investment amount

@@ -11,22 +11,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (identifier: string, password: string) => Promise<{ success: boolean; message: string; otpCode?: string }>;
-  register: (data: { name: string; email: string; mobile: string; password: string }) => Promise<{ success: boolean; message: string; otpCode?: string }>;
-  registerCompany: (data: {
-    name: string;
-    email: string;
-    mobile: string;
-    password: string;
-    companyLegalName: string;
-    companyType?: string;
-    industry: string;
-    pan: string;
-    cin?: string;
-    city?: string;
-    state?: string;
-    pincode?: string;
-    description?: string;
-  }) => Promise<{ success: boolean; message: string }>;
+  register: (data: Record<string, any>) => Promise<{ success: boolean; message: string; otpCode?: string }>;
+  registerCompany: (data: Record<string, any>) => Promise<{ success: boolean; message: string }>;
   verifyOtp: (payload: { email?: string; mobile?: string; otp: string }) => Promise<{ success: boolean; message: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -92,7 +78,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return { success: false, message: res.message || 'Login failed' };
   };
 
-  const register = async (data: { name: string; email: string; mobile: string; password: string }) => {
+  const register = async (data: Record<string, any>) => {
     const res = await authService.register(data);
     if (res.success && res.data) {
       await storage.setToken(res.data.token);
@@ -105,21 +91,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return { success: false, message: res.message || 'Registration failed' };
   };
 
-  const registerCompany = async (data: {
-    name: string;
-    email: string;
-    mobile: string;
-    password: string;
-    companyLegalName: string;
-    companyType?: string;
-    industry: string;
-    pan: string;
-    cin?: string;
-    city?: string;
-    state?: string;
-    pincode?: string;
-    description?: string;
-  }) => {
+  const registerCompany = async (data: Record<string, any>) => {
     const res = await authService.registerCompany(data);
     if (res.success && res.token) {
       await storage.setToken(res.token);
