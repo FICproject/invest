@@ -74,7 +74,43 @@ const userSchema = new mongoose.Schema(
     termsAccepted: {
       type: Boolean,
       default: true
-    }
+    },
+    registrationStatus: {
+      type: String,
+      enum: ['Pending Approval', 'Approved', 'Rejected', 'Resubmission Required'],
+      default: 'Pending Approval',
+      index: true
+    },
+    rejectionReason: {
+      type: String,
+      default: null
+    },
+    adminRemarks: {
+      type: String,
+      default: null
+    },
+    submittedAt: {
+      type: Date,
+      default: Date.now
+    },
+    reviewedAt: {
+      type: Date,
+      default: null
+    },
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    statusHistory: [
+      {
+        status: { type: String, required: true },
+        reason: { type: String, default: '' },
+        adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        adminName: { type: String, default: '' },
+        timestamp: { type: Date, default: Date.now }
+      }
+    ]
   },
   {
     timestamps: true

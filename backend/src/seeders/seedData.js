@@ -79,6 +79,7 @@ export async function seedDatabase(isDirectRun = false) {
       password: adminHash,
       passwordHash: adminHash,
       status: 'active',
+      registrationStatus: 'Approved',
       isVerified: true
     });
     console.log(`[Unified Seeder] Created Admin: ${adminUser.email} (Password: AdminPassword123!)`);
@@ -93,6 +94,7 @@ export async function seedDatabase(isDirectRun = false) {
       password: companyHash,
       passwordHash: companyHash,
       status: 'active',
+      registrationStatus: 'Approved',
       isVerified: true
     });
 
@@ -106,6 +108,7 @@ export async function seedDatabase(isDirectRun = false) {
       gstin: '07AABCA1234F1Z5',
       status: Statuses.COMPANY.APPROVED,
       verificationStatus: 'Verified',
+      registrationStatus: 'Approved',
       ownerUserId: companyOwner1._id,
       userId: companyOwner1._id,
       industry: 'Renewable Energy',
@@ -141,6 +144,7 @@ export async function seedDatabase(isDirectRun = false) {
       password: companyHash,
       passwordHash: companyHash,
       status: 'active',
+      registrationStatus: 'Approved',
       isVerified: true
     });
 
@@ -154,6 +158,7 @@ export async function seedDatabase(isDirectRun = false) {
       gstin: '29AABCV5678K1Z3',
       status: Statuses.COMPANY.APPROVED,
       verificationStatus: 'Verified',
+      registrationStatus: 'Approved',
       ownerUserId: companyOwner2._id,
       userId: companyOwner2._id,
       industry: 'Food & Agriculture',
@@ -181,6 +186,7 @@ export async function seedDatabase(isDirectRun = false) {
       password: investorHash,
       passwordHash: investorHash,
       status: 'active',
+      registrationStatus: 'Approved',
       isVerified: true
     });
 
@@ -192,6 +198,7 @@ export async function seedDatabase(isDirectRun = false) {
       password: investorHash,
       passwordHash: investorHash,
       status: 'active',
+      registrationStatus: 'Approved',
       isVerified: true
     });
 
@@ -278,6 +285,159 @@ export async function seedDatabase(isDirectRun = false) {
       submittedAt: new Date(),
       reviewedAt: new Date()
     });
+
+    // 4b. Seed a Pending Investor for Compliance Review
+    const pendingInvestor = await User.create({
+      role: 'investor',
+      name: 'Ananya Deshmukh',
+      email: 'ananya.deshmukh@example.com',
+      mobile: '+919877001122',
+      password: investorHash,
+      passwordHash: investorHash,
+      status: 'active',
+      registrationStatus: 'Pending Approval',
+      isVerified: true
+    });
+
+    await InvestorProfile.create({
+      userId: pendingInvestor._id,
+      pan: 'ABCDE9988K',
+      panNumber: 'ABCDE9988K',
+      aadhaarNumber: 'XXXX-XXXX-4567',
+      aadhaarVerified: false,
+      dob: new Date('1994-08-22'),
+      nationality: 'Indian',
+      occupation: 'Software Architect',
+      annualIncomeRange: '₹25L - ₹50L',
+      sourceOfFunds: 'Salary & Investments',
+      kycStatus: 'Pending Approval',
+      registrationStatus: 'Pending Approval',
+      panCardUrl: '/uploads/sample-pan.png',
+      identityProofUrl: '/uploads/sample-aadhaar.png',
+      cancelledChequeUrl: '/uploads/sample-cheque.png',
+      address: {
+        line1: 'Tower 4, Apt 12B, Hiranandani Estate',
+        street: 'Ghodbunder Road',
+        city: 'Thane',
+        state: 'Maharashtra',
+        pincode: '400607'
+      },
+      bankAccount: {
+        holderName: 'Ananya Deshmukh',
+        accountNo: '334455667788',
+        ifsc: 'ICIC0001020',
+        verified: false
+      },
+      bankDetails: {
+        bankName: 'ICICI Bank Ltd',
+        accountNumber: '334455667788',
+        ifscCode: 'ICIC0001020',
+        accountHolderName: 'Ananya Deshmukh',
+        chequeUrl: '/uploads/sample-cheque.png',
+        isVerified: false
+      },
+      investmentProfile: {
+        experience: '5-10 Years',
+        preferredType: 'Clean Tech & Infrastructure',
+        riskTolerance: 'Moderate',
+        expectedAmount: '₹5,00,000 - ₹10,00,000',
+        goals: 'Capital Growth & Fixed Returns'
+      }
+    });
+
+    await KYC.create({
+      investorId: pendingInvestor._id,
+      fullName: 'Ananya Deshmukh',
+      panNumber: 'ABCDE9988K',
+      panDocumentUrl: '/uploads/sample-pan.png',
+      addressProofType: 'Aadhaar Card',
+      addressProofNumber: 'XXXX-XXXX-4567',
+      addressProofUrl: '/uploads/sample-aadhaar.png',
+      bankProofUrl: '/uploads/sample-cheque.png',
+      bankName: 'ICICI Bank Ltd',
+      accountNumber: '334455667788',
+      ifscCode: 'ICIC0001020',
+      status: 'Pending Approval',
+      registrationStatus: 'Pending Approval',
+      submittedAt: new Date(Date.now() - 2 * 60 * 60 * 1000)
+    });
+
+    // 4c. Seed a Pending Company for Compliance Review
+    const pendingCompanyOwner = await User.create({
+      role: 'companyOwner',
+      name: 'Sunil Verma',
+      email: 'sunil@zenithmobility.in',
+      mobile: '+919845012345',
+      password: companyHash,
+      passwordHash: companyHash,
+      status: 'active',
+      registrationStatus: 'Pending Approval',
+      isVerified: true
+    });
+
+    const pendingCompany = await Company.create({
+      name: 'Zenith EV Mobility Pvt Ltd',
+      legalName: 'Zenith EV Mobility Pvt Ltd',
+      brandName: 'Zenith EV',
+      regNo: 'U34100KA2023PTC176543',
+      cin: 'U34100KA2023PTC176543',
+      pan: 'AAACZ8765E',
+      gstin: '29AAACZ8765E1Z8',
+      status: 'Pending Approval',
+      registrationStatus: 'Pending Approval',
+      verificationStatus: 'Pending Approval',
+      ownerUserId: pendingCompanyOwner._id,
+      userId: pendingCompanyOwner._id,
+      industry: 'Electric Vehicles',
+      sector: 'Automotive & Clean Transport',
+      website: 'https://zenithev.in',
+      officialEmail: 'contact@zenithev.in',
+      officialMobile: '+919845012345',
+      description: 'Building ultra-fast commercial EV charging stations and fleet electrification solutions.',
+      registeredAddress: {
+        street: '14th Main, Sector 4, HSR Layout',
+        city: 'Bengaluru',
+        state: 'Karnataka',
+        pincode: '560102',
+        country: 'India'
+      },
+      bankAccount: {
+        holderName: 'Zenith EV Mobility Private Limited',
+        accountNo: '778899001122',
+        ifsc: 'KKBK0008055',
+        bankName: 'Kotak Mahindra Bank',
+        verified: false
+      },
+      bankDetails: {
+        accountHolderName: 'Zenith EV Mobility Private Limited',
+        bankName: 'Kotak Mahindra Bank',
+        accountNumber: '778899001122',
+        ifscCode: 'KKBK0008055',
+        chequeUrl: '/uploads/sample-cheque.png',
+        isVerified: false
+      },
+      documents: {
+        incorporationCertificateUrl: '/uploads/sample-incorporation.pdf',
+        panCardUrl: '/uploads/sample-company-pan.png',
+        gstCertificateUrl: '/uploads/sample-gst.pdf',
+        moaAoaUrl: '/uploads/sample-moa.pdf',
+        shareholdingPatternUrl: '/uploads/sample-shareholding.pdf',
+        financialStatementsUrl: '/uploads/sample-financials.pdf'
+      },
+      directors: [
+        {
+          name: 'Sunil Verma',
+          email: 'sunil@zenithmobility.in',
+          mobile: '+919845012345',
+          designation: 'Managing Director',
+          pan: 'AAACZ8765E',
+          sharesOwnedPercentage: 70,
+          identityVerified: true
+        }
+      ]
+    });
+    pendingCompanyOwner.companyId = pendingCompany._id;
+    await pendingCompanyOwner.save();
 
     // 5. Offers (Both Offer and InvestmentOffer for complete compatibility)
     const offer1 = await Offer.create({

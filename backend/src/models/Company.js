@@ -85,13 +85,31 @@ const companySchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: Object.values(Statuses.COMPANY),
-      default: Statuses.COMPANY.INVITED
+      default: 'Pending Approval'
     },
+    registrationStatus: {
+      type: String,
+      enum: ['Pending Approval', 'Approved', 'Rejected', 'Resubmission Required'],
+      default: 'Pending Approval',
+      index: true
+    },
+    rejectionReason: {
+      type: String,
+      default: null
+    },
+    statusHistory: [
+      {
+        status: { type: String, required: true },
+        reason: { type: String, default: '' },
+        adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        adminName: { type: String, default: '' },
+        timestamp: { type: Date, default: Date.now }
+      }
+    ],
     verificationStatus: {
       type: String,
-      enum: ['Pending', 'In Review', 'Verified', 'Rejected', 'Action Required', 'Active'],
-      default: 'Pending'
+      enum: ['Pending', 'In Review', 'Verified', 'Rejected', 'Action Required', 'Active', 'Pending Approval', 'Approved', 'Resubmission Required'],
+      default: 'Pending Approval'
     },
     statusReason: {
       type: String,

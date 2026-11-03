@@ -35,9 +35,9 @@ export const VerifyOTP = () => {
       if (res.success && res.data) {
         localStorage.setItem('ci_investor_token', res.data.token);
         await refreshMe();
-        setSuccess('Account verified successfully! Redirecting to KYC onboarding...');
+        setSuccess('Account verified successfully! Your application is pending compliance verification.');
         setTimeout(() => {
-          navigate('/investor/kyc');
+          navigate('/approval-status');
         }, 1200);
       }
     } catch (err) {

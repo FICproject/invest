@@ -46,7 +46,12 @@ import {
   declareDividend,
   distributeDividend,
   getShareholders,
-  updateShareholderAllotment
+  updateShareholderAllotment,
+  getAllApprovals,
+  getApprovalById,
+  decideRegistrationApproval,
+  previewDocument,
+  downloadDocument
 } from './adminController.js';
 import { authenticate, requireAdmin } from '../../middleware/auth.js';
 
@@ -58,6 +63,13 @@ router.use(authenticate, requireAdmin);
 // Dashboard & WorkList
 router.get('/dashboard', getDashboardStats);
 router.get('/worklist', getWorkList);
+
+// Registration Approvals & Document Inspection Suite
+router.get('/approvals', getAllApprovals);
+router.get('/approvals/:id', getApprovalById);
+router.post('/approvals/:id/decision', decideRegistrationApproval);
+router.get('/documents/:filename', previewDocument);
+router.get('/documents/:filename/download', downloadDocument);
 
 // Investors & KYC
 router.get('/investors', getInvestors);

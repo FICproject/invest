@@ -81,19 +81,33 @@ export const Login = () => {
           });
           if (compRes && compRes.token) {
             companyAuth.login(compRes.token, compRes.user, compRes.company);
-            navigate('/dashboard');
+            const status = compRes.company?.registrationStatus || compRes.user?.registrationStatus || 'Approved';
+            if (status !== 'Approved') {
+              navigate('/company/approval-status');
+            } else {
+              navigate('/dashboard');
+            }
             return;
           }
         } catch (compErr) {
           // If company login returned invalid, attempt unified investor check in case it's an investor
           try {
             const invRes = await investorAuth.login(identifier.trim(), password, rememberMe);
+            const regStatus = invRes.data?.user?.registrationStatus || 'Approved';
             if (invRes.data?.user?.role === 'company_admin' || invRes.data?.user?.role === 'company_member') {
               companyAuth.login(invRes.data.token, invRes.data.user, invRes.data.company);
-              navigate('/dashboard');
+              if (regStatus !== 'Approved') {
+                navigate('/company/approval-status');
+              } else {
+                navigate('/dashboard');
+              }
               return;
             } else {
-              navigate('/investor/dashboard');
+              if (regStatus !== 'Approved') {
+                navigate('/approval-status');
+              } else {
+                navigate('/investor/dashboard');
+              }
               return;
             }
           } catch {
@@ -105,14 +119,23 @@ export const Login = () => {
       // 2. Default: Unified Login with Smart Role-Based Access
       const res = await investorAuth.login(identifier.trim(), password, rememberMe);
       const userRole = res.data?.user?.role;
+      const regStatus = res.data?.user?.registrationStatus || 'Approved';
 
       if (userRole === 'company_admin' || userRole === 'company_member') {
         // Log into company portal session & route to corporate dashboard
         companyAuth.login(res.data.token, res.data.user, res.data.company);
-        navigate('/dashboard');
+        if (regStatus !== 'Approved') {
+          navigate('/company/approval-status');
+        } else {
+          navigate('/dashboard');
+        }
       } else {
         // Investor portal session
-        navigate('/investor/dashboard');
+        if (regStatus !== 'Approved') {
+          navigate('/approval-status');
+        } else {
+          navigate('/investor/dashboard');
+        }
       }
     } catch (err) {
       setError(err.message || err.response?.data?.message || 'Login failed. Please check your credentials.');

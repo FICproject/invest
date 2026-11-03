@@ -40,6 +40,13 @@ export const authApi = {
 };
 
 export const adminApi = {
+  // Registration Approvals & Document Review Suite
+  getApprovals: params => api.get('/admin/approvals', { params }),
+  getApprovalById: (id, params) => api.get(`/admin/approvals/${id}`, { params }),
+  decideApproval: (id, data) => api.post(`/admin/approvals/${id}/decision`, data),
+  getDocumentPreviewUrl: filename => `${API_BASE}/admin/documents/${filename}`,
+  getDocumentDownloadUrl: filename => `${API_BASE}/admin/documents/${filename}/download`,
+
   // Dashboard & WorkList
   getDashboard: () => api.get('/admin/dashboard'),
   getWorkList: () => api.get('/admin/worklist'),

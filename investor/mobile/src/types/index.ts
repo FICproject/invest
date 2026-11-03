@@ -1,11 +1,15 @@
 export interface User {
   id: string;
+  _id?: string;
   name: string;
   email: string;
   mobile: string;
   role: 'investor' | 'admin' | 'company_admin' | 'company_member';
   companyId?: string;
   isVerified: boolean;
+  registrationStatus?: 'Pending Approval' | 'Approved' | 'Rejected' | 'Resubmission Required';
+  rejectionReason?: string;
+  adminRemarks?: string;
   createdAt?: string;
 }
 

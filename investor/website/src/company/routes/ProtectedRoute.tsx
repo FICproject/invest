@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Loader } from '../components/common';
 
 export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { token, isLoading } = useAuth();
+  const { token, isLoading, company, user } = useAuth();
 
   if (isLoading) {
     return (
@@ -16,6 +16,12 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
 
   if (!token) {
     return <Navigate to="/company/login" replace />;
+  }
+
+  // Intercept company users whose registration is not approved yet
+  const status = company?.registrationStatus || user?.registrationStatus || 'Approved';
+  if (status !== 'Approved') {
+    return <Navigate to="/company/approval-status" replace />;
   }
 
   return <>{children}</>;

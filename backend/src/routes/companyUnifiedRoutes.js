@@ -1,9 +1,11 @@
 import express from 'express';
 import { requireCompanyAuth, requireCompany } from '../middleware/companyAuthMiddleware.js';
+import { requireApprovedUser } from '../middleware/requireApprovedUser.js';
 import { upload } from '../middleware/uploadMiddleware.js';
 import {
   registerCompany,
-  loginCompany
+  loginCompany,
+  resubmitCompany
 } from '../controllers/companyAuthController.js';
 import {
   getCompanyProfile,
@@ -36,16 +38,20 @@ const router = express.Router();
 // Company Auth (public)
 router.post('/auth/register', registerCompany);
 router.post('/auth/login', loginCompany);
+router.post('/auth/resubmit', requireCompanyAuth, resubmitCompany);
 
 // All protected company endpoints
 router.use(requireCompanyAuth, requireCompany);
 
-// Profile
+// Profile (accessible during pending/resubmission for viewing/updating details)
 router.get('/profile', getCompanyProfile);
 router.put('/profile', updateCompanyProfile);
 router.post('/directors', addDirector);
 router.delete('/directors/:directorIndex', removeDirector);
 router.post('/submit-verification', submitVerification);
+
+// Dashboard & Operational routes - strictly require Admin Approval
+router.use(requireApprovedUser);
 
 // Dashboard & Investments
 router.get('/dashboard-overview', getDashboardOverview);

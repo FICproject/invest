@@ -1,6 +1,9 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import {
   User,
   InvestorProfile,
@@ -16,8 +19,13 @@ import {
   AuditLog,
   Query,
   Subscription,
-  Dividend
+  Dividend,
+  KYC
 } from '../../models/index.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadDir = path.join(__dirname, '../../../uploads');
 import {
   Roles,
   Statuses,
@@ -499,13 +507,39 @@ export async function decideKyc(req, res, next) {
 
     const before = { kycStatus: profile.kycStatus, kycReason: profile.kycReason };
     profile.kycStatus = decision;
+    profile.registrationStatus = decision;
     profile.kycReason = reason.trim();
+    profile.rejectionReason = decision === 'Approved' ? null : reason.trim();
     if (decision === Statuses.KYC.APPROVED && profile.bankAccount) {
       profile.bankAccount.verified = true;
     }
     await profile.save();
 
+    if (profile.userId) {
+      profile.userId.registrationStatus = decision;
+      profile.userId.rejectionReason = decision === 'Approved' ? null : reason.trim();
+      profile.userId.adminRemarks = reason.trim();
+      profile.userId.reviewedAt = new Date();
+      profile.userId.reviewedBy = req.user._id;
+      if (!profile.userId.statusHistory) profile.userId.statusHistory = [];
+      profile.userId.statusHistory.push({
+        status: decision,
+        reason: reason.trim(),
+        adminId: req.user._id,
+        adminName: req.user.name,
+        timestamp: new Date()
+      });
+      await profile.userId.save();
+    }
+
     broadcastSyncEvent('INVESTOR_KYC', 'DECIDED', { profileId: profile._id, status: decision });
+    broadcastSyncEvent('REGISTRATION_DECISION', 'DECIDED', {
+      userId: profile.userId?._id,
+      role: 'investor',
+      decision,
+      status: decision,
+      reason: reason.trim()
+    });
 
     await logAction({
       actorId: req.user._id,
@@ -687,13 +721,43 @@ export async function decideKyb(req, res, next) {
 
     const before = { status: company.status, statusReason: company.statusReason };
     company.status = decision;
+    company.registrationStatus = decision;
+    company.verificationStatus = decision;
     company.statusReason = reason.trim();
+    company.rejectionReason = decision === 'Approved' ? null : reason.trim();
     if (decision === Statuses.COMPANY.APPROVED && company.bankAccount) {
       company.bankAccount.verified = true;
     }
     await company.save();
 
+    const owner = await User.findById(company.ownerUserId || company.userId);
+    if (owner) {
+      owner.registrationStatus = decision;
+      owner.rejectionReason = decision === 'Approved' ? null : reason.trim();
+      owner.adminRemarks = reason.trim();
+      owner.reviewedAt = new Date();
+      owner.reviewedBy = req.user._id;
+      if (!owner.statusHistory) owner.statusHistory = [];
+      owner.statusHistory.push({
+        status: decision,
+        reason: reason.trim(),
+        adminId: req.user._id,
+        adminName: req.user.name,
+        timestamp: new Date()
+      });
+      await owner.save();
+    }
+
     broadcastSyncEvent('COMPANY_KYB', 'DECIDED', { companyId: company._id, status: decision });
+    broadcastSyncEvent('REGISTRATION_DECISION', 'DECIDED', {
+      companyId: company._id,
+      userId: owner?._id,
+      role: 'company',
+      legalName: company.legalName,
+      decision,
+      status: decision,
+      reason: reason.trim()
+    });
 
     await logAction({
       actorId: req.user._id,
@@ -2998,6 +3062,473 @@ export async function updateShareholderAllotment(req, res, next) {
     });
 
     return res.json({ success: true, message: 'Shareholder allotment details updated', investment });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ==========================================
+// REGISTRATION APPROVAL WORKFLOW CONTROLLER
+// ==========================================
+
+export async function getAllApprovals(req, res, next) {
+  try {
+    const { type = 'all', status = 'all', search = '' } = req.query;
+
+    let investorList = [];
+    let companyList = [];
+
+    // 1. Fetch Investors
+    if (type === 'all' || type === 'investor') {
+      const profiles = await InvestorProfile.find().populate('userId').sort({ createdAt: -1 });
+      const kycs = await KYC.find();
+      const kycMap = new Map();
+      kycs.forEach(k => kycMap.set(String(k.investorId), k));
+
+      for (const p of profiles) {
+        if (!p.userId) continue;
+
+        const regStatus = p.registrationStatus || p.userId.registrationStatus || (p.kycStatus === 'Approved' ? 'Approved' : 'Pending Approval');
+        const kyc = kycMap.get(String(p.userId._id));
+
+        // Status filter
+        if (status !== 'all' && regStatus !== status) continue;
+
+        // Search filter
+        if (search) {
+          const s = search.toLowerCase();
+          const matches =
+            p.userId.name?.toLowerCase().includes(s) ||
+            p.userId.email?.toLowerCase().includes(s) ||
+            p.userId.mobile?.includes(s) ||
+            p.pan?.toLowerCase().includes(s);
+          if (!matches) continue;
+        }
+
+        const documents = [];
+        const panUrl = p.panCardUrl || kyc?.panDocumentUrl;
+        if (panUrl) documents.push({ name: 'PAN Card', key: 'panCard', url: panUrl, type: 'identity' });
+
+        const addressUrl = p.identityProofUrl || kyc?.addressProofUrl;
+        if (addressUrl) documents.push({ name: kyc?.addressProofType || 'Address & Identity Proof', key: 'addressProof', url: addressUrl, type: 'address' });
+
+        const chequeUrl = p.cancelledChequeUrl || p.bankDetails?.chequeUrl || kyc?.bankProofUrl;
+        if (chequeUrl) documents.push({ name: 'Cancelled Cheque / Bank Proof', key: 'bankProof', url: chequeUrl, type: 'financial' });
+
+        if (kyc?.selfieUrl) documents.push({ name: 'Investor Selfie Photo', key: 'selfie', url: kyc.selfieUrl, type: 'identity' });
+
+        investorList.push({
+          id: p._id,
+          profileId: p._id,
+          userId: p.userId._id,
+          type: 'investor',
+          name: p.userId.name,
+          email: p.userId.email,
+          mobile: p.userId.mobile,
+          registrationStatus: regStatus,
+          rejectionReason: p.rejectionReason || p.userId.rejectionReason || p.kycReason || null,
+          adminRemarks: p.userId.adminRemarks || null,
+          submittedAt: p.userId.submittedAt || p.createdAt,
+          reviewedAt: p.userId.reviewedAt || null,
+          details: {
+            pan: p.pan || p.panNumber || 'N/A',
+            aadhaar: p.aadhaarNumber || 'N/A',
+            dob: p.dob || p.dateOfBirth,
+            nationality: p.nationality || 'Indian',
+            occupation: p.occupation || 'N/A',
+            annualIncomeRange: p.annualIncomeRange || 'N/A',
+            sourceOfFunds: p.sourceOfFunds || 'N/A',
+            address: p.address,
+            bankDetails: p.bankDetails || p.bankAccount,
+            investmentProfile: p.investmentProfile
+          },
+          documents,
+          statusHistory: p.userId.statusHistory?.length ? p.userId.statusHistory : (p.statusHistory || [])
+        });
+      }
+    }
+
+    // 2. Fetch Companies
+    if (type === 'all' || type === 'company') {
+      const companies = await Company.find().populate('ownerUserId').populate('userId').sort({ createdAt: -1 });
+
+      for (const c of companies) {
+        const owner = c.ownerUserId || c.userId;
+        const regStatus = c.registrationStatus || (c.status === 'Approved' ? 'Approved' : 'Pending Approval');
+
+        // Status filter
+        if (status !== 'all' && regStatus !== status) continue;
+
+        // Search filter
+        if (search) {
+          const s = search.toLowerCase();
+          const matches =
+            c.legalName?.toLowerCase().includes(s) ||
+            c.name?.toLowerCase().includes(s) ||
+            c.cin?.toLowerCase().includes(s) ||
+            c.pan?.toLowerCase().includes(s) ||
+            c.officialEmail?.toLowerCase().includes(s) ||
+            owner?.name?.toLowerCase().includes(s);
+          if (!matches) continue;
+        }
+
+        const documents = [];
+        if (c.documents?.incorporationCertificateUrl) {
+          documents.push({ name: 'Certificate of Incorporation', key: 'incorporation', url: c.documents.incorporationCertificateUrl, type: 'legal' });
+        }
+        if (c.documents?.panCardUrl) {
+          documents.push({ name: 'Company PAN Card', key: 'panCard', url: c.documents.panCardUrl, type: 'identity' });
+        }
+        if (c.documents?.gstCertificateUrl) {
+          documents.push({ name: 'GST Registration Certificate', key: 'gst', url: c.documents.gstCertificateUrl, type: 'tax' });
+        }
+        if (c.documents?.moaAoaUrl) {
+          documents.push({ name: 'MOA & AOA Charter', key: 'moaAoa', url: c.documents.moaAoaUrl, type: 'legal' });
+        }
+        if (c.documents?.shareholdingPatternUrl) {
+          documents.push({ name: 'Shareholding Pattern', key: 'shareholding', url: c.documents.shareholdingPatternUrl, type: 'compliance' });
+        }
+        if (c.documents?.financialStatementsUrl) {
+          documents.push({ name: 'Audited Financial Statements', key: 'financials', url: c.documents.financialStatementsUrl, type: 'financial' });
+        }
+        const chequeUrl = c.bankDetails?.chequeUrl;
+        if (chequeUrl) {
+          documents.push({ name: 'Cancelled Cheque', key: 'cancelledCheque', url: chequeUrl, type: 'financial' });
+        }
+
+        companyList.push({
+          id: c._id,
+          companyId: c._id,
+          userId: owner?._id,
+          type: 'company',
+          name: c.legalName || c.name,
+          legalName: c.legalName || c.name,
+          brandName: c.brandName || c.name,
+          email: c.officialEmail || owner?.email,
+          mobile: c.officialMobile || owner?.mobile,
+          registrationStatus: regStatus,
+          rejectionReason: c.rejectionReason || c.statusReason || null,
+          adminRemarks: owner?.adminRemarks || null,
+          submittedAt: c.createdAt,
+          reviewedAt: c.verifiedAt || null,
+          details: {
+            cin: c.cin || c.regNo || 'N/A',
+            pan: c.pan || 'N/A',
+            gstin: c.gstin || 'N/A',
+            companyType: c.companyType || 'Private Limited',
+            industry: c.industry || 'General',
+            sector: c.sector || 'General',
+            website: c.website || '',
+            registeredAddress: c.registeredAddress,
+            bankDetails: c.bankDetails || c.bankAccount,
+            directors: c.directors || [],
+            description: c.description || '',
+            authorizedCapital: c.authorizedCapital,
+            paidUpCapital: c.paidUpCapital
+          },
+          documents,
+          statusHistory: c.statusHistory?.length ? c.statusHistory : (owner?.statusHistory || [])
+        });
+      }
+    }
+
+    // Combine or sort by submittedAt descending
+    const applications = [...investorList, ...companyList].sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+
+    // Compute stats
+    const allProfiles = await InvestorProfile.find().populate('userId');
+    const allCompanies = await Company.find().populate('ownerUserId');
+
+    let totalPending = 0;
+    let pendingInvestors = 0;
+    let pendingCompanies = 0;
+    let totalApproved = 0;
+    let totalRejected = 0;
+    let resubmissionsNeeded = 0;
+
+    allProfiles.forEach(p => {
+      const st = p.registrationStatus || p.userId?.registrationStatus || (p.kycStatus === 'Approved' ? 'Approved' : 'Pending Approval');
+      if (st === 'Pending Approval') {
+        totalPending++;
+        pendingInvestors++;
+      } else if (st === 'Approved') {
+        totalApproved++;
+      } else if (st === 'Rejected') {
+        totalRejected++;
+      } else if (st === 'Resubmission Required') {
+        resubmissionsNeeded++;
+      }
+    });
+
+    allCompanies.forEach(c => {
+      const st = c.registrationStatus || (c.status === 'Approved' ? 'Approved' : 'Pending Approval');
+      if (st === 'Pending Approval') {
+        totalPending++;
+        pendingCompanies++;
+      } else if (st === 'Approved') {
+        totalApproved++;
+      } else if (st === 'Rejected') {
+        totalRejected++;
+      } else if (st === 'Resubmission Required') {
+        resubmissionsNeeded++;
+      }
+    });
+
+    return res.json({
+      success: true,
+      stats: {
+        totalPending,
+        pendingInvestors,
+        pendingCompanies,
+        totalApproved,
+        totalRejected,
+        resubmissionsNeeded,
+        totalApplications: allProfiles.length + allCompanies.length
+      },
+      applications
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getApprovalById(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { type } = req.query;
+
+    if (type === 'investor') {
+      const profile = await InvestorProfile.findById(id).populate('userId');
+      if (!profile) return res.status(404).json({ success: false, error: 'Investor profile not found' });
+      const kyc = await KYC.findOne({ investorId: profile.userId?._id });
+      return res.json({ success: true, application: { profile, kyc, user: profile.userId } });
+    } else {
+      const company = await Company.findById(id).populate('ownerUserId').populate('userId');
+      if (!company) return res.status(404).json({ success: false, error: 'Company record not found' });
+      return res.json({ success: true, application: { company } });
+    }
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function decideRegistrationApproval(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { type, decision, reason } = req.body;
+
+    if (!['Approved', 'Rejected', 'Resubmission Required'].includes(decision)) {
+      return res.status(400).json({ success: false, error: 'Decision must be Approved, Rejected, or Resubmission Required.' });
+    }
+
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ success: false, error: 'A written reason or compliance remark is required for any decision.' });
+    }
+
+    const trimmedReason = reason.trim();
+    const adminId = req.user._id;
+    const adminName = req.user.name || 'Compliance Admin';
+    const now = new Date();
+
+    if (type === 'investor') {
+      let profile = await InvestorProfile.findById(id).populate('userId');
+      let user = profile?.userId;
+      if (!profile) {
+        user = await User.findById(id);
+        if (user) profile = await InvestorProfile.findOne({ userId: user._id });
+      }
+
+      if (!user) {
+        return res.status(404).json({ success: false, error: 'Investor user account not found.' });
+      }
+
+      const historyEntry = {
+        status: decision,
+        reason: trimmedReason,
+        adminId,
+        adminName,
+        timestamp: now
+      };
+
+      user.registrationStatus = decision;
+      user.rejectionReason = decision === 'Approved' ? null : trimmedReason;
+      user.adminRemarks = trimmedReason;
+      user.reviewedAt = now;
+      user.reviewedBy = adminId;
+      if (!user.statusHistory) user.statusHistory = [];
+      user.statusHistory.push(historyEntry);
+      await user.save();
+
+      if (profile) {
+        profile.registrationStatus = decision;
+        profile.kycStatus = decision;
+        profile.kycReason = trimmedReason;
+        profile.rejectionReason = decision === 'Approved' ? null : trimmedReason;
+        if (!profile.statusHistory) profile.statusHistory = [];
+        profile.statusHistory.push(historyEntry);
+        if (decision === 'Approved' && profile.bankAccount) {
+          profile.bankAccount.verified = true;
+          if (profile.bankDetails) profile.bankDetails.isVerified = true;
+        }
+        await profile.save();
+      }
+
+      const kyc = await KYC.findOne({ investorId: user._id });
+      if (kyc) {
+        kyc.status = decision;
+        kyc.registrationStatus = decision;
+        kyc.rejectionReason = decision === 'Approved' ? '' : trimmedReason;
+        kyc.reviewedAt = now;
+        await kyc.save();
+      }
+
+      await logAction({
+        actorId: adminId,
+        role: req.user.role,
+        action: `INVESTOR_REGISTRATION_${decision.toUpperCase().replace(/\s+/g, '_')}`,
+        targetEntity: 'User',
+        targetId: user._id,
+        reason: trimmedReason,
+        ipAddress: req.ip
+      });
+
+      // Broadcast real-time SSE event to Web & Mobile
+      broadcastSyncEvent('REGISTRATION_DECISION', 'DECIDED', {
+        id: user._id,
+        userId: user._id,
+        profileId: profile?._id,
+        role: 'investor',
+        name: user.name,
+        email: user.email,
+        decision,
+        status: decision,
+        reason: trimmedReason,
+        reviewedBy: adminName,
+        timestamp: now
+      });
+
+      return res.json({
+        success: true,
+        message: `Investor application marked as ${decision}.`,
+        decision,
+        user: { id: user._id, registrationStatus: user.registrationStatus }
+      });
+    } else {
+      // Company decision
+      const company = await Company.findById(id).populate('ownerUserId').populate('userId');
+      if (!company) {
+        return res.status(404).json({ success: false, error: 'Company record not found.' });
+      }
+
+      const owner = company.ownerUserId || company.userId;
+      const historyEntry = {
+        status: decision,
+        reason: trimmedReason,
+        adminId,
+        adminName,
+        timestamp: now
+      };
+
+      company.registrationStatus = decision;
+      company.status = decision;
+      company.verificationStatus = decision;
+      company.statusReason = trimmedReason;
+      company.rejectionReason = decision === 'Approved' ? null : trimmedReason;
+      company.verificationRemarks = trimmedReason;
+      company.verifiedAt = now;
+      if (!company.statusHistory) company.statusHistory = [];
+      company.statusHistory.push(historyEntry);
+      if (decision === 'Approved' && company.bankAccount) {
+        company.bankAccount.verified = true;
+        if (company.bankDetails) company.bankDetails.isVerified = true;
+      }
+      await company.save();
+
+      if (owner) {
+        owner.registrationStatus = decision;
+        owner.rejectionReason = decision === 'Approved' ? null : trimmedReason;
+        owner.adminRemarks = trimmedReason;
+        owner.reviewedAt = now;
+        owner.reviewedBy = adminId;
+        if (!owner.statusHistory) owner.statusHistory = [];
+        owner.statusHistory.push(historyEntry);
+        await owner.save();
+      }
+
+      await logAction({
+        actorId: adminId,
+        role: req.user.role,
+        action: `COMPANY_REGISTRATION_${decision.toUpperCase().replace(/\s+/g, '_')}`,
+        targetEntity: 'Company',
+        targetId: company._id,
+        reason: trimmedReason,
+        ipAddress: req.ip
+      });
+
+      // Broadcast real-time SSE event to Web & Mobile
+      broadcastSyncEvent('REGISTRATION_DECISION', 'DECIDED', {
+        id: company._id,
+        companyId: company._id,
+        userId: owner?._id,
+        role: 'company',
+        legalName: company.legalName,
+        decision,
+        status: decision,
+        reason: trimmedReason,
+        reviewedBy: adminName,
+        timestamp: now
+      });
+
+      return res.json({
+        success: true,
+        message: `Company application marked as ${decision}.`,
+        decision,
+        company: { id: company._id, registrationStatus: company.registrationStatus }
+      });
+    }
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function previewDocument(req, res, next) {
+  try {
+    const { filename } = req.params;
+    const safeFilename = path.basename(filename);
+    const filePath = path.join(uploadDir, safeFilename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, error: 'Document file not found' });
+    }
+
+    const ext = path.extname(safeFilename).toLowerCase();
+    const mimeTypes = {
+      '.pdf': 'application/pdf',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg'
+    };
+    const contentType = mimeTypes[ext] || 'application/octet-stream';
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `inline; filename="${safeFilename}"`);
+    return fs.createReadStream(filePath).pipe(res);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function downloadDocument(req, res, next) {
+  try {
+    const { filename } = req.params;
+    const safeFilename = path.basename(filename);
+    const filePath = path.join(uploadDir, safeFilename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, error: 'Document file not found' });
+    }
+
+    return res.download(filePath, safeFilename);
   } catch (error) {
     next(error);
   }

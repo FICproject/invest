@@ -22,7 +22,12 @@ export const CompanyLogin: React.FC = () => {
     try {
       const data = await authService.login({ email, password });
       login(data.token, data.user, data.company);
-      navigate('/dashboard');
+      const status = data.company?.registrationStatus || data.user?.registrationStatus || 'Approved';
+      if (status !== 'Approved') {
+        navigate('/company/approval-status');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed. Please verify your credentials.');
     } finally {

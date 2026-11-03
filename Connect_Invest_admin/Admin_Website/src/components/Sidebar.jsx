@@ -17,10 +17,11 @@ import {
 import { ForgeIndiaBrandHeader } from '../assets/ForgeIndiaLogo';
 import { useAuth } from '../context/AuthContext';
 
-export default function Sidebar({ activeTab, setActiveTab }) {
+export default function Sidebar({ activeTab, setActiveTab, pendingCounts = {} }) {
   const { logout, user } = useAuth();
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
+    { id: 'approvals', label: 'Registration Approvals', icon: ShieldCheck, badgeCount: pendingCounts?.total || 0 },
     { id: 'investors', label: 'Investor Management', icon: Users },
     { id: 'companies', label: 'Company Management', icon: Building2 },
     { id: 'offers', label: 'Investment Management', icon: Briefcase },
@@ -101,6 +102,20 @@ export default function Sidebar({ activeTab, setActiveTab }) {
                 />
                 <span>{item.label}</span>
               </div>
+
+              {item.badgeCount > 0 && (
+                <span style={{
+                  background: isActive ? '#FFFFFF' : '#0047BA',
+                  color: isActive ? '#0047BA' : '#FFFFFF',
+                  borderRadius: '9999px',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  padding: '2px 8px',
+                  lineHeight: 1.2
+                }}>
+                  {item.badgeCount}
+                </span>
+              )}
 
               {item.id === 'notifications' && (
                 <span style={{

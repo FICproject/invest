@@ -6,6 +6,7 @@ import { Notification } from '../models/Notification.js';
 import { ENV } from '../config/env.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { broadcastSyncEvent } from '../services/sse.js';
 
 const generateToken = (id) => {
   return jwt.sign({ id, userId: id }, ENV.JWT_SECRET, { expiresIn: ENV.JWT_EXPIRES_IN });
@@ -73,7 +74,9 @@ export const registerCompany = asyncHandler(async (req, res) => {
     mobile: adminMobile,
     password,
     role: 'company_admin',
-    isVerified: true
+    isVerified: true,
+    registrationStatus: 'Pending Approval',
+    submittedAt: new Date()
   });
 
   const company = await Company.create({
@@ -98,6 +101,7 @@ export const registerCompany = asyncHandler(async (req, res) => {
     },
     description: description || `${companyLegalName} - Innovating growth via Connect Invest.`,
     userId: user._id,
+    ownerUserId: user._id,
     bankDetails: {
       accountHolderName: accountHolderName || companyLegalName,
       bankName: bankName || '',
@@ -125,7 +129,9 @@ export const registerCompany = asyncHandler(async (req, res) => {
         identityVerified: Boolean(repIdentityVerified)
       }
     ],
-    verificationStatus: 'Verified'
+    status: 'Pending Approval',
+    registrationStatus: 'Pending Approval',
+    verificationStatus: 'Pending Approval'
   });
 
   user.companyId = company._id;
@@ -134,7 +140,7 @@ export const registerCompany = asyncHandler(async (req, res) => {
   await Notification.create({
     companyId: company._id,
     title: 'Welcome to Connect Invest Company Portal!',
-    message: `Your company ${company.legalName} has been initialized successfully.`,
+    message: `Your company ${company.legalName} has been submitted for admin compliance verification.`,
     type: 'system'
   });
 
@@ -142,25 +148,40 @@ export const registerCompany = asyncHandler(async (req, res) => {
     companyId: company._id,
     userId: user._id,
     userEmail: user.email,
-    action: 'REGISTER_COMPANY',
+    action: 'REGISTER_COMPANY_PENDING',
     module: 'AUTH',
-    details: { companyId: company._id, legalName: company.legalName }
+    details: { companyId: company._id, legalName: company.legalName, status: 'Pending Approval' }
+  });
+
+  // Broadcast real-time event to Admin Console
+  broadcastSyncEvent('REGISTRATION', 'SUBMITTED', {
+    id: company._id,
+    companyId: company._id,
+    userId: user._id,
+    role: 'company',
+    legalName: company.legalName,
+    email: company.officialEmail,
+    mobile: company.officialMobile,
+    status: 'Pending Approval',
+    submittedAt: new Date()
   });
 
   const token = generateToken(user._id);
 
   res.status(201).json({
     success: true,
-    message: 'Company registered successfully',
+    message: 'Company registered successfully. Application is pending admin compliance approval.',
     token,
     user: {
       id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
-      companyId: company._id
+      companyId: company._id,
+      registrationStatus: 'Pending Approval'
     },
-    company
+    company,
+    registrationStatus: 'Pending Approval'
   });
 });
 
@@ -186,6 +207,8 @@ export const loginCompany = asyncHandler(async (req, res) => {
     company = await Company.findById(user.companyId);
   }
 
+  const currentStatus = company?.registrationStatus || user.registrationStatus || 'Approved';
+  const currentReason = company?.rejectionReason || user.rejectionReason || null;
   const token = generateToken(user._id);
 
   res.status(200).json({
@@ -197,9 +220,136 @@ export const loginCompany = asyncHandler(async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
-      companyId: user.companyId
+      companyId: user.companyId,
+      registrationStatus: currentStatus,
+      rejectionReason: currentReason,
+      adminRemarks: user.adminRemarks || null
     },
-    company
+    company,
+    registrationStatus: currentStatus,
+    rejectionReason: currentReason
+  });
+});
+
+// @route   POST /api/company/auth/resubmit
+// @desc    Resubmit corrected company details & documents after rejection or change request
+export const resubmitCompany = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const user = await User.findById(userId);
+  if (!user || !user.companyId) {
+    throw new ApiError(404, 'Associated company profile not found.');
+  }
+
+  const company = await Company.findById(user.companyId);
+  if (!company) {
+    throw new ApiError(404, 'Company entity not found.');
+  }
+
+  const {
+    companyLegalName,
+    brandName,
+    cin,
+    pan,
+    gstin,
+    website,
+    industry,
+    registeredAddress,
+    city,
+    state,
+    pincode,
+    accountHolderName,
+    bankName,
+    accountNumber,
+    ifscCode,
+    cancelledChequeUrl,
+    incorporationCertificateUrl,
+    panCardUrl,
+    gstCertificateUrl,
+    moaAoaUrl,
+    shareholdingPatternUrl,
+    financialStatementsUrl
+  } = req.body;
+
+  if (companyLegalName) company.legalName = companyLegalName;
+  if (brandName) company.brandName = brandName;
+  if (cin) company.cin = cin.toUpperCase();
+  if (pan) company.pan = pan.toUpperCase();
+  if (gstin) company.gstin = gstin.toUpperCase();
+  if (website) company.website = website;
+  if (industry) company.industry = industry;
+
+  if (registeredAddress || city || state || pincode) {
+    company.registeredAddress = {
+      street: registeredAddress || company.registeredAddress?.street || '',
+      city: city || company.registeredAddress?.city || '',
+      state: state || company.registeredAddress?.state || '',
+      pincode: pincode || company.registeredAddress?.pincode || '',
+      country: 'India'
+    };
+  }
+
+  if (bankName || accountNumber || ifscCode) {
+    company.bankDetails = {
+      accountHolderName: accountHolderName || company.legalName,
+      bankName: bankName || company.bankDetails?.bankName || '',
+      accountNumber: accountNumber || company.bankDetails?.accountNumber || '',
+      ifscCode: ifscCode ? ifscCode.toUpperCase() : (company.bankDetails?.ifscCode || ''),
+      chequeUrl: cancelledChequeUrl || company.bankDetails?.chequeUrl || '',
+      isVerified: false
+    };
+  }
+
+  if (!company.documents) company.documents = {};
+  if (incorporationCertificateUrl) company.documents.incorporationCertificateUrl = incorporationCertificateUrl;
+  if (panCardUrl) company.documents.panCardUrl = panCardUrl;
+  if (gstCertificateUrl) company.documents.gstCertificateUrl = gstCertificateUrl;
+  if (moaAoaUrl) company.documents.moaAoaUrl = moaAoaUrl;
+  if (shareholdingPatternUrl) company.documents.shareholdingPatternUrl = shareholdingPatternUrl;
+  if (financialStatementsUrl) company.documents.financialStatementsUrl = financialStatementsUrl;
+
+  company.status = 'Pending Approval';
+  company.registrationStatus = 'Pending Approval';
+  company.verificationStatus = 'Pending Approval';
+  company.rejectionReason = null;
+  company.statusHistory.push({
+    status: 'Pending Approval',
+    reason: 'Application resubmitted by company with updated information/documents',
+    timestamp: new Date()
+  });
+  await company.save();
+
+  user.registrationStatus = 'Pending Approval';
+  user.rejectionReason = null;
+  user.adminRemarks = null;
+  user.statusHistory.push({
+    status: 'Pending Approval',
+    reason: 'Company application resubmitted',
+    timestamp: new Date()
+  });
+  await user.save();
+
+  broadcastSyncEvent('REGISTRATION', 'RESUBMITTED', {
+    id: company._id,
+    companyId: company._id,
+    userId: user._id,
+    role: 'company',
+    legalName: company.legalName,
+    status: 'Pending Approval',
+    resubmittedAt: new Date()
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Company registration details resubmitted successfully for compliance review.',
+    data: {
+      company,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        registrationStatus: user.registrationStatus
+      }
+    }
   });
 });
 

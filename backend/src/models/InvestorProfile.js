@@ -58,9 +58,30 @@ const investorProfileSchema = new mongoose.Schema(
     },
     kycStatus: {
       type: String,
-      enum: Object.values(Statuses.KYC),
-      default: Statuses.KYC.NOT_STARTED
+      default: 'Pending Approval'
     },
+    registrationStatus: {
+      type: String,
+      enum: ['Pending Approval', 'Approved', 'Rejected', 'Resubmission Required'],
+      default: 'Pending Approval',
+      index: true
+    },
+    rejectionReason: {
+      type: String,
+      default: null
+    },
+    statusHistory: [
+      {
+        status: { type: String, required: true },
+        reason: { type: String, default: '' },
+        adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        adminName: { type: String, default: '' },
+        timestamp: { type: Date, default: Date.now }
+      }
+    ],
+    panCardUrl: { type: String, default: '' },
+    identityProofUrl: { type: String, default: '' },
+    cancelledChequeUrl: { type: String, default: '' },
     kycReason: {
       type: String,
       default: null

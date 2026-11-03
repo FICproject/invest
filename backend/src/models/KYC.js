@@ -58,15 +58,21 @@ const kycSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['NOT_STARTED', 'PENDING', 'APPROVED', 'REJECTED'],
-      default: 'NOT_STARTED'
+      enum: ['NOT_STARTED', 'PENDING', 'APPROVED', 'REJECTED', 'Pending Approval', 'Approved', 'Rejected', 'Resubmission Required'],
+      default: 'Pending Approval'
+    },
+    registrationStatus: {
+      type: String,
+      enum: ['Pending Approval', 'Approved', 'Rejected', 'Resubmission Required'],
+      default: 'Pending Approval'
     },
     rejectionReason: {
       type: String,
       default: ''
     },
     submittedAt: {
-      type: Date
+      type: Date,
+      default: Date.now
     },
     reviewedAt: {
       type: Date

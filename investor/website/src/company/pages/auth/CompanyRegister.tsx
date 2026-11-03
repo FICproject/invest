@@ -173,7 +173,7 @@ export const CompanyRegister: React.FC = () => {
       });
 
       login(data.token, data.user, data.company);
-      navigate('/dashboard');
+      navigate('/company/approval-status');
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Registration failed. Please check inputs.');
     } finally {

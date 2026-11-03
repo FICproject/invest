@@ -6,10 +6,33 @@ import { Company } from '../models/Company.js';
 import { ENV } from '../config/env.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { broadcastSyncEvent } from '../services/sse.js';
 
 const generateToken = (id) => {
   return jwt.sign({ id, userId: id }, ENV.JWT_SECRET, { expiresIn: ENV.JWT_EXPIRES_IN });
 };
+
+// @route   POST /api/auth/upload-doc
+// @desc    Upload an onboarding/registration document
+export const uploadRegistrationDocument = asyncHandler(async (req, res) => {
+  const file = req.file || (req.files && (req.files['file']?.[0] || req.files['document']?.[0]));
+  if (!file) {
+    throw new ApiError(400, 'No document file uploaded. Please select a valid JPEG, PNG, or PDF file.');
+  }
+
+  const fileUrl = `/uploads/${file.filename}`;
+  res.status(200).json({
+    success: true,
+    message: 'Document uploaded successfully',
+    data: {
+      url: fileUrl,
+      filename: file.filename,
+      originalName: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size
+    }
+  });
+});
 
 // @route   POST /api/auth/register
 // @desc    Register a new investor (with all 5-step details)
@@ -81,7 +104,9 @@ export const register = asyncHandler(async (req, res) => {
     mobile,
     password,
     role: 'investor',
-    isVerified: true, // Activated for seamless testing, OTP can also be verified
+    isVerified: true,
+    registrationStatus: 'Pending Approval',
+    submittedAt: new Date(),
     otp: { code: otpCode, expiresAt: otpExpires },
     termsAccepted: termsAccepted !== false
   });
@@ -90,6 +115,7 @@ export const register = asyncHandler(async (req, res) => {
   await InvestorProfile.create({
     userId: user._id,
     panNumber: pan ? pan.toUpperCase() : '',
+    pan: pan ? pan.toUpperCase() : '',
     aadhaarNumber: aadhaarNumber || '',
     aadhaarVerified: Boolean(aadhaarNumber),
     dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
@@ -97,6 +123,11 @@ export const register = asyncHandler(async (req, res) => {
     occupation: occupation || '',
     annualIncomeRange: annualIncomeRange || '',
     sourceOfFunds: sourceOfFunds || '',
+    kycStatus: 'Pending Approval',
+    registrationStatus: 'Pending Approval',
+    panCardUrl: panCardUrl || '',
+    identityProofUrl: identityProofUrl || '',
+    cancelledChequeUrl: cancelledChequeUrl || '',
     address: {
       street: residentialAddress || '',
       city: city || '',
@@ -138,14 +169,27 @@ export const register = asyncHandler(async (req, res) => {
     bankName: bankName || '',
     accountNumber: accountNumber || '',
     ifscCode: ifscCode ? ifscCode.toUpperCase() : '',
-    status: pan ? 'APPROVED' : 'NOT_STARTED'
+    status: 'Pending Approval',
+    registrationStatus: 'Pending Approval',
+    submittedAt: new Date()
+  });
+
+  // Broadcast real-time event to Admin Console
+  broadcastSyncEvent('REGISTRATION', 'SUBMITTED', {
+    userId: user._id,
+    role: 'investor',
+    name: user.name,
+    email: user.email,
+    mobile: user.mobile,
+    status: 'Pending Approval',
+    submittedAt: user.submittedAt
   });
 
   const token = generateToken(user._id);
 
   res.status(201).json({
     success: true,
-    message: 'Investor registered successfully. Welcome to Connect Invest!',
+    message: 'Investor registered successfully. Your application is pending compliance approval.',
     data: {
       token,
       user: {
@@ -154,9 +198,11 @@ export const register = asyncHandler(async (req, res) => {
         email: user.email,
         mobile: user.mobile,
         role: user.role,
-        isVerified: user.isVerified
+        isVerified: user.isVerified,
+        registrationStatus: 'Pending Approval'
       },
-      kycStatus: pan ? 'APPROVED' : 'NOT_STARTED',
+      registrationStatus: 'Pending Approval',
+      kycStatus: 'Pending Approval',
       otpCode
     }
   });
@@ -208,9 +254,13 @@ export const login = asyncHandler(async (req, res) => {
         mobile: user.mobile,
         role: user.role,
         isVerified: user.isVerified,
-        companyId: user.companyId
+        companyId: user.companyId,
+        registrationStatus: user.registrationStatus || 'Approved',
+        rejectionReason: user.rejectionReason || null,
+        adminRemarks: user.adminRemarks || null
       },
       company,
+      registrationStatus: user.registrationStatus || 'Approved',
       kycStatus: kyc ? kyc.status : 'NOT_STARTED'
     }
   });
@@ -251,8 +301,12 @@ export const verifyOTP = asyncHandler(async (req, res) => {
           email: user.email,
           mobile: user.mobile,
           role: user.role,
-          isVerified: user.isVerified
+          isVerified: user.isVerified,
+          registrationStatus: user.registrationStatus || 'Approved',
+          rejectionReason: user.rejectionReason || null,
+          adminRemarks: user.adminRemarks || null
         },
+        registrationStatus: user.registrationStatus || 'Approved',
         kycStatus: kyc ? kyc.status : 'NOT_STARTED'
       }
     });
@@ -277,10 +331,127 @@ export const getMe = asyncHandler(async (req, res) => {
         email: user.email,
         mobile: user.mobile,
         role: user.role,
-        isVerified: user.isVerified
+        isVerified: user.isVerified,
+        companyId: user.companyId,
+        registrationStatus: user.registrationStatus || 'Approved',
+        rejectionReason: user.rejectionReason || null,
+        adminRemarks: user.adminRemarks || null
       },
       profile,
+      registrationStatus: user.registrationStatus || 'Approved',
       kycStatus: kyc ? kyc.status : 'NOT_STARTED'
+    }
+  });
+});
+
+// @route   POST /api/auth/resubmit
+// @desc    Resubmit corrected investor details & documents after rejection or change request
+export const resubmit = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new ApiError(404, 'User account not found.');
+  }
+
+  const {
+    name,
+    dateOfBirth,
+    pan,
+    aadhaarNumber,
+    residentialAddress,
+    city,
+    state,
+    pincode,
+    bankName,
+    accountNumber,
+    ifscCode,
+    accountHolderName,
+    cancelledChequeUrl,
+    panCardUrl,
+    identityProofUrl
+  } = req.body;
+
+  if (name) user.name = name;
+  user.registrationStatus = 'Pending Approval';
+  user.adminRemarks = null;
+  user.statusHistory.push({
+    status: 'Pending Approval',
+    reason: 'Application resubmitted with updated details / documents',
+    timestamp: new Date()
+  });
+  await user.save();
+
+  const profile = await InvestorProfile.findOne({ userId });
+  if (profile) {
+    if (pan) {
+      profile.pan = pan.toUpperCase();
+      profile.panNumber = pan.toUpperCase();
+    }
+    if (aadhaarNumber) profile.aadhaarNumber = aadhaarNumber;
+    if (dateOfBirth) profile.dateOfBirth = new Date(dateOfBirth);
+    if (residentialAddress || city || state || pincode) {
+      profile.address = {
+        street: residentialAddress || profile.address?.street || '',
+        city: city || profile.address?.city || '',
+        state: state || profile.address?.state || '',
+        pincode: pincode || profile.address?.pincode || ''
+      };
+    }
+    if (bankName || accountNumber || ifscCode) {
+      profile.bankDetails = {
+        bankName: bankName || profile.bankDetails?.bankName || '',
+        accountNumber: accountNumber || profile.bankDetails?.accountNumber || '',
+        ifscCode: ifscCode ? ifscCode.toUpperCase() : (profile.bankDetails?.ifscCode || ''),
+        accountHolderName: accountHolderName || user.name,
+        chequeUrl: cancelledChequeUrl || profile.bankDetails?.chequeUrl || '',
+        isVerified: false
+      };
+    }
+    if (panCardUrl) profile.panCardUrl = panCardUrl;
+    if (identityProofUrl) profile.identityProofUrl = identityProofUrl;
+    if (cancelledChequeUrl) profile.cancelledChequeUrl = cancelledChequeUrl;
+
+    profile.kycStatus = 'Pending Approval';
+    profile.registrationStatus = 'Pending Approval';
+    await profile.save();
+  }
+
+  const kyc = await KYC.findOne({ investorId: userId });
+  if (kyc) {
+    if (pan) kyc.panNumber = pan.toUpperCase();
+    if (panCardUrl) kyc.panDocumentUrl = panCardUrl;
+    if (identityProofUrl) kyc.addressProofUrl = identityProofUrl;
+    if (cancelledChequeUrl) kyc.bankProofUrl = cancelledChequeUrl;
+    if (bankName) kyc.bankName = bankName;
+    if (accountNumber) kyc.accountNumber = accountNumber;
+    if (ifscCode) kyc.ifscCode = ifscCode.toUpperCase();
+    kyc.status = 'Pending Approval';
+    kyc.registrationStatus = 'Pending Approval';
+    kyc.submittedAt = new Date();
+    await kyc.save();
+  }
+
+  broadcastSyncEvent('REGISTRATION', 'RESUBMITTED', {
+    userId: user._id,
+    role: 'investor',
+    name: user.name,
+    email: user.email,
+    mobile: user.mobile,
+    status: 'Pending Approval',
+    resubmittedAt: new Date()
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Your updated information has been submitted for compliance verification.',
+    data: {
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        mobile: user.mobile,
+        registrationStatus: user.registrationStatus
+      }
     }
   });
 });
