@@ -104,9 +104,10 @@ h1, h2, h3, h4, h5, h6 {
 /* Common Layout Utilities */
 .container {
   width: 100%;
-  max-width: 1240px;
+  max-width: min(100%, 1500px);
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 clamp(16px, 2.5vw, 32px);
+  box-sizing: border-box;
 }
 
 /* Badge Styles */

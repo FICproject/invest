@@ -185,7 +185,7 @@ export default function Queries() {
   };
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="page-container">
       {/* Top Banner / Metrics Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
         <div className="glass-panel" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -429,7 +429,7 @@ export default function Queries() {
           zIndex: 60,
           padding: '20px'
         }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '780px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', padding: '0', background: 'var(--bg-modal)', overflow: 'hidden' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 'min(92vw, 780px)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', padding: '0', background: 'var(--bg-modal)', overflow: 'hidden' }}>
             {/* Modal Header */}
             <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255, 255, 255, 0.02)' }}>
               <div>
@@ -611,7 +611,7 @@ export default function Queries() {
           zIndex: 60,
           padding: '20px'
         }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '580px', padding: '28px', background: 'var(--bg-modal)' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 'min(92vw, 580px)', maxHeight: '90vh', overflowY: 'auto', padding: '28px', background: 'var(--bg-modal)' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '6px' }}>
               Log Inbound Query Ticket
             </h3>

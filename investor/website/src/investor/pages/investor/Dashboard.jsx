@@ -468,7 +468,7 @@ export const Dashboard = () => {
       </div>
 
       <style>{`
-        @media (max-width: 900px) {
+        @media (max-width: 1200px) {
           .dashboard-charts-grid,
           .dashboard-status-grid {
             grid-template-columns: 1fr !important;

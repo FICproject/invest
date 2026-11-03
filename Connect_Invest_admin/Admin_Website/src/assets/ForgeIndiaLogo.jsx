@@ -33,7 +33,26 @@ export function ForgeIndiaLogoCircle({ size = 120, className = '' }) {
 /**
  * Sidebar Brand Header with the exact user uploaded logo
  */
-export function ForgeIndiaBrandHeader({ size = 42 }) {
+export function ForgeIndiaBrandHeader({ size = 42, collapsed = false }) {
+  if (collapsed) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }} title="Forge India Connect Admin">
+        <img
+          src={logoImg}
+          alt="Forge India Connect"
+          style={{
+            width: `${size}px`,
+            height: `${size}px`,
+            borderRadius: '10px',
+            objectFit: 'cover',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+            flexShrink: 0
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
       <img
@@ -49,7 +68,7 @@ export function ForgeIndiaBrandHeader({ size = 42 }) {
         }}
       />
 
-      <div style={{ lineHeight: 1.15 }}>
+      <div style={{ lineHeight: 1.15, whiteSpace: 'nowrap', overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
           <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0047BA', letterSpacing: '0.02em' }}>
             FORGE

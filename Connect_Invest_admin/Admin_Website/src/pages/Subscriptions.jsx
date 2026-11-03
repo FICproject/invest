@@ -161,7 +161,7 @@ export default function Subscriptions() {
   };
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1440px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="page-container">
       
       {/* Page Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
@@ -498,7 +498,9 @@ export default function Subscriptions() {
             background: 'var(--bg-modal, #FFFFFF)',
             borderRadius: '20px',
             width: '100%',
-            maxWidth: '520px',
+            maxWidth: 'min(92vw, 520px)',
+            maxHeight: '90vh',
+            overflowY: 'auto',
             boxShadow: 'var(--shadow-modal)',
             overflow: 'hidden'
           }}>
@@ -703,7 +705,9 @@ export default function Subscriptions() {
             background: 'var(--bg-modal, #FFFFFF)',
             borderRadius: '20px',
             width: '100%',
-            maxWidth: '480px',
+            maxWidth: 'min(92vw, 480px)',
+            maxHeight: '90vh',
+            overflowY: 'auto',
             boxShadow: 'var(--shadow-modal)',
             overflow: 'hidden'
           }}>

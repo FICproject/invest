@@ -49,7 +49,7 @@ export default function InvestmentsPortfolio() {
   const maturedCount = investments.filter(i => i.status === 'Matured' || i.status === 'Completed').length;
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="page-container">
       {/* Top Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
         <div>

@@ -132,11 +132,11 @@ export default function Dashboard({ setActiveTab }) {
   const activitiesList = recentData.recentActivities || [];
 
   return (
-    <div style={{ padding: '24px 32px', maxWidth: '1440px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+    <div className="page-container">
       {/* Title & Filter Bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '1.85rem', fontWeight: 800, color: '#0F172A', marginBottom: '4px' }}>
+          <h1 style={{ fontSize: 'clamp(1.5rem, 2.2vw, 1.85rem)', fontWeight: 800, color: '#0F172A', marginBottom: '4px' }}>
             Dashboard
           </h1>
           <p style={{ fontSize: '0.88rem', color: '#64748B' }}>
@@ -223,11 +223,7 @@ export default function Dashboard({ setActiveTab }) {
       </div>
 
       {/* Row 1: 4 KPI Cards matching Image */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-        gap: '18px'
-      }}>
+      <div className="dashboard-kpi-grid">
         {/* Card 1: Total Investors */}
         <div className="forge-card" style={{ padding: '20px 22px', display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{
@@ -243,10 +239,10 @@ export default function Dashboard({ setActiveTab }) {
           }}>
             <Users size={22} />
           </div>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>Total Investors</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '2px' }}>
-              <span style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.1 }}>
+              <span style={{ fontSize: 'clamp(1.3rem, 1.8vw, 1.6rem)', fontWeight: 800, color: '#0F172A', lineHeight: 1.1 }}>
                 {s.totalInvestorsCount !== undefined ? s.totalInvestorsCount.toLocaleString('en-IN') : '...'}
               </span>
             </div>
@@ -269,10 +265,10 @@ export default function Dashboard({ setActiveTab }) {
           }}>
             <ShieldCheck size={24} />
           </div>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>Verified Investors</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '2px' }}>
-              <span style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.1 }}>
+              <span style={{ fontSize: 'clamp(1.3rem, 1.8vw, 1.6rem)', fontWeight: 800, color: '#0F172A', lineHeight: 1.1 }}>
                 {s.verifiedInvestorsCount !== undefined ? s.verifiedInvestorsCount.toLocaleString('en-IN') : '...'}
               </span>
             </div>
@@ -295,10 +291,10 @@ export default function Dashboard({ setActiveTab }) {
           }}>
             <Building2 size={22} />
           </div>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>Registered Companies</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '2px' }}>
-              <span style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.1 }}>
+              <span style={{ fontSize: 'clamp(1.3rem, 1.8vw, 1.6rem)', fontWeight: 800, color: '#0F172A', lineHeight: 1.1 }}>
                 {s.registeredCompaniesCount !== undefined ? s.registeredCompaniesCount.toLocaleString('en-IN') : '...'}
               </span>
             </div>
@@ -321,10 +317,10 @@ export default function Dashboard({ setActiveTab }) {
           }}>
             <Rocket size={22} />
           </div>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>Active Opportunities</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '2px' }}>
-              <span style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.1 }}>
+              <span style={{ fontSize: 'clamp(1.3rem, 1.8vw, 1.6rem)', fontWeight: 800, color: '#0F172A', lineHeight: 1.1 }}>
                 {s.activeOffersCount !== undefined ? s.activeOffersCount.toLocaleString('en-IN') : '...'}
               </span>
             </div>
@@ -334,7 +330,7 @@ export default function Dashboard({ setActiveTab }) {
       </div>
 
       {/* Row 2: Investment Overview (Bars + Line) + Investment Distribution (Donut) + Quick Actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.55fr 1.6fr 0.95fr', gap: '18px' }}>
+      <div className="dashboard-charts-grid">
         {/* Card 1: Investment Overview (Bar + Line Hybrid Chart) */}
         <div className="forge-card" style={{ padding: '22px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <div>
@@ -562,7 +558,7 @@ export default function Dashboard({ setActiveTab }) {
       </div>
 
       {/* Row 3: Recent Investors + Recent Companies Tables */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px' }}>
+      <div className="dashboard-tables-grid">
         {/* Table 1: Recent Investors */}
         <div className="forge-card" style={{ padding: '22px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -580,45 +576,47 @@ export default function Dashboard({ setActiveTab }) {
             </button>
           </div>
 
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-            <thead>
-              <tr style={{ color: '#64748B', textAlign: 'left', borderBottom: '1px solid #F1F5F9' }}>
-                <th style={{ padding: '8px 4px', fontWeight: 600 }}>Name</th>
-                <th style={{ padding: '8px 4px', fontWeight: 600 }}>Email</th>
-                <th style={{ padding: '8px 4px', fontWeight: 600 }}>Investment Amount</th>
-                <th style={{ padding: '8px 4px', fontWeight: 600, textAlign: 'right' }}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {investorsList.length === 0 ? (
-                <tr>
-                  <td colSpan="4" style={{ padding: '24px', textAlign: 'center', color: '#94A3B8' }}>
-                    No registered investors yet.
-                  </td>
+          <div className="table-responsive">
+            <table style={{ width: '100%', minWidth: '380px', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+              <thead>
+                <tr style={{ color: '#64748B', textAlign: 'left', borderBottom: '1px solid #F1F5F9' }}>
+                  <th style={{ padding: '8px 4px', fontWeight: 600 }}>Name</th>
+                  <th style={{ padding: '8px 4px', fontWeight: 600 }}>Email</th>
+                  <th style={{ padding: '8px 4px', fontWeight: 600 }}>Investment Amount</th>
+                  <th style={{ padding: '8px 4px', fontWeight: 600, textAlign: 'right' }}>Status</th>
                 </tr>
-              ) : (
-                investorsList.map((inv, idx) => (
-                  <tr key={idx} style={{ borderBottom: idx < investorsList.length - 1 ? '1px solid #F8FAFC' : 'none' }}>
-                    <td style={{ padding: '10px 4px', fontWeight: 600, color: '#1E293B' }}>{inv.name}</td>
-                    <td style={{ padding: '10px 4px', color: '#64748B' }}>{inv.email}</td>
-                    <td style={{ padding: '10px 4px', fontWeight: 600, color: '#1E293B' }}>{inv.amount}</td>
-                    <td style={{ padding: '10px 4px', textAlign: 'right' }}>
-                      <span style={{
-                        padding: '3px 10px',
-                        borderRadius: '9999px',
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        background: inv.status === 'Verified' ? '#DCFCE7' : '#FEF3C7',
-                        color: inv.status === 'Verified' ? '#15803D' : '#B45309'
-                      }}>
-                        {inv.status}
-                      </span>
+              </thead>
+              <tbody>
+                {investorsList.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" style={{ padding: '24px', textAlign: 'center', color: '#94A3B8' }}>
+                      No registered investors yet.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  investorsList.map((inv, idx) => (
+                    <tr key={idx} style={{ borderBottom: idx < investorsList.length - 1 ? '1px solid #F8FAFC' : 'none' }}>
+                      <td style={{ padding: '10px 4px', fontWeight: 600, color: '#1E293B' }}>{inv.name}</td>
+                      <td style={{ padding: '10px 4px', color: '#64748B' }}>{inv.email}</td>
+                      <td style={{ padding: '10px 4px', fontWeight: 600, color: '#1E293B' }}>{inv.amount}</td>
+                      <td style={{ padding: '10px 4px', textAlign: 'right' }}>
+                        <span style={{
+                          padding: '3px 10px',
+                          borderRadius: '9999px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          background: inv.status === 'Verified' ? '#DCFCE7' : '#FEF3C7',
+                          color: inv.status === 'Verified' ? '#15803D' : '#B45309'
+                        }}>
+                          {inv.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Table 2: Recent Companies */}
@@ -638,50 +636,52 @@ export default function Dashboard({ setActiveTab }) {
             </button>
           </div>
 
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-            <thead>
-              <tr style={{ color: '#64748B', textAlign: 'left', borderBottom: '1px solid #F1F5F9' }}>
-                <th style={{ padding: '8px 4px', fontWeight: 600 }}>Company Name</th>
-                <th style={{ padding: '8px 4px', fontWeight: 600 }}>Industry</th>
-                <th style={{ padding: '8px 4px', fontWeight: 600 }}>Funding Required</th>
-                <th style={{ padding: '8px 4px', fontWeight: 600, textAlign: 'right' }}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {companiesList.length === 0 ? (
-                <tr>
-                  <td colSpan="4" style={{ padding: '24px', textAlign: 'center', color: '#94A3B8' }}>
-                    No companies onboarded yet.
-                  </td>
+          <div className="table-responsive">
+            <table style={{ width: '100%', minWidth: '400px', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+              <thead>
+                <tr style={{ color: '#64748B', textAlign: 'left', borderBottom: '1px solid #F1F5F9' }}>
+                  <th style={{ padding: '8px 4px', fontWeight: 600 }}>Company Name</th>
+                  <th style={{ padding: '8px 4px', fontWeight: 600 }}>Industry</th>
+                  <th style={{ padding: '8px 4px', fontWeight: 600 }}>Funding Required</th>
+                  <th style={{ padding: '8px 4px', fontWeight: 600, textAlign: 'right' }}>Status</th>
                 </tr>
-              ) : (
-                companiesList.map((comp, idx) => (
-                  <tr key={idx} style={{ borderBottom: idx < companiesList.length - 1 ? '1px solid #F8FAFC' : 'none' }}>
-                    <td style={{ padding: '10px 4px', fontWeight: 600, color: '#1E293B' }}>{comp.name}</td>
-                    <td style={{ padding: '10px 4px', color: '#64748B' }}>{comp.industry}</td>
-                    <td style={{ padding: '10px 4px', fontWeight: 600, color: '#1E293B' }}>{comp.fundingRequired}</td>
-                    <td style={{ padding: '10px 4px', textAlign: 'right' }}>
-                      <span style={{
-                        padding: '3px 10px',
-                        borderRadius: '9999px',
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        background: comp.status === 'Approved' ? '#DCFCE7' : comp.status === 'Under Review' ? '#E0EDFD' : comp.status === 'Rejected' ? '#FEE2E2' : '#FEF3C7',
-                        color: comp.status === 'Approved' ? '#15803D' : comp.status === 'Under Review' ? '#1D4ED8' : comp.status === 'Rejected' ? '#B91C1C' : '#B45309'
-                      }}>
-                        {comp.status}
-                      </span>
+              </thead>
+              <tbody>
+                {companiesList.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" style={{ padding: '24px', textAlign: 'center', color: '#94A3B8' }}>
+                      No companies onboarded yet.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  companiesList.map((comp, idx) => (
+                    <tr key={idx} style={{ borderBottom: idx < companiesList.length - 1 ? '1px solid #F8FAFC' : 'none' }}>
+                      <td style={{ padding: '10px 4px', fontWeight: 600, color: '#1E293B' }}>{comp.name}</td>
+                      <td style={{ padding: '10px 4px', color: '#64748B' }}>{comp.industry}</td>
+                      <td style={{ padding: '10px 4px', fontWeight: 600, color: '#1E293B' }}>{comp.fundingRequired}</td>
+                      <td style={{ padding: '10px 4px', textAlign: 'right' }}>
+                        <span style={{
+                          padding: '3px 10px',
+                          borderRadius: '9999px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          background: comp.status === 'Approved' ? '#DCFCE7' : comp.status === 'Under Review' ? '#E0EDFD' : comp.status === 'Rejected' ? '#FEE2E2' : '#FEF3C7',
+                          color: comp.status === 'Approved' ? '#15803D' : comp.status === 'Under Review' ? '#1D4ED8' : comp.status === 'Rejected' ? '#B91C1C' : '#B45309'
+                        }}>
+                          {comp.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
       {/* Row 4: Recent Transactions + Recent Activity */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '18px' }}>
+      <div className="dashboard-activity-grid">
         {/* Card 1: Recent Transactions */}
         <div className="forge-card" style={{ padding: '22px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -699,39 +699,41 @@ export default function Dashboard({ setActiveTab }) {
             </button>
           </div>
 
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-            <thead>
-              <tr style={{ color: '#64748B', textAlign: 'left', borderBottom: '1px solid #F1F5F9' }}>
-                <th style={{ padding: '6px 4px', fontWeight: 600 }}>Date</th>
-                <th style={{ padding: '6px 4px', fontWeight: 600 }}>Type</th>
-                <th style={{ padding: '6px 4px', fontWeight: 600 }}>Investor / Company</th>
-                <th style={{ padding: '6px 4px', fontWeight: 600 }}>Amount</th>
-                <th style={{ padding: '6px 4px', fontWeight: 600, textAlign: 'right' }}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactionsList.map((tx, idx) => (
-                <tr key={idx} style={{ borderBottom: idx < transactionsList.length - 1 ? '1px solid #F8FAFC' : 'none' }}>
-                  <td style={{ padding: '8px 4px', color: '#64748B' }}>{tx.date}</td>
-                  <td style={{ padding: '8px 4px', fontWeight: 600, color: '#1E293B' }}>{tx.type}</td>
-                  <td style={{ padding: '8px 4px', color: '#334155' }}>{tx.party}</td>
-                  <td style={{ padding: '8px 4px', fontWeight: 600, color: '#1E293B' }}>{tx.amount}</td>
-                  <td style={{ padding: '8px 4px', textAlign: 'right' }}>
-                    <span style={{
-                      padding: '2px 8px',
-                      borderRadius: '9999px',
-                      fontSize: '0.7rem',
-                      fontWeight: 700,
-                      background: tx.status === 'Completed' ? '#DCFCE7' : '#FEF3C7',
-                      color: tx.status === 'Completed' ? '#15803D' : '#B45309'
-                    }}>
-                      {tx.status}
-                    </span>
-                  </td>
+          <div className="table-responsive">
+            <table style={{ width: '100%', minWidth: '420px', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+              <thead>
+                <tr style={{ color: '#64748B', textAlign: 'left', borderBottom: '1px solid #F1F5F9' }}>
+                  <th style={{ padding: '6px 4px', fontWeight: 600 }}>Date</th>
+                  <th style={{ padding: '6px 4px', fontWeight: 600 }}>Type</th>
+                  <th style={{ padding: '6px 4px', fontWeight: 600 }}>Investor / Company</th>
+                  <th style={{ padding: '6px 4px', fontWeight: 600 }}>Amount</th>
+                  <th style={{ padding: '6px 4px', fontWeight: 600, textAlign: 'right' }}>Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {transactionsList.map((tx, idx) => (
+                  <tr key={idx} style={{ borderBottom: idx < transactionsList.length - 1 ? '1px solid #F8FAFC' : 'none' }}>
+                    <td style={{ padding: '8px 4px', color: '#64748B' }}>{tx.date}</td>
+                    <td style={{ padding: '8px 4px', fontWeight: 600, color: '#1E293B' }}>{tx.type}</td>
+                    <td style={{ padding: '8px 4px', color: '#334155' }}>{tx.party}</td>
+                    <td style={{ padding: '8px 4px', fontWeight: 600, color: '#1E293B' }}>{tx.amount}</td>
+                    <td style={{ padding: '8px 4px', textAlign: 'right' }}>
+                      <span style={{
+                        padding: '2px 8px',
+                        borderRadius: '9999px',
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        background: tx.status === 'Completed' ? '#DCFCE7' : '#FEF3C7',
+                        color: tx.status === 'Completed' ? '#15803D' : '#B45309'
+                      }}>
+                        {tx.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Card 2: Recent Activity Timeline */}

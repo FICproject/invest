@@ -90,7 +90,7 @@ export default function Settings() {
   };
 
   return (
-    <div style={{ padding: '28px 32px', maxWidth: '1000px', margin: '0 auto' }}>
+    <div className="page-container" style={{ maxWidth: 'min(100%, 1100px)' }}>
       {/* Page Title */}
       <div style={{ marginBottom: '28px' }}>
         <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0F172A', marginBottom: '6px' }}>

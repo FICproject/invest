@@ -94,7 +94,7 @@ export default function WorkList({ setActiveTab }) {
     (wl.failedPayouts?.length || 0);
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+    <div className="page-container">
       {/* Header bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
@@ -350,7 +350,9 @@ export default function WorkList({ setActiveTab }) {
         }}>
           <div className="glass-panel" style={{
             width: '100%',
-            maxWidth: '560px',
+            maxWidth: 'min(92vw, 560px)',
+            maxHeight: '90vh',
+            overflowY: 'auto',
             padding: '28px',
             background: 'var(--bg-modal)'
           }}>

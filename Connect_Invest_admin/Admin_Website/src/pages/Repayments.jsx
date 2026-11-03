@@ -88,7 +88,7 @@ export default function Repayments() {
   };
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="page-container">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h2 style={{ fontSize: '1.35rem', fontWeight: 700 }}>Company Repayments & Dues</h2>
@@ -226,7 +226,7 @@ export default function Repayments() {
           zIndex: 50,
           padding: '20px'
         }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '500px', padding: '28px', background: 'var(--bg-modal)' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 'min(92vw, 500px)', maxHeight: '90vh', overflowY: 'auto', padding: '28px', background: 'var(--bg-modal)' }}>
             <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '4px' }}>
               Confirm Company Repayment Receipt
             </h3>
@@ -280,7 +280,7 @@ export default function Repayments() {
           zIndex: 50,
           padding: '20px'
         }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '500px', padding: '28px', background: 'var(--bg-modal)' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 'min(92vw, 500px)', maxHeight: '90vh', overflowY: 'auto', padding: '28px', background: 'var(--bg-modal)' }}>
             <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '4px', color: '#f87171' }}>
               Mark Repayment as Defaulted
             </h3>

@@ -109,7 +109,7 @@ export const DashboardHome: React.FC = () => {
       </div>
 
       {/* 2. KPI Cards Grid (8 Cards as requested) */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
         {/* Total Funds Requested */}
         <Card className="p-5">
           <div className="flex items-center justify-between">
@@ -355,7 +355,7 @@ export const DashboardHome: React.FC = () => {
       </div>
 
       {/* 4. Bottom Grid: Recent Activity, Transactions & Compliance */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {/* Recent Investments */}
         <div className="bg-white rounded-3xl p-6 border border-[#EFE8D8] shadow-sm space-y-4">
           <div className="flex items-center justify-between">

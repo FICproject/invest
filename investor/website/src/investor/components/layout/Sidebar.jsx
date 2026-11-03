@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-export const Sidebar = ({ isOpen, onClose }) => {
+export const Sidebar = ({ isOpen, onClose, isCollapsedDesktop = false }) => {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -68,7 +68,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
           boxShadow: '4px 0 20px rgba(0,0,0,0.15)',
           overflowY: 'auto'
         }}
-        className={`sidebar-aside ${isOpen ? 'sidebar-open' : ''}`}
+        className={`sidebar-aside ${isOpen ? 'sidebar-open' : ''} ${isCollapsedDesktop ? 'sidebar-collapsed-desktop' : ''}`}
       >
         {/* Sidebar Header / Logo */}
         <div
@@ -269,7 +269,10 @@ export const Sidebar = ({ isOpen, onClose }) => {
             display: none !important;
           }
           .sidebar-aside {
-            transform: none !important;
+            transform: none;
+          }
+          .sidebar-aside.sidebar-collapsed-desktop {
+            transform: translateX(-100%) !important;
           }
         }
       `}</style>

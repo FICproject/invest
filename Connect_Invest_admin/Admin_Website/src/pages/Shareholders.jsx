@@ -116,7 +116,7 @@ export default function Shareholders() {
   };
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1440px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="page-container">
       {/* Header & Controls */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
         <div>
@@ -432,7 +432,7 @@ export default function Shareholders() {
           zIndex: 60,
           padding: '20px'
         }}>
-          <div className="forge-card" style={{ width: '100%', maxWidth: '520px', padding: '28px', background: '#FFFFFF', borderRadius: '16px' }}>
+          <div className="forge-card" style={{ width: '100%', maxWidth: 'min(92vw, 520px)', maxHeight: '90vh', overflowY: 'auto', padding: '28px', background: '#FFFFFF', borderRadius: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
               <div>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>

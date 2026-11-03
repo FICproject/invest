@@ -60,7 +60,7 @@ export default function Releases() {
   };
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="page-container">
       <div>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '4px 10px', borderRadius: '8px', background: '#EFF6FF', color: '#0047BA', fontSize: '0.75rem', fontWeight: 700, marginBottom: '8px' }}>
           <ShieldAlert size={14} />
@@ -177,7 +177,7 @@ export default function Releases() {
           zIndex: 50,
           padding: '20px'
         }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '540px', padding: '28px', background: 'var(--bg-modal)' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 'min(92vw, 540px)', maxHeight: '90vh', overflowY: 'auto', padding: '28px', background: 'var(--bg-modal)' }}>
             <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '4px' }}>
               Confirm Fund Disbursement
             </h3>

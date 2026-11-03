@@ -72,6 +72,18 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: -0.02em;
 }
 
+h1 {
+  font-size: clamp(1.4rem, 2vw, 1.85rem);
+}
+
+h2 {
+  font-size: clamp(1.15rem, 1.6vw, 1.45rem);
+}
+
+h3 {
+  font-size: clamp(0.95rem, 1.3vw, 1.2rem);
+}
+
 /* Premium Card Styles & Aliases */
 .forge-card,
 .glass-panel {
@@ -428,29 +440,102 @@ input[type='number'] {
 
 /* Page Layout Wrapper */
 .page-container {
-  padding: 28px 32px;
-  max-width: 1400px;
+  padding: clamp(16px, 2vw, 32px);
+  max-width: min(100%, 1920px);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: clamp(16px, 1.8vw, 24px);
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Responsive Table Wrapper */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  min-width: 0;
+}
+
+/* Modal Viewport Limit */
+.modal-responsive {
+  max-width: min(92vw, 850px);
+  max-height: 90vh;
+  overflow-y: auto;
   width: 100%;
 }
 
+/* Admin Sidebar Transitions */
+.admin-sidebar {
+  transition: width 0.22s cubic-bezier(0.16, 1, 0.3, 1), min-width 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* Responsive Grid System */
-@media (max-width: 1200px) {
+.dashboard-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(12px, 1.2vw, 18px);
+  width: 100%;
+}
+
+.dashboard-charts-grid {
+  display: grid;
+  grid-template-columns: 1.55fr 1.6fr 0.95fr;
+  gap: clamp(12px, 1.2vw, 18px);
+  width: 100%;
+  min-width: 0;
+}
+
+.dashboard-tables-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(12px, 1.2vw, 18px);
+  width: 100%;
+  min-width: 0;
+}
+
+.dashboard-activity-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: clamp(12px, 1.2vw, 18px);
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 1400px) {
   .dashboard-kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
   .dashboard-charts-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .dashboard-charts-grid > :nth-child(3) {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 1150px) {
+  .dashboard-tables-grid,
+  .dashboard-activity-grid {
     grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 1050px) {
+  .dashboard-charts-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .dashboard-charts-grid > :nth-child(3) {
+    grid-column: auto;
   }
 }
 
 @media (max-width: 768px) {
   .page-container {
-    padding: 20px 16px;
-    gap: 18px;
+    padding: 16px 14px;
+    gap: 16px;
   }
   .dashboard-kpi-grid {
     grid-template-columns: 1fr !important;

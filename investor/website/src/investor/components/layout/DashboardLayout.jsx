@@ -7,6 +7,7 @@ import { SystemAdaptabilityBar } from '../common/SystemAdaptabilityBar';
 
 export const DashboardLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { user, kycStatus } = useAuth();
   const navigate = useNavigate();
@@ -18,10 +19,22 @@ export const DashboardLayout = ({ children }) => {
     }
   };
 
+  const handleToggleSidebar = () => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setSidebarOpen(prev => !prev);
+    } else {
+      setSidebarCollapsed(prev => !prev);
+    }
+  };
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--bg-app)', display: 'flex' }}>
       {/* Sidebar */}
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        isCollapsedDesktop={sidebarCollapsed}
+      />
 
       {/* Main Wrapper */}
       <div
@@ -32,7 +45,7 @@ export const DashboardLayout = ({ children }) => {
           minWidth: 0,
           transition: 'margin-left 0.3s ease'
         }}
-        className="dashboard-main-content"
+        className={`dashboard-main-content ${sidebarCollapsed ? 'sidebar-collapsed-content' : ''}`}
       >
         {/* Top Navbar */}
         <header
@@ -43,31 +56,37 @@ export const DashboardLayout = ({ children }) => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0 24px',
+            padding: '0 clamp(16px, 2vw, 24px)',
             position: 'sticky',
             top: 0,
-            zIndex: 900
+            zIndex: 900,
+            gap: '12px'
           }}
         >
           {/* Left: Mobile Toggle & Global Search */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, maxWidth: '480px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, maxWidth: '480px', minWidth: 0 }}>
             <button
-              onClick={() => setSidebarOpen(true)}
+              onClick={handleToggleSidebar}
               style={{
                 background: 'none',
                 border: 'none',
                 color: 'var(--text-main)',
                 cursor: 'pointer',
-                display: 'none',
-                padding: '6px'
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '6px',
+                borderRadius: '8px',
+                flexShrink: 0
               }}
               className="topbar-hamburger"
-              aria-label="Open sidebar menu"
+              title={sidebarCollapsed ? "Expand sidebar" : "Toggle sidebar"}
+              aria-label="Toggle sidebar menu"
             >
-              <Menu size={24} />
+              <Menu size={22} />
             </button>
 
-            <form onSubmit={handleSearchSubmit} style={{ width: '100%', position: 'relative' }}>
+            <form onSubmit={handleSearchSubmit} style={{ width: '100%', position: 'relative', minWidth: 0 }}>
               <Search
                 size={18}
                 color="var(--text-muted)"
@@ -170,7 +189,7 @@ export const DashboardLayout = ({ children }) => {
         </header>
 
         {/* Dynamic Page Content */}
-        <main style={{ flex: 1, padding: '24px 28px' }} className="dashboard-content-container">
+        <main className="dashboard-content-container">
           {children}
         </main>
       </div>
@@ -179,15 +198,25 @@ export const DashboardLayout = ({ children }) => {
       <SystemAdaptabilityBar />
 
       <style>{`
+        .dashboard-content-container {
+          flex: 1;
+          width: 100%;
+          max-width: min(100%, 1920px);
+          margin: 0 auto;
+          padding: clamp(16px, 2vw, 28px);
+          box-sizing: border-box;
+          min-width: 0;
+        }
+
         @media (min-width: 1024px) {
           .dashboard-main-content {
             margin-left: var(--sidebar-width);
           }
+          .dashboard-main-content.sidebar-collapsed-content {
+            margin-left: 0 !important;
+          }
         }
         @media (max-width: 1023px) {
-          .topbar-hamburger {
-            display: flex !important;
-          }
           .dashboard-content-container {
             padding: 16px !important;
           }

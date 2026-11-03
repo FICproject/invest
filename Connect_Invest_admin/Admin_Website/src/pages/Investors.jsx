@@ -163,7 +163,7 @@ export default function Investors() {
   };
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="page-container">
       {/* Top Filter Bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
         <div>
@@ -368,7 +368,7 @@ export default function Investors() {
           zIndex: 50,
           padding: '20px'
         }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '620px', padding: '28px', background: 'var(--bg-modal)' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 'min(92vw, 620px)', maxHeight: '90vh', overflowY: 'auto', padding: '28px', background: 'var(--bg-modal)' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '4px' }}>
               KYC Inspection: {reviewInvestor.userId?.name}
             </h3>
@@ -525,7 +525,7 @@ export default function Investors() {
           zIndex: 60,
           padding: '20px'
         }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '520px', padding: '24px', background: 'var(--bg-modal)', borderRadius: '16px', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 'min(92vw, 520px)', maxHeight: '90vh', overflowY: 'auto', padding: '24px', background: 'var(--bg-modal)', borderRadius: '16px', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <ShieldAlert size={22} color="#f59e0b" />
@@ -723,7 +723,7 @@ export default function Investors() {
           zIndex: 50,
           padding: '20px'
         }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '480px', padding: '24px', background: 'var(--bg-modal)' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 'min(92vw, 480px)', maxHeight: '90vh', overflowY: 'auto', padding: '24px', background: 'var(--bg-modal)' }}>
             <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '6px' }}>
               {blockUser.userId?.status === 'blocked' ? 'Unblock Investor' : 'Block Investor Account'}
             </h3>
@@ -774,7 +774,7 @@ export default function Investors() {
         }}>
           <div className="glass-panel" style={{
             width: '100%',
-            maxWidth: '920px',
+            maxWidth: 'min(92vw, 920px)',
             maxHeight: '90vh',
             display: 'flex',
             flexDirection: 'column',

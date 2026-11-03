@@ -40,8 +40,8 @@ export default function DocumentPreviewModal({ isOpen, onClose, documentUrl, tit
       <div
         style={{
           width: '100%',
-          maxWidth: '1050px',
-          height: '90vh',
+          maxWidth: 'min(94vw, 1100px)',
+          height: 'min(92vh, 900px)',
           backgroundColor: '#FFFFFF',
           borderRadius: '16px',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',

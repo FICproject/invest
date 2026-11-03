@@ -197,7 +197,7 @@ export default function Companies() {
   };
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="page-container">
       {/* Top Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
         <div>
@@ -397,7 +397,7 @@ export default function Companies() {
           zIndex: 50,
           padding: '20px'
         }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '640px', padding: '28px', background: 'var(--bg-modal)' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 'min(92vw, 640px)', maxHeight: '90vh', overflowY: 'auto', padding: '28px', background: 'var(--bg-modal)' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '6px' }}>Onboard New Company</h3>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '18px' }}>
               Admin creates the company and initial company owner user (PRD Section 5.2 C-1).
@@ -533,7 +533,7 @@ export default function Companies() {
           zIndex: 50,
           padding: '20px'
         }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '600px', padding: '28px', background: 'var(--bg-modal)' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 'min(92vw, 600px)', maxHeight: '90vh', overflowY: 'auto', padding: '28px', background: 'var(--bg-modal)' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '4px' }}>
               KYB Verification: {reviewCompany.name}
             </h3>
@@ -670,7 +670,7 @@ export default function Companies() {
           zIndex: 60,
           padding: '20px'
         }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '520px', padding: '24px', background: 'var(--bg-modal)', borderRadius: '16px', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 'min(92vw, 520px)', maxHeight: '90vh', overflowY: 'auto', padding: '24px', background: 'var(--bg-modal)', borderRadius: '16px', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <ShieldAlert size={22} color="#f59e0b" />

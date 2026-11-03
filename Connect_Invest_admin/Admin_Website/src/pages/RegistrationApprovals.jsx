@@ -198,7 +198,7 @@ export default function RegistrationApprovals() {
   };
 
   return (
-    <div style={{ padding: '28px 32px', maxWidth: '1440px', margin: '0 auto' }}>
+    <div className="page-container">
       {/* Top Banner & Title */}
       <div
         style={{
@@ -445,8 +445,8 @@ export default function RegistrationApprovals() {
         </div>
 
         {/* Search & Status Pill Filters */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, justifyContent: 'flex-end' }}>
-          <div style={{ position: 'relative', width: '100%', maxWidth: '320px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, justifyContent: 'flex-end', flexWrap: 'wrap', minWidth: 0 }}>
+          <div style={{ position: 'relative', width: '100%', maxWidth: '320px', minWidth: '200px' }}>
             <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
             <input
               type="text"
@@ -491,12 +491,13 @@ export default function RegistrationApprovals() {
 
       {/* Applications Table / Cards */}
       <div
+        className="table-responsive"
         style={{
           backgroundColor: '#FFFFFF',
           borderRadius: '16px',
           border: '1px solid #E2E8F0',
-          overflow: 'hidden',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+          overflowX: 'auto'
         }}
       >
         {loading ? (
@@ -511,7 +512,7 @@ export default function RegistrationApprovals() {
             <p style={{ margin: 0, fontSize: '0.85rem' }}>All submitted applications have been processed or no matching records were found.</p>
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+          <table style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
             <thead>
               <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#475569', fontWeight: 700, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 <th style={{ padding: '14px 20px' }}>Applicant / Entity</th>
@@ -687,7 +688,7 @@ export default function RegistrationApprovals() {
           <div
             style={{
               width: '100%',
-              maxWidth: '850px',
+              maxWidth: 'min(92vw, 850px)',
               maxHeight: '92vh',
               backgroundColor: '#FFFFFF',
               borderRadius: '20px',

@@ -46,7 +46,7 @@ export default function Reports() {
   };
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="page-container">
       <div>
         <h2 style={{ fontSize: '1.35rem', fontWeight: 700 }}>Reports & Data Export (PRD M-2)</h2>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>

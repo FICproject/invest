@@ -270,7 +270,7 @@ export default function Offers() {
   });
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="page-container">
       {/* Top Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
         <div>
@@ -503,7 +503,7 @@ export default function Offers() {
           zIndex: 50,
           padding: '20px'
         }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '640px', padding: '28px', background: 'var(--bg-modal)' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 'min(92vw, 640px)', maxHeight: '90vh', overflowY: 'auto', padding: '28px', background: 'var(--bg-modal)' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '4px' }}>
               Configure Term Sheet: {selectedOfferTerms.title}
             </h3>
@@ -639,7 +639,7 @@ export default function Offers() {
         }}>
           <div className="forge-card" style={{
             width: '100%',
-            maxWidth: '620px',
+            maxWidth: 'min(92vw, 620px)',
             maxHeight: '90vh',
             overflowY: 'auto',
             padding: '32px',

@@ -27,6 +27,20 @@ function MainApp() {
   const [pendingCounts, setPendingCounts] = useState({});
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    const handleAutoCollapse = () => {
+      if (typeof window !== 'undefined' && window.innerWidth < 1200) {
+        setSidebarCollapsed(true);
+      }
+    };
+    if (typeof window !== 'undefined' && window.innerWidth < 1200) {
+      setSidebarCollapsed(true);
+    }
+    window.addEventListener('resize', handleAutoCollapse);
+    return () => window.removeEventListener('resize', handleAutoCollapse);
+  }, []);
 
   const fetchGlobalStats = async () => {
     if (!isAuthenticated) return;
@@ -101,6 +115,8 @@ function MainApp() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         pendingCounts={pendingCounts}
+        isCollapsed={sidebarCollapsed}
+        setIsCollapsed={setSidebarCollapsed}
       />
 
       {/* Main Content Area */}
@@ -110,6 +126,8 @@ function MainApp() {
           activeTab={activeTab}
           onRefresh={fetchGlobalStats}
           refreshing={refreshing}
+          sidebarCollapsed={sidebarCollapsed}
+          onToggleSidebar={() => setSidebarCollapsed(prev => !prev)}
         />
 
         <main style={{ flex: 1, overflowY: 'auto' }}>
