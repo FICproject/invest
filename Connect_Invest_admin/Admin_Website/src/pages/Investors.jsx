@@ -32,6 +32,12 @@ export default function Investors() {
   const [blockReason, setBlockReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Suspension & Revocation Modal
+  const [suspendModalUser, setSuspendModalUser] = useState(null);
+  const [suspendType, setSuspendType] = useState('funding'); // 'funding' | 'account'
+  const [suspendTargetStatus, setSuspendTargetStatus] = useState('Suspended');
+  const [suspendReason, setSuspendReason] = useState('');
+
   // Portfolio modal
   const [portfolioInvestor, setPortfolioInvestor] = useState(null);
   const [portfolioData, setPortfolioData] = useState(null);
@@ -100,6 +106,37 @@ export default function Investors() {
       fetchInvestors();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Action failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSuspendSubmit = async () => {
+    if (!suspendReason.trim()) {
+      toast.warning('A written reason is required when suspending or revoking privileges');
+      return;
+    }
+    try {
+      setSubmitting(true);
+      const targetUserId = suspendModalUser.userId?._id || suspendModalUser._id;
+      if (suspendType === 'funding') {
+        await adminApi.suspendInvestorFunding(targetUserId, {
+          status: suspendTargetStatus,
+          reason: suspendReason.trim()
+        });
+        toast.success(`Investor funding privileges updated to ${suspendTargetStatus}`);
+      } else {
+        await adminApi.suspendInvestorAccount(targetUserId, {
+          status: suspendTargetStatus,
+          reason: suspendReason.trim()
+        });
+        toast.success(`Investor account status updated to ${suspendTargetStatus}`);
+      }
+      setSuspendModalUser(null);
+      setSuspendReason('');
+      fetchInvestors();
+    } catch (err) {
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Action failed');
     } finally {
       setSubmitting(false);
     }
@@ -183,6 +220,7 @@ export default function Investors() {
                   <th>Bank Account</th>
                   <th>Total Invested</th>
                   <th style={{ textAlign: 'center' }}>Account Status</th>
+                  <th style={{ textAlign: 'center' }}>Funding Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -229,31 +267,35 @@ export default function Investors() {
                       </td>
                       <td style={{ textAlign: 'center' }}>
                         {(() => {
-                          if (isBlocked) {
-                            return <span className="badge badge-rose">BLOCKED</span>;
+                          const accStatus = inv.userId?.accountStatus || (isBlocked ? 'Suspended' : 'Active');
+                          if (accStatus === 'Revoked') {
+                            return <span className="badge badge-rose">REVOKED</span>;
                           }
-                          if (inv.kycStatus === 'Approved') {
-                            return <span className="badge badge-emerald">ACTIVE</span>;
+                          if (accStatus === 'Suspended') {
+                            return <span className="badge badge-amber">SUSPENDED</span>;
                           }
-                          if (inv.kycStatus === 'Submitted') {
-                            return <span className="badge badge-amber" title="Account restricted from investing until KYC approval">PENDING KYC</span>;
+                          return <span className="badge badge-emerald">ACTIVE</span>;
+                        })()}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        {(() => {
+                          const fundStatus = inv.userId?.fundingStatus || 'Allowed';
+                          if (fundStatus === 'Revoked') {
+                            return <span className="badge badge-rose">REVOKED</span>;
                           }
-                          if (inv.kycStatus === 'More info needed') {
-                            return <span className="badge badge-amber" title="Awaiting additional KYC information">ACTION NEEDED</span>;
+                          if (fundStatus === 'Suspended') {
+                            return <span className="badge badge-amber">SUSPENDED</span>;
                           }
-                          if (inv.kycStatus === 'Rejected') {
-                            return <span className="badge badge-rose" title="KYC was rejected">KYC REJECTED</span>;
-                          }
-                          return <span className="badge badge-slate" title="KYC not started">UNVERIFIED</span>;
+                          return <span className="badge badge-emerald">ALLOWED</span>;
                         })()}
                       </td>
                       <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           <button
                             onClick={() => handleOpenPortfolio(inv)}
                             className="btn-primary"
                             style={{
-                              padding: '5px 10px',
+                              padding: '5px 8px',
                               fontSize: '0.75rem',
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -270,19 +312,31 @@ export default function Investors() {
                               setDecisionReason(inv.kycReason || '');
                             }}
                             className="btn-secondary"
-                            style={{ padding: '5px 10px', fontSize: '0.75rem' }}
+                            style={{ padding: '5px 8px', fontSize: '0.75rem' }}
                           >
                             KYC
                           </button>
                           <button
                             onClick={() => {
-                              setBlockUser(inv);
-                              setBlockReason(inv.userId?.blockReason || '');
+                              setSuspendModalUser(inv);
+                              setSuspendType('funding');
+                              setSuspendTargetStatus(inv.userId?.fundingStatus === 'Suspended' ? 'Allowed' : 'Suspended');
+                              setSuspendReason(inv.userId?.fundingSuspendedReason || '');
                             }}
-                            className="btn-danger"
-                            style={{ padding: '5px 10px', fontSize: '0.75rem' }}
+                            className="btn-secondary"
+                            style={{
+                              padding: '5px 8px',
+                              fontSize: '0.75rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              borderColor: '#f59e0b',
+                              color: '#d97706'
+                            }}
+                            title="Suspend or Revoke funding or account"
                           >
-                            {isBlocked ? 'Unblock' : 'Block'}
+                            <ShieldAlert size={13} />
+                            Suspend/Revoke
                           </button>
                         </div>
                       </td>
@@ -372,7 +426,206 @@ export default function Investors() {
         </div>
       )}
 
-      {/* Block Modal */}
+      {/* Suspend or Revoke Privileges Modal */}
+      {suspendModalUser && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 60,
+          padding: '20px'
+        }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '520px', padding: '24px', background: 'var(--bg-modal)', borderRadius: '16px', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ShieldAlert size={22} color="#f59e0b" />
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>
+                  Manage Privileges & Access
+                </h3>
+              </div>
+              <button
+                onClick={() => setSuspendModalUser(null)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+              Investor: <strong>{suspendModalUser.userId?.name}</strong> ({suspendModalUser.userId?.email})
+            </p>
+
+            {/* Current Status Overview */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '10px',
+              padding: '12px',
+              backgroundColor: 'rgba(255, 255, 255, 0.03)',
+              borderRadius: '8px',
+              border: '1px solid var(--border-color)',
+              marginBottom: '18px'
+            }}>
+              <div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Current Account</div>
+                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: suspendModalUser.userId?.accountStatus === 'Suspended' ? '#f59e0b' : suspendModalUser.userId?.accountStatus === 'Revoked' ? '#ef4444' : '#10b981' }}>
+                  {suspendModalUser.userId?.accountStatus || 'Active'}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Current Funding</div>
+                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: suspendModalUser.userId?.fundingStatus === 'Suspended' ? '#f59e0b' : suspendModalUser.userId?.fundingStatus === 'Revoked' ? '#ef4444' : '#10b981' }}>
+                  {suspendModalUser.userId?.fundingStatus || 'Allowed'}
+                </div>
+              </div>
+            </div>
+
+            {/* Tab: Action Target */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>
+                Select Action Scope:
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSuspendType('funding');
+                    setSuspendTargetStatus('Suspended');
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: suspendType === 'funding' ? '2px solid #f59e0b' : '1px solid var(--border-color)',
+                    background: suspendType === 'funding' ? 'rgba(245, 158, 11, 0.15)' : 'transparent',
+                    color: suspendType === 'funding' ? '#f59e0b' : 'var(--text-secondary)',
+                    fontWeight: 600,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Funding Privileges
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSuspendType('account');
+                    setSuspendTargetStatus('Suspended');
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: suspendType === 'account' ? '2px solid #ef4444' : '1px solid var(--border-color)',
+                    background: suspendType === 'account' ? 'rgba(239, 68, 68, 0.15)' : 'transparent',
+                    color: suspendType === 'account' ? '#ef4444' : 'var(--text-secondary)',
+                    fontWeight: 600,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Account Access (Login & Dashboard)
+                </button>
+              </div>
+            </div>
+
+            {/* Target Status Selection */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>
+                Set New Status:
+              </label>
+              {suspendType === 'funding' ? (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {['Allowed', 'Suspended', 'Revoked'].map(st => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => setSuspendTargetStatus(st)}
+                      style={{
+                        flex: 1,
+                        padding: '6px 10px',
+                        borderRadius: '6px',
+                        border: suspendTargetStatus === st ? '2px solid var(--primary-color)' : '1px solid var(--border-color)',
+                        background: suspendTargetStatus === st ? 'rgba(0, 71, 186, 0.15)' : 'transparent',
+                        fontWeight: suspendTargetStatus === st ? 700 : 500,
+                        fontSize: '0.8rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {st}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {['Active', 'Suspended', 'Revoked'].map(st => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => setSuspendTargetStatus(st)}
+                      style={{
+                        flex: 1,
+                        padding: '6px 10px',
+                        borderRadius: '6px',
+                        border: suspendTargetStatus === st ? '2px solid var(--primary-color)' : '1px solid var(--border-color)',
+                        background: suspendTargetStatus === st ? 'rgba(0, 71, 186, 0.15)' : 'transparent',
+                        fontWeight: suspendTargetStatus === st ? 700 : 500,
+                        fontSize: '0.8rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {st}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Mandatory Reason */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>
+                Administrative Reason (Mandatory):
+              </label>
+              <textarea
+                value={suspendReason}
+                onChange={e => setSuspendReason(e.target.value)}
+                placeholder="Specify the regulatory, KYC, or risk reason for this action..."
+                className="input-field"
+                rows={3}
+                style={{ width: '100%' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                disabled={submitting}
+                onClick={() => setSuspendModalUser(null)}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={submitting}
+                onClick={handleSuspendSubmit}
+                className={suspendTargetStatus === 'Revoked' ? 'btn-danger' : 'btn-primary'}
+                style={{
+                  background: suspendTargetStatus === 'Revoked' ? '#ef4444' : suspendTargetStatus === 'Suspended' ? '#f59e0b' : '#10b981',
+                  borderColor: suspendTargetStatus === 'Revoked' ? '#ef4444' : suspendTargetStatus === 'Suspended' ? '#f59e0b' : '#10b981'
+                }}
+              >
+                {submitting ? 'Applying...' : `Confirm Set to ${suspendTargetStatus}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {blockUser && (
         <div style={{
           position: 'fixed',

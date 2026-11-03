@@ -1,5 +1,5 @@
 // realTimeSync.js - Browser SSE Client for Connect Invest Admin Web
-const SSE_URL = 'http://localhost:5000/api/v1/events';
+const SSE_URL = typeof window !== 'undefined' ? '/api/v1/events' : 'http://localhost:5000/api/v1/events';
 
 let eventSource = null;
 const listeners = new Set();

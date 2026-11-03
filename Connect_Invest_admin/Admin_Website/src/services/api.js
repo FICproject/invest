@@ -1,6 +1,14 @@
 import axios from 'axios';
 
-const API_BASE = 'http://localhost:5000/api/v1';
+const getApiBase = () => {
+  if (typeof window !== 'undefined' && window.location) {
+    // Use relative path so Vite proxy routes requests seamlessly across LAN/Network
+    return '/api/v1';
+  }
+  return 'http://localhost:5000/api/v1';
+};
+
+const API_BASE = getApiBase();
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -57,11 +65,15 @@ export const adminApi = {
   getAllInvestments: params => api.get('/admin/investments', { params }),
   decideKyc: (id, data) => api.post(`/admin/kyc/${id}/decision`, data),
   setUserBlockStatus: (id, data) => api.post(`/admin/users/${id}/block`, data),
+  suspendInvestorFunding: (id, data) => api.post(`/admin/investors/${id}/suspend-funding`, data),
+  suspendInvestorAccount: (id, data) => api.post(`/admin/investors/${id}/suspend-account`, data),
 
   // Companies & KYB
   getCompanies: params => api.get('/admin/companies', { params }),
   createCompany: data => api.post('/admin/companies', data),
   decideKyb: (id, data) => api.post(`/admin/kyb/${id}/decision`, data),
+  suspendCompanyFunding: (id, data) => api.post(`/admin/companies/${id}/suspend-funding`, data),
+  suspendCompanyAccount: (id, data) => api.post(`/admin/companies/${id}/suspend-account`, data),
   deleteCompany: id => api.delete(`/admin/companies/${id}`),
 
   // Offers & Term Sheets

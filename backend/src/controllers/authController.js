@@ -94,10 +94,6 @@ export const register = asyncHandler(async (req, res) => {
     throw new ApiError(409, 'An investor account with this mobile number already exists. Please sign in.');
   }
 
-  // Generate 6-digit OTP
-  const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-  const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
   const user = await User.create({
     name,
     email: email.toLowerCase(),
@@ -107,7 +103,6 @@ export const register = asyncHandler(async (req, res) => {
     isVerified: true,
     registrationStatus: 'Pending Approval',
     submittedAt: new Date(),
-    otp: { code: otpCode, expiresAt: otpExpires },
     termsAccepted: termsAccepted !== false
   });
 
@@ -202,8 +197,7 @@ export const register = asyncHandler(async (req, res) => {
         registrationStatus: 'Pending Approval'
       },
       registrationStatus: 'Pending Approval',
-      kycStatus: 'Pending Approval',
-      otpCode
+      kycStatus: 'Pending Approval'
     }
   });
 });
@@ -259,9 +253,28 @@ export const login = asyncHandler(async (req, res) => {
         companyId: user.companyId,
         registrationStatus: currentRegistrationStatus,
         rejectionReason: user.rejectionReason || null,
-        adminRemarks: user.adminRemarks || null
+        adminRemarks: user.adminRemarks || null,
+        accountStatus: user.accountStatus || 'Active',
+        accountSuspendedReason: user.accountSuspendedReason || null,
+        accountSuspendedAt: user.accountSuspendedAt || null,
+        fundingStatus: user.fundingStatus || 'Allowed',
+        fundingSuspendedReason: user.fundingSuspendedReason || null,
+        fundingSuspendedAt: user.fundingSuspendedAt || null
       },
-      company,
+      company: company ? {
+        id: company._id,
+        legalName: company.legalName || company.name,
+        accountStatus: company.accountStatus || 'Active',
+        accountSuspendedReason: company.accountSuspendedReason || null,
+        accountSuspendedAt: company.accountSuspendedAt || null,
+        fundingStatus: company.fundingStatus || 'Allowed',
+        fundingSuspendedReason: company.fundingSuspendedReason || null,
+        fundingSuspendedAt: company.fundingSuspendedAt || null
+      } : null,
+      accountStatus: user.accountStatus || 'Active',
+      accountSuspendedReason: user.accountSuspendedReason || null,
+      fundingStatus: user.fundingStatus || 'Allowed',
+      fundingSuspendedReason: user.fundingSuspendedReason || null,
       registrationStatus: currentRegistrationStatus,
       kycStatus: kyc ? kyc.status : 'NOT_STARTED'
     }
@@ -284,38 +297,34 @@ export const verifyOTP = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'User account not found.');
   }
 
-  if (user.otp && user.otp.code === otp) {
-    user.isVerified = true;
-    user.otp = undefined;
-    await user.save();
+  user.isVerified = true;
+  user.otp = undefined;
+  await user.save();
 
-    const token = generateToken(user._id);
-    const kyc = await KYC.findOne({ investorId: user._id });
-    const verifiedRegistrationStatus = user.registrationStatus || (user.role === 'admin' ? 'Approved' : 'Pending Approval');
+  const token = generateToken(user._id);
+  const kyc = await KYC.findOne({ investorId: user._id });
+  const verifiedRegistrationStatus = user.registrationStatus || (user.role === 'admin' ? 'Approved' : 'Pending Approval');
 
-    return res.status(200).json({
-      success: true,
-      message: 'OTP verified successfully.',
-      data: {
-        token,
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          mobile: user.mobile,
-          role: user.role,
-          isVerified: user.isVerified,
-          registrationStatus: verifiedRegistrationStatus,
-          rejectionReason: user.rejectionReason || null,
-          adminRemarks: user.adminRemarks || null
-        },
+  return res.status(200).json({
+    success: true,
+    message: 'Account verified successfully.',
+    data: {
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        mobile: user.mobile,
+        role: user.role,
+        isVerified: user.isVerified,
         registrationStatus: verifiedRegistrationStatus,
-        kycStatus: kyc ? kyc.status : 'NOT_STARTED'
-      }
-    });
-  }
-
-  throw new ApiError(400, 'Invalid or expired OTP code. Please enter the correct code.');
+        rejectionReason: user.rejectionReason || null,
+        adminRemarks: user.adminRemarks || null
+      },
+      registrationStatus: verifiedRegistrationStatus,
+      kycStatus: kyc ? kyc.status : 'NOT_STARTED'
+    }
+  });
 });
 
 // @route   GET /api/auth/me
@@ -326,6 +335,11 @@ export const getMe = asyncHandler(async (req, res) => {
   const kyc = await KYC.findOne({ investorId: req.user._id });
 
   const activeRegistrationStatus = user.registrationStatus || (user.role === 'admin' ? 'Approved' : 'Pending Approval');
+
+  let company = null;
+  if (user.companyId) {
+    company = await Company.findById(user.companyId);
+  }
 
   res.status(200).json({
     success: true,
@@ -340,11 +354,33 @@ export const getMe = asyncHandler(async (req, res) => {
         companyId: user.companyId,
         registrationStatus: activeRegistrationStatus,
         rejectionReason: user.rejectionReason || null,
-        adminRemarks: user.adminRemarks || null
+        adminRemarks: user.adminRemarks || null,
+        accountStatus: user.accountStatus || 'Active',
+        accountSuspendedReason: user.accountSuspendedReason || null,
+        accountSuspendedAt: user.accountSuspendedAt || null,
+        fundingStatus: user.fundingStatus || 'Allowed',
+        fundingSuspendedReason: user.fundingSuspendedReason || null,
+        fundingSuspendedAt: user.fundingSuspendedAt || null
       },
+      company: company ? {
+        id: company._id,
+        legalName: company.legalName || company.name,
+        accountStatus: company.accountStatus || 'Active',
+        accountSuspendedReason: company.accountSuspendedReason || null,
+        accountSuspendedAt: company.accountSuspendedAt || null,
+        fundingStatus: company.fundingStatus || 'Allowed',
+        fundingSuspendedReason: company.fundingSuspendedReason || null,
+        fundingSuspendedAt: company.fundingSuspendedAt || null
+      } : null,
       profile,
       registrationStatus: activeRegistrationStatus,
-      kycStatus: kyc ? kyc.status : 'NOT_STARTED'
+      kycStatus: kyc ? kyc.status : 'NOT_STARTED',
+      accountStatus: user.accountStatus || 'Active',
+      accountSuspendedReason: user.accountSuspendedReason || null,
+      accountSuspendedAt: user.accountSuspendedAt || null,
+      fundingStatus: user.fundingStatus || 'Allowed',
+      fundingSuspendedReason: user.fundingSuspendedReason || null,
+      fundingSuspendedAt: user.fundingSuspendedAt || null
     }
   });
 });

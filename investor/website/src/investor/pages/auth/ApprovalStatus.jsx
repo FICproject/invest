@@ -92,7 +92,7 @@ export const ApprovalStatus = () => {
   const checkCurrentStatus = async () => {
     try {
       setChecking(true);
-      const res = await axios.get('http://localhost:5000/api/auth/me', {
+      const res = await axios.get('/api/auth/me', {
         headers: { Authorization: `Bearer ${token || localStorage.getItem('ci_investor_token')}` }
       });
 
@@ -123,7 +123,7 @@ export const ApprovalStatus = () => {
 
     try {
       setUploadingField(fieldName);
-      const res = await axios.post('http://localhost:5000/api/auth/upload-doc', data, {
+      const res = await axios.post('/api/auth/upload-doc', data, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
@@ -148,7 +148,7 @@ export const ApprovalStatus = () => {
       setErrorMsg('');
 
       const res = await axios.post(
-        'http://localhost:5000/api/auth/resubmit',
+        '/api/auth/resubmit',
         formData,
         { headers: { Authorization: `Bearer ${token || localStorage.getItem('ci_investor_token')}` } }
       );

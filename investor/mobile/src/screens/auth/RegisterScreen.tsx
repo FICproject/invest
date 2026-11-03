@@ -223,11 +223,8 @@ export const RegisterScreen = ({ navigation, route }: any) => {
         termsAccepted: invTerms
       });
 
-      navigation.navigate(ROUTES.OTP_VERIFICATION, {
-        email: invEmail,
-        mobile: invMobile,
-        otpCode: res.otpCode
-      });
+      // User registered successfully with 'Pending Approval' status;
+      // AppNavigator automatically transitions to the ApprovalStatusScreen.
     } catch (err: any) {
       setError(err?.message || 'Registration failed. Please try again.');
     } finally {

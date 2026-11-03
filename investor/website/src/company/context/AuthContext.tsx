@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Company } from '../types';
 import { authService } from '../services';
+import { initRealTimeSync } from '../../services/realTimeSync';
 
 interface AuthContextType {
   user: User | null;
@@ -50,6 +51,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     init();
   }, [token]);
+
+  // Real-time synchronization for Account/Funding suspensions & status decisions
+  useEffect(() => {
+    const cleanup = initRealTimeSync((event: any) => {
+      if (event?.type === 'DATA_SYNC') {
+        if (
+          event.entity === 'ACCOUNT_STATUS_CHANGED' ||
+          event.entity === 'FUNDING_STATUS_CHANGED' ||
+          event.entity === 'REGISTRATION_DECISION'
+        ) {
+          const payload = event.payload || {};
+          const currentCompId = company?._id || company?.id;
+          const currentUserId = user?._id || user?.id;
+          if (
+            (currentCompId && (String(payload.companyId) === String(currentCompId) || String(payload.id) === String(currentCompId))) ||
+            (currentUserId && (String(payload.userId) === String(currentUserId) || String(payload.id) === String(currentUserId)))
+          ) {
+            console.log('[Company SSE] Refreshing company auth state on event:', event);
+            refreshCompany();
+          }
+        }
+      }
+    });
+    return cleanup;
+  }, [company, user, token]);
 
   const login = (newToken: string, newUser: User, newCompany: Company) => {
     setToken(newToken);

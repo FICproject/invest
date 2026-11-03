@@ -7,8 +7,12 @@ import {
   getAllInvestments,
   decideKyc,
   setUserBlockStatus,
+  suspendInvestorFunding,
+  suspendInvestorAccount,
   getCompanies,
   createCompany,
+  suspendCompanyFunding,
+  suspendCompanyAccount,
   decideKyb,
   deleteCompany,
   getOffers,
@@ -77,12 +81,16 @@ router.get('/investors/:id/investments', getInvestorInvestments);
 router.get('/investments', getAllInvestments);
 router.post('/kyc/:id/decision', decideKyc);
 router.post('/users/:id/block', setUserBlockStatus);
+router.post('/investors/:id/suspend-funding', suspendInvestorFunding);
+router.post('/investors/:id/suspend-account', suspendInvestorAccount);
 
 // Companies & KYB
 router.get('/companies', getCompanies);
 router.post('/companies', createCompany);
 router.get('/companies/:id/cap-table', getCompanyCapTable);
 router.post('/kyb/:id/decision', decideKyb);
+router.post('/companies/:id/suspend-funding', suspendCompanyFunding);
+router.post('/companies/:id/suspend-account', suspendCompanyAccount);
 router.delete('/companies/:id', deleteCompany);
 
 // Offers & Term Sheets

@@ -135,6 +135,8 @@ export async function seedDatabase(isDirectRun = false) {
         }
       ]
     });
+    companyOwner1.companyId = company1._id;
+    await companyOwner1.save();
 
     const companyOwner2 = await User.create({
       role: 'companyOwner',
@@ -175,6 +177,73 @@ export async function seedDatabase(isDirectRun = false) {
         effectiveFrom: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
       }
     });
+    companyOwner2.companyId = company2._id;
+    await companyOwner2.save();
+
+    // 2b. Demo Company: Nexus Technologies Private Limited
+    const nexusPasswordHash = await bcrypt.hash('Password123!', 10);
+    const nexusUser = await User.create({
+      role: 'company_admin',
+      name: 'Rajesh Sharma',
+      email: 'contact@nexustech.in',
+      mobile: '+919876543230',
+      password: nexusPasswordHash,
+      passwordHash: nexusPasswordHash,
+      status: 'active',
+      registrationStatus: 'Approved',
+      isVerified: true
+    });
+
+    const nexusCompany = await Company.create({
+      name: 'Nexus Technologies Private Limited',
+      legalName: 'Nexus Technologies Private Limited',
+      brandName: 'Nexus Technologies',
+      tradingName: 'Nexus Technologies',
+      regNo: 'U72900KA2021PTC145678',
+      cin: 'U72900KA2021PTC145678',
+      pan: 'AABCN1234T',
+      gstin: '29AABCN1234T1Z8',
+      companyType: 'Private Limited',
+      industry: 'Technology & SaaS',
+      sector: 'Enterprise Software',
+      status: Statuses.COMPANY.APPROVED,
+      verificationStatus: 'Verified',
+      registrationStatus: 'Approved',
+      ownerUserId: nexusUser._id,
+      userId: nexusUser._id,
+      website: 'https://nexustech.in',
+      officialEmail: 'contact@nexustech.in',
+      officialMobile: '+919876543230',
+      description: 'Building scalable enterprise cloud solutions, data intelligence engines, and high-yield financial tech.',
+      registeredAddress: {
+        street: 'Level 4, Nexus Tower, Indiranagar 100ft Road',
+        city: 'Bengaluru',
+        state: 'Karnataka',
+        pincode: '560038',
+        country: 'India'
+      },
+      bankAccount: {
+        holderName: 'Nexus Technologies Private Limited',
+        accountNo: '987654321098',
+        ifsc: 'HDFC0000240',
+        bankName: 'HDFC Bank, Indiranagar Bengaluru',
+        verified: true,
+        effectiveFrom: new Date()
+      },
+      directors: [
+        {
+          name: 'Rajesh Sharma',
+          email: 'contact@nexustech.in',
+          mobile: '+919876543230',
+          designation: 'Managing Director & CEO',
+          pan: 'AABCN1234T',
+          sharesOwnedPercentage: 70,
+          identityVerified: true
+        }
+      ]
+    });
+    nexusUser.companyId = nexusCompany._id;
+    await nexusUser.save();
 
     // 3. Investors
     const investorHash = await bcrypt.hash('InvestorPassword123!', 10);
@@ -243,6 +312,53 @@ export async function seedDatabase(isDirectRun = false) {
       bankName: 'HDFC Bank Ltd',
       accountNumber: '50100482934210',
       ifscCode: 'HDFC0001234',
+      status: 'APPROVED',
+      submittedAt: new Date(),
+      reviewedAt: new Date()
+    });
+
+    const rahulHash = await bcrypt.hash('Password@123', 10);
+    const investorDemo = await User.create({
+      role: 'investor',
+      name: 'Rahul Sharma',
+      email: 'rahul.sharma@investor.com',
+      mobile: '+919876543220',
+      password: rahulHash,
+      passwordHash: rahulHash,
+      status: 'active',
+      registrationStatus: 'Approved',
+      isVerified: true
+    });
+
+    await InvestorProfile.create({
+      userId: investorDemo._id,
+      pan: 'ABCDE1234F',
+      panNumber: 'ABCDE1234F',
+      aadhaarNumber: 'XXXX-XXXX-8921',
+      aadhaarVerified: true,
+      dob: new Date('1990-05-15'),
+      nationality: 'Indian',
+      kycStatus: Statuses.KYC.APPROVED,
+      address: {
+        line1: 'B-402, Green Glen Layout, Bellandur',
+        street: 'B-402, Green Glen Layout',
+        city: 'Bengaluru',
+        state: 'Karnataka',
+        pincode: '560103'
+      },
+      bankDetails: {
+        bankName: 'HDFC Bank Ltd',
+        accountNumber: '50100482934210',
+        ifscCode: 'HDFC0001234',
+        accountHolderName: 'Rahul Sharma',
+        isVerified: true
+      }
+    });
+
+    await KYC.create({
+      investorId: investorDemo._id,
+      fullName: 'Rahul Sharma',
+      panNumber: 'ABCDE1234F',
       status: 'APPROVED',
       submittedAt: new Date(),
       reviewedAt: new Date()
@@ -612,8 +728,8 @@ export async function seedDatabase(isDirectRun = false) {
     console.log('[Unified Seeder] Database seeded successfully!');
     console.log('--------------------------------------------------');
     console.log('Admin Account:    admin@connectinvest.com / AdminPassword123!');
-    console.log('Investor Account: investor@connectinvest.com / InvestorPassword123!');
-    console.log('Company Account:  arjun@apexrenewables.in / CompanyPass123!');
+    console.log('Investor Account: rahul.sharma@investor.com / Password@123 (or investor@connectinvest.com / InvestorPassword123!)');
+    console.log('Company Account:  contact@nexustech.in / Password123! (or arjun@apexrenewables.in / CompanyPass123!)');
     console.log('--------------------------------------------------');
 
     if (isDirectRun) {

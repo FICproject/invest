@@ -109,7 +109,7 @@ async function bootstrap() {
     console.warn('[Bootstrap] Auto-seed check notice:', err.message);
   }
 
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`=============================================================`);
     console.log(`  CONNECT INVEST - UNIFIED MONOREPO BACKEND SERVER`);
     console.log(`  Status:       Online`);

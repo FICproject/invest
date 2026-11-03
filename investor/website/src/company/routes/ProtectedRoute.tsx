@@ -18,6 +18,16 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
     return <Navigate to="/company/login" replace />;
   }
 
+  // Intercept company users whose account is suspended or revoked
+  const isSuspended =
+    company?.accountStatus === 'Suspended' ||
+    company?.accountStatus === 'Revoked' ||
+    user?.accountStatus === 'Suspended' ||
+    user?.accountStatus === 'Revoked';
+  if (isSuspended) {
+    return <Navigate to="/company/account-suspended" replace />;
+  }
+
   // Intercept company users whose registration is not approved yet
   const status = company?.registrationStatus || user?.registrationStatus || 'Pending Approval';
   if (status !== 'Approved') {

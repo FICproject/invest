@@ -130,7 +130,7 @@ export const Login = () => {
         }
       }
     } catch (err) {
-      setError(err.message || err.response?.data?.message || 'Login failed. Please check your credentials.');
+      setError(err.response?.data?.message || err.data?.message || err.message || 'Login failed. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }

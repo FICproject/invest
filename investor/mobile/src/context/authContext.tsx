@@ -73,7 +73,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setToken(res.data.token);
       setUser(res.data.user);
       setKycStatus(res.data.kycStatus || 'NOT_STARTED');
-      return { success: true, message: res.message, otpCode: res.data.otpCode };
+      return { success: true, message: res.message };
     }
     return { success: false, message: res.message || 'Login failed' };
   };
@@ -86,7 +86,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setToken(res.data.token);
       setUser(res.data.user);
       setKycStatus(res.data.kycStatus || 'NOT_STARTED');
-      return { success: true, message: res.message, otpCode: res.data.otpCode };
+      return { success: true, message: res.message };
     }
     return { success: false, message: res.message || 'Registration failed' };
   };

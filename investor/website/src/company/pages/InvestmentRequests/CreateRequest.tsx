@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Button, Badge } from '../../components/common';
 import { investmentService } from '../../services';
+import { useAuth } from '../../context/AuthContext';
 import {
   Building,
   FolderKanban,
@@ -19,6 +20,8 @@ import {
 
 export const CreateRequest: React.FC = () => {
   const navigate = useNavigate();
+  const { company } = useAuth();
+  const isFundingSuspended = company?.fundingStatus === 'Suspended' || company?.fundingStatus === 'Revoked';
 
   // Step state: 1: Investment Purpose, 2: Terms & Amounts, 3: Review & Submit
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -59,6 +62,11 @@ export const CreateRequest: React.FC = () => {
 
   const handleSubmit = async (isDraft: boolean) => {
     setError('');
+
+    if (isFundingSuspended) {
+      setError(`Fundraising Privileges ${company?.fundingStatus}: ${company?.fundingSuspendedReason || 'Fundraising privileges for this company are suspended by Platform Administration.'}`);
+      return;
+    }
 
     if (!isDraft) {
       if (!entityOrProjectName.trim()) {
@@ -141,6 +149,21 @@ export const CreateRequest: React.FC = () => {
           Request capital from Connect Invest for another company or a specific project.
         </p>
       </div>
+
+      {isFundingSuspended && (
+        <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-left">
+          <div className="flex items-center gap-2 text-red-700 font-bold text-sm">
+            <AlertCircle className="w-5 h-5" />
+            Fundraising Privileges {company?.fundingStatus}
+          </div>
+          <p className="text-xs text-red-600 mt-1 leading-relaxed">
+            {company?.fundingSuspendedReason || 'Your company is currently suspended from creating funding requests or accepting investments by Platform Administration.'}
+          </p>
+          <p className="text-[11px] text-red-500 mt-2 font-medium">
+            Contact corporate-compliance@connectinvest.in for reinstatement assistance.
+          </p>
+        </div>
+      )}
 
       {/* 3-Step Wizard Indicator */}
       <div className="flex items-center justify-between border-b border-[#F2EBD9] pb-4">

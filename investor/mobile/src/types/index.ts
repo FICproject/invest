@@ -10,6 +10,12 @@ export interface User {
   registrationStatus?: 'Pending Approval' | 'Approved' | 'Rejected' | 'Resubmission Required';
   rejectionReason?: string;
   adminRemarks?: string;
+  accountStatus?: 'Active' | 'Suspended' | 'Revoked';
+  accountSuspendedReason?: string;
+  accountSuspendedAt?: string;
+  fundingStatus?: 'Allowed' | 'Suspended' | 'Revoked';
+  fundingSuspendedReason?: string;
+  fundingSuspendedAt?: string;
   createdAt?: string;
 }
 

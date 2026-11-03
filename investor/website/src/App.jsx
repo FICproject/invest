@@ -27,6 +27,7 @@ import { Register as InvestorRegister } from './investor/pages/auth/Register';
 import { VerifyOTP as InvestorVerifyOTP } from './investor/pages/auth/VerifyOTP';
 import { ForgotPassword as InvestorForgotPassword } from './investor/pages/auth/ForgotPassword';
 import { ApprovalStatus as InvestorApprovalStatus } from './investor/pages/auth/ApprovalStatus';
+import { AccountSuspended as InvestorAccountSuspended } from './investor/pages/auth/AccountSuspended';
 
 import { Dashboard as InvestorDashboard } from './investor/pages/investor/Dashboard';
 import { MyInvestments } from './investor/pages/investor/MyInvestments';
@@ -51,6 +52,7 @@ import { FaqPage as CompanyFaqPage } from './company/pages/public/FaqPage';
 import { CompanyLogin } from './company/pages/auth/CompanyLogin';
 import { CompanyRegister } from './company/pages/auth/CompanyRegister';
 import { CompanyApprovalStatus } from './company/pages/auth/CompanyApprovalStatus';
+import { CompanyAccountSuspended } from './company/pages/auth/CompanyAccountSuspended';
 import { ForgotPassword as CompanyForgotPassword } from './company/pages/auth/ForgotPassword';
 import { ResetPassword as CompanyResetPassword } from './company/pages/auth/ResetPassword';
 
@@ -91,9 +93,10 @@ export default function App() {
 
             <Route path="/login" element={<InvestorLogin />} />
             <Route path="/register" element={<InvestorRegister />} />
-            <Route path="/verify-otp" element={<InvestorVerifyOTP />} />
+            <Route path="/verify-otp" element={<Navigate to="/approval-status" replace />} />
             <Route path="/forgot-password" element={<InvestorForgotPassword />} />
             <Route path="/approval-status" element={<InvestorApprovalStatus />} />
+            <Route path="/account-suspended" element={<InvestorAccountSuspended />} />
 
             {/* Investor Protected Pages */}
             <Route
@@ -189,6 +192,7 @@ export default function App() {
             <Route path="/company/login" element={<Navigate to="/login?role=company" replace />} />
             <Route path="/company/register" element={<Navigate to="/register?role=company" replace />} />
             <Route path="/company/approval-status" element={<CompanyApprovalStatus />} />
+            <Route path="/company/account-suspended" element={<CompanyAccountSuspended />} />
             <Route path="/company/forgot-password" element={<CompanyForgotPassword />} />
             <Route path="/company/reset-password" element={<CompanyResetPassword />} />
 

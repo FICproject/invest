@@ -106,6 +106,57 @@ const companySchema = new mongoose.Schema(
         timestamp: { type: Date, default: Date.now }
       }
     ],
+    // Suspension & Revocation Controls
+    accountStatus: {
+      type: String,
+      enum: ['Active', 'Suspended', 'Revoked'],
+      default: 'Active',
+      index: true
+    },
+    accountSuspendedReason: {
+      type: String,
+      default: null
+    },
+    accountSuspendedAt: {
+      type: Date,
+      default: null
+    },
+    accountSuspendedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    fundingStatus: {
+      type: String,
+      enum: ['Allowed', 'Suspended', 'Revoked'],
+      default: 'Allowed',
+      index: true
+    },
+    fundingSuspendedReason: {
+      type: String,
+      default: null
+    },
+    fundingSuspendedAt: {
+      type: Date,
+      default: null
+    },
+    fundingSuspendedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    suspensionHistory: [
+      {
+        action: { type: String, required: true },
+        type: { type: String, enum: ['account', 'funding'], required: true },
+        previousStatus: { type: String },
+        newStatus: { type: String, required: true },
+        reason: { type: String, default: '' },
+        adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        adminName: { type: String, default: '' },
+        timestamp: { type: Date, default: Date.now }
+      }
+    ],
     verificationStatus: {
       type: String,
       enum: ['Pending', 'In Review', 'Verified', 'Rejected', 'Action Required', 'Active', 'Pending Approval', 'Approved', 'Resubmission Required'],

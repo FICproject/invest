@@ -103,7 +103,7 @@ export const CompanyApprovalStatus: React.FC = () => {
   const checkCurrentStatus = async () => {
     try {
       setChecking(true);
-      const res = await axios.get('http://localhost:5000/api/company/profile', {
+      const res = await axios.get('/api/company/profile', {
         headers: { Authorization: `Bearer ${token || localStorage.getItem('ci_company_token')}` }
       });
 
@@ -134,7 +134,7 @@ export const CompanyApprovalStatus: React.FC = () => {
 
     try {
       setUploadingField(fieldName);
-      const res = await axios.post('http://localhost:5000/api/auth/upload-doc', data, {
+      const res = await axios.post('/api/auth/upload-doc', data, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
@@ -159,7 +159,7 @@ export const CompanyApprovalStatus: React.FC = () => {
       setErrorMsg('');
 
       const res = await axios.post(
-        'http://localhost:5000/api/company/auth/resubmit',
+        '/api/company/auth/resubmit',
         formData,
         { headers: { Authorization: `Bearer ${token || localStorage.getItem('ci_company_token')}` } }
       );

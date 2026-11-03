@@ -51,9 +51,15 @@ export const InvestmentDetails = () => {
     return () => { isMounted = false; };
   }, [id]);
 
+  const isFundingSuspended = user?.fundingStatus === 'Suspended' || user?.fundingStatus === 'Revoked';
+
   const handleInvestClick = () => {
     if (!isAuthenticated) {
       navigate('/login');
+      return;
+    }
+    if (isFundingSuspended) {
+      alert(`Funding Privileges ${user.fundingStatus}: ${user.fundingSuspendedReason || 'Your ability to execute investments has been temporarily suspended by Platform Administration.'}`);
       return;
     }
     setIsModalOpen(true);
@@ -315,15 +321,36 @@ export const InvestmentDetails = () => {
                   </div>
                 </div>
 
-                {/* Primary Invest Now CTA */}
-                <Button
-                  variant="primary"
-                  size="lg"
-                  fullWidth
-                  onClick={handleInvestClick}
-                >
-                  Invest Now
-                </Button>
+                {/* Primary Invest Now CTA or Suspension Notice */}
+                {isFundingSuspended ? (
+                  <div style={{
+                    backgroundColor: '#FEF2F2',
+                    border: '1px solid #F87171',
+                    borderRadius: '8px',
+                    padding: '14px',
+                    textAlign: 'left'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#B91C1C', fontWeight: 600, fontSize: '14px' }}>
+                      <AlertCircle size={16} />
+                      Funding Privileges {user.fundingStatus}
+                    </div>
+                    <p style={{ fontSize: '12px', color: '#7F1D1D', marginTop: '4px', lineHeight: 1.4 }}>
+                      {user.fundingSuspendedReason || 'Your ability to execute investments is suspended by Platform Administration.'}
+                    </p>
+                    <div style={{ fontSize: '11px', color: '#991B1B', marginTop: '6px' }}>
+                      Contact compliance@connectinvest.in for assistance.
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    fullWidth
+                    onClick={handleInvestClick}
+                  >
+                    Invest Now
+                  </Button>
+                )}
 
                 {!isAuthenticated && (
                   <p style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '10px' }}>

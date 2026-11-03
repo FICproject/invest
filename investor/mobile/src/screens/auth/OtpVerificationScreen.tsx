@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,13 @@ export const OtpVerificationScreen = ({ route, navigation }: any) => {
   const [otp, setOtp] = useState<string>(devOtp || '');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+
+  useEffect(() => {
+    // OTP verification decommissioned - redirect back
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    }
+  }, [navigation]);
 
   const handleVerify = async () => {
     if (!otp.trim() || otp.trim().length < 4) {

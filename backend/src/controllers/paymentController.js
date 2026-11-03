@@ -5,6 +5,7 @@ import { Transaction } from '../models/Transaction.js';
 import { Payout } from '../models/Payout.js';
 import { Notification } from '../models/Notification.js';
 import { KYC } from '../models/KYC.js';
+import { Company } from '../models/Company.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
@@ -45,6 +46,27 @@ export const createOrder = asyncHandler(async (req, res) => {
       message: 'KYC Verification is required before you can execute an investment. Please complete and submit your KYC documents.',
       kycStatus: kyc ? kyc.status : 'NOT_STARTED'
     });
+  }
+
+  // Check if target Company has active fundraising status
+  if (offer.companyId) {
+    const targetComp = await Company.findById(offer.companyId);
+    if (targetComp) {
+      if (targetComp.accountStatus === 'Suspended' || targetComp.accountStatus === 'Revoked') {
+        return res.status(403).json({
+          success: false,
+          code: 'COMPANY_ACCOUNT_SUSPENDED',
+          message: `Fundraising for this company is currently suspended by Platform Administration.${targetComp.accountSuspendedReason ? ' Reason: ' + targetComp.accountSuspendedReason : ''}`
+        });
+      }
+      if (targetComp.fundingStatus === 'Suspended' || targetComp.fundingStatus === 'Revoked') {
+        return res.status(403).json({
+          success: false,
+          code: 'COMPANY_FUNDING_SUSPENDED',
+          message: `Fundraising for this company has been suspended by Platform Administration.${targetComp.fundingSuspendedReason ? ' Reason: ' + targetComp.fundingSuspendedReason : ''}`
+        });
+      }
+    }
   }
 
   const orderId = 'ORD_' + Date.now() + '_' + Math.floor(1000 + Math.random() * 9000);

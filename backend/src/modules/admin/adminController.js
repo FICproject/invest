@@ -575,6 +575,8 @@ export async function setUserBlockStatus(req, res, next) {
     const before = { status: user.status, blockReason: user.blockReason };
     user.status = status;
     user.blockReason = status === 'blocked' ? reason.trim() : null;
+    user.accountStatus = status === 'blocked' ? 'Suspended' : 'Active';
+    user.accountSuspendedReason = status === 'blocked' ? reason.trim() : null;
     await user.save();
 
     await logAction({
@@ -589,7 +591,340 @@ export async function setUserBlockStatus(req, res, next) {
       ipAddress: req.ip
     });
 
+    broadcastSyncEvent('ACCOUNT_STATUS_CHANGED', 'UPDATED', {
+      userId: user._id,
+      role: user.role || 'investor',
+      accountStatus: user.accountStatus,
+      reason: user.accountSuspendedReason
+    });
+
     return res.json({ success: true, message: `User status updated to ${status}`, user });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function suspendInvestorFunding(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { status, reason } = req.body; // 'Allowed' | 'Suspended' | 'Revoked'
+
+    if (!['Allowed', 'Suspended', 'Revoked'].includes(status)) {
+      return res.status(400).json({ success: false, error: 'Status must be Allowed, Suspended, or Revoked' });
+    }
+    if ((status === 'Suspended' || status === 'Revoked') && (!reason || !reason.trim())) {
+      return res.status(400).json({ success: false, error: 'A written reason is required when suspending or revoking funding privileges' });
+    }
+
+    let user = await User.findById(id);
+    if (!user) {
+      const profile = await InvestorProfile.findById(id);
+      if (profile && profile.userId) {
+        user = await User.findById(profile.userId);
+      }
+    }
+    if (!user) return res.status(404).json({ success: false, error: 'Investor not found' });
+
+    const prev = user.fundingStatus || 'Allowed';
+    user.fundingStatus = status;
+    user.fundingSuspendedReason = status === 'Allowed' ? null : reason.trim();
+    user.fundingSuspendedAt = status === 'Allowed' ? null : new Date();
+    user.fundingSuspendedBy = status === 'Allowed' ? null : req.user._id;
+
+    if (!user.suspensionHistory) user.suspensionHistory = [];
+    user.suspensionHistory.push({
+      action: status === 'Allowed' ? 'REACTIVATE_FUNDING' : (status === 'Suspended' ? 'SUSPEND_FUNDING' : 'REVOKE_FUNDING'),
+      type: 'funding',
+      previousStatus: prev,
+      newStatus: status,
+      reason: reason ? reason.trim() : 'Reinstated by Admin',
+      adminId: req.user._id,
+      adminName: req.user.name || 'Admin',
+      timestamp: new Date()
+    });
+
+    await user.save();
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: status === 'Allowed' ? 'INVESTOR_FUNDING_RESTORED' : 'INVESTOR_FUNDING_SUSPENDED',
+      targetEntity: 'User',
+      targetId: user._id,
+      before: { fundingStatus: prev },
+      after: { fundingStatus: status, reason: user.fundingSuspendedReason },
+      reason,
+      ipAddress: req.ip
+    });
+
+    await Notification.create({
+      investorId: user._id,
+      title: status === 'Allowed' ? 'Funding Privileges Restored' : `Funding Privileges ${status}`,
+      message: status === 'Allowed'
+        ? 'Your investment privileges on Connect Invest have been re-enabled.'
+        : `Your ability to execute investments has been ${status.toLowerCase()} by administration.${reason ? ' Reason: ' + reason.trim() : ''}`,
+      type: 'system',
+      link: '/investor/dashboard'
+    });
+
+    broadcastSyncEvent('FUNDING_STATUS_CHANGED', 'UPDATED', {
+      userId: user._id,
+      role: 'investor',
+      fundingStatus: status,
+      reason: user.fundingSuspendedReason
+    });
+
+    return res.json({
+      success: true,
+      message: `Investor funding privileges updated to ${status}`,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        fundingStatus: user.fundingStatus,
+        fundingSuspendedReason: user.fundingSuspendedReason
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function suspendInvestorAccount(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { status, reason } = req.body; // 'Active' | 'Suspended' | 'Revoked'
+
+    if (!['Active', 'Suspended', 'Revoked'].includes(status)) {
+      return res.status(400).json({ success: false, error: 'Status must be Active, Suspended, or Revoked' });
+    }
+    if ((status === 'Suspended' || status === 'Revoked') && (!reason || !reason.trim())) {
+      return res.status(400).json({ success: false, error: 'A written reason is required when suspending or revoking an account' });
+    }
+
+    let user = await User.findById(id);
+    if (!user) {
+      const profile = await InvestorProfile.findById(id);
+      if (profile && profile.userId) {
+        user = await User.findById(profile.userId);
+      }
+    }
+    if (!user) return res.status(404).json({ success: false, error: 'Investor not found' });
+
+    const prev = user.accountStatus || 'Active';
+    user.accountStatus = status;
+    user.accountSuspendedReason = status === 'Active' ? null : reason.trim();
+    user.accountSuspendedAt = status === 'Active' ? null : new Date();
+    user.accountSuspendedBy = status === 'Active' ? null : req.user._id;
+    user.status = status === 'Active' ? 'active' : 'blocked';
+    user.blockReason = status === 'Active' ? null : reason.trim();
+
+    if (!user.suspensionHistory) user.suspensionHistory = [];
+    user.suspensionHistory.push({
+      action: status === 'Active' ? 'REACTIVATE_ACCOUNT' : (status === 'Suspended' ? 'SUSPEND_ACCOUNT' : 'REVOKE_ACCOUNT'),
+      type: 'account',
+      previousStatus: prev,
+      newStatus: status,
+      reason: reason ? reason.trim() : 'Reactivated by Admin',
+      adminId: req.user._id,
+      adminName: req.user.name || 'Admin',
+      timestamp: new Date()
+    });
+
+    await user.save();
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: status === 'Active' ? 'INVESTOR_ACCOUNT_REACTIVATED' : 'INVESTOR_ACCOUNT_SUSPENDED',
+      targetEntity: 'User',
+      targetId: user._id,
+      before: { accountStatus: prev },
+      after: { accountStatus: status, reason: user.accountSuspendedReason },
+      reason,
+      ipAddress: req.ip
+    });
+
+    broadcastSyncEvent('ACCOUNT_STATUS_CHANGED', 'UPDATED', {
+      userId: user._id,
+      role: 'investor',
+      accountStatus: status,
+      reason: user.accountSuspendedReason
+    });
+
+    return res.json({
+      success: true,
+      message: `Investor account status updated to ${status}`,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        accountStatus: user.accountStatus,
+        accountSuspendedReason: user.accountSuspendedReason
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function suspendCompanyFunding(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { status, reason } = req.body; // 'Allowed' | 'Suspended' | 'Revoked'
+
+    if (!['Allowed', 'Suspended', 'Revoked'].includes(status)) {
+      return res.status(400).json({ success: false, error: 'Status must be Allowed, Suspended, or Revoked' });
+    }
+    if ((status === 'Suspended' || status === 'Revoked') && (!reason || !reason.trim())) {
+      return res.status(400).json({ success: false, error: 'A written reason is required when suspending or revoking fundraising privileges' });
+    }
+
+    const company = await Company.findById(id);
+    if (!company) return res.status(404).json({ success: false, error: 'Company not found' });
+
+    const prev = company.fundingStatus || 'Allowed';
+    company.fundingStatus = status;
+    company.fundingSuspendedReason = status === 'Allowed' ? null : reason.trim();
+    company.fundingSuspendedAt = status === 'Allowed' ? null : new Date();
+    company.fundingSuspendedBy = status === 'Allowed' ? null : req.user._id;
+
+    if (!company.suspensionHistory) company.suspensionHistory = [];
+    company.suspensionHistory.push({
+      action: status === 'Allowed' ? 'REACTIVATE_FUNDING' : (status === 'Suspended' ? 'SUSPEND_FUNDING' : 'REVOKE_FUNDING'),
+      type: 'funding',
+      previousStatus: prev,
+      newStatus: status,
+      reason: reason ? reason.trim() : 'Reinstated by Admin',
+      adminId: req.user._id,
+      adminName: req.user.name || 'Admin',
+      timestamp: new Date()
+    });
+
+    await company.save();
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: status === 'Allowed' ? 'COMPANY_FUNDING_RESTORED' : 'COMPANY_FUNDING_SUSPENDED',
+      targetEntity: 'Company',
+      targetId: company._id,
+      before: { fundingStatus: prev },
+      after: { fundingStatus: status, reason: company.fundingSuspendedReason },
+      reason,
+      ipAddress: req.ip
+    });
+
+    await Notification.create({
+      companyId: company._id,
+      title: status === 'Allowed' ? 'Fundraising Privileges Restored' : `Fundraising Privileges ${status}`,
+      message: status === 'Allowed'
+        ? 'Your company can now create funding requests and raise capital.'
+        : `Fundraising privileges for ${company.legalName || company.name} have been ${status.toLowerCase()} by administration.${reason ? ' Reason: ' + reason.trim() : ''}`,
+      type: 'system',
+      link: '/company/dashboard'
+    });
+
+    broadcastSyncEvent('FUNDING_STATUS_CHANGED', 'UPDATED', {
+      companyId: company._id,
+      role: 'company',
+      fundingStatus: status,
+      reason: company.fundingSuspendedReason
+    });
+
+    return res.json({
+      success: true,
+      message: `Company fundraising privileges updated to ${status}`,
+      company: {
+        id: company._id,
+        name: company.legalName || company.name,
+        fundingStatus: company.fundingStatus,
+        fundingSuspendedReason: company.fundingSuspendedReason
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function suspendCompanyAccount(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { status, reason } = req.body; // 'Active' | 'Suspended' | 'Revoked'
+
+    if (!['Active', 'Suspended', 'Revoked'].includes(status)) {
+      return res.status(400).json({ success: false, error: 'Status must be Active, Suspended, or Revoked' });
+    }
+    if ((status === 'Suspended' || status === 'Revoked') && (!reason || !reason.trim())) {
+      return res.status(400).json({ success: false, error: 'A written reason is required when suspending or revoking a company account' });
+    }
+
+    const company = await Company.findById(id);
+    if (!company) return res.status(404).json({ success: false, error: 'Company not found' });
+
+    const prev = company.accountStatus || 'Active';
+    company.accountStatus = status;
+    company.accountSuspendedReason = status === 'Active' ? null : reason.trim();
+    company.accountSuspendedAt = status === 'Active' ? null : new Date();
+    company.accountSuspendedBy = status === 'Active' ? null : req.user._id;
+    company.status = status === 'Active' ? 'Active' : 'Suspended';
+
+    if (!company.suspensionHistory) company.suspensionHistory = [];
+    company.suspensionHistory.push({
+      action: status === 'Active' ? 'REACTIVATE_ACCOUNT' : (status === 'Suspended' ? 'SUSPEND_ACCOUNT' : 'REVOKE_ACCOUNT'),
+      type: 'account',
+      previousStatus: prev,
+      newStatus: status,
+      reason: reason ? reason.trim() : 'Reactivated by Admin',
+      adminId: req.user._id,
+      adminName: req.user.name || 'Admin',
+      timestamp: new Date()
+    });
+
+    await company.save();
+
+    // Also update associated owner user accountStatus & block status
+    if (company.ownerUserId || company.userId) {
+      const ownerId = company.ownerUserId || company.userId;
+      const ownerUser = await User.findById(ownerId);
+      if (ownerUser) {
+        ownerUser.accountStatus = status;
+        ownerUser.accountSuspendedReason = company.accountSuspendedReason;
+        ownerUser.status = status === 'Active' ? 'active' : 'blocked';
+        ownerUser.blockReason = company.accountSuspendedReason;
+        await ownerUser.save();
+      }
+    }
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: status === 'Active' ? 'COMPANY_ACCOUNT_REACTIVATED' : 'COMPANY_ACCOUNT_SUSPENDED',
+      targetEntity: 'Company',
+      targetId: company._id,
+      before: { accountStatus: prev },
+      after: { accountStatus: status, reason: company.accountSuspendedReason },
+      reason,
+      ipAddress: req.ip
+    });
+
+    broadcastSyncEvent('ACCOUNT_STATUS_CHANGED', 'UPDATED', {
+      companyId: company._id,
+      role: 'company',
+      accountStatus: status,
+      reason: company.accountSuspendedReason
+    });
+
+    return res.json({
+      success: true,
+      message: `Company account status updated to ${status}`,
+      company: {
+        id: company._id,
+        name: company.legalName || company.name,
+        accountStatus: company.accountStatus,
+        accountSuspendedReason: company.accountSuspendedReason
+      }
+    });
   } catch (error) {
     next(error);
   }

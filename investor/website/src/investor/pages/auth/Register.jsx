@@ -298,13 +298,7 @@ export const Register = () => {
         riskDisclosureAccepted: investorData.riskDisclosureAccepted
       });
 
-      navigate('/verify-otp', {
-        state: {
-          email: investorData.email,
-          mobile: investorData.mobile,
-          otpCode: res.data?.otpCode
-        }
-      });
+      navigate('/approval-status');
     } catch (err) {
       setError(err.message || 'Investor registration failed. Please review your entries.');
     } finally {
@@ -363,7 +357,7 @@ export const Register = () => {
 
       if (res && res.token) {
         companyAuth.login(res.token, res.user, res.company);
-        navigate('/dashboard');
+        navigate('/company/approval-status');
       } else {
         navigate('/login?role=company');
       }

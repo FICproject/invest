@@ -1,6 +1,6 @@
 import express from 'express';
 import { requireCompanyAuth, requireCompany } from '../middleware/companyAuthMiddleware.js';
-import { requireApprovedUser } from '../middleware/requireApprovedUser.js';
+import { requireApprovedUser, requireActiveFunding } from '../middleware/requireApprovedUser.js';
 import { upload } from '../middleware/uploadMiddleware.js';
 import {
   registerCompany,
@@ -56,9 +56,9 @@ router.use(requireApprovedUser);
 // Dashboard & Investments
 router.get('/dashboard-overview', getDashboardOverview);
 router.get('/requests', getRequests);
-router.post('/requests', upload.array('documents', 5), createRequest);
+router.post('/requests', requireActiveFunding, upload.array('documents', 5), createRequest);
 router.get('/requests/:id', getRequestById);
-router.put('/requests/:id', upload.array('documents', 5), updateRequest);
+router.put('/requests/:id', requireActiveFunding, upload.array('documents', 5), updateRequest);
 router.get('/investments', getCompanyInvestments);
 
 // Shareholders & Cap Table

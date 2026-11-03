@@ -206,6 +206,20 @@ export const loginCompany = asyncHandler(async (req, res) => {
   if (user.companyId) {
     company = await Company.findById(user.companyId);
   }
+  if (!company) {
+    company = await Company.findOne({
+      $or: [
+        { ownerUserId: user._id },
+        { userId: user._id },
+        { officialEmail: user.email.toLowerCase() },
+        { 'directors.email': user.email.toLowerCase() }
+      ]
+    });
+    if (company && !user.companyId) {
+      user.companyId = company._id;
+      await user.save();
+    }
+  }
 
   const currentStatus = company?.registrationStatus || user.registrationStatus || 'Pending Approval';
   const currentReason = company?.rejectionReason || user.rejectionReason || null;
@@ -223,9 +237,19 @@ export const loginCompany = asyncHandler(async (req, res) => {
       companyId: user.companyId,
       registrationStatus: currentStatus,
       rejectionReason: currentReason,
-      adminRemarks: user.adminRemarks || null
+      adminRemarks: user.adminRemarks || null,
+      accountStatus: company?.accountStatus || user.accountStatus || 'Active',
+      accountSuspendedReason: company?.accountSuspendedReason || user.accountSuspendedReason || null,
+      accountSuspendedAt: company?.accountSuspendedAt || user.accountSuspendedAt || null,
+      fundingStatus: company?.fundingStatus || user.fundingStatus || 'Allowed',
+      fundingSuspendedReason: company?.fundingSuspendedReason || user.fundingSuspendedReason || null,
+      fundingSuspendedAt: company?.fundingSuspendedAt || user.fundingSuspendedAt || null
     },
     company,
+    accountStatus: company?.accountStatus || user.accountStatus || 'Active',
+    accountSuspendedReason: company?.accountSuspendedReason || user.accountSuspendedReason || null,
+    fundingStatus: company?.fundingStatus || user.fundingStatus || 'Allowed',
+    fundingSuspendedReason: company?.fundingSuspendedReason || user.fundingSuspendedReason || null,
     registrationStatus: currentStatus,
     rejectionReason: currentReason
   });

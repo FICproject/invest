@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../services/authService';
+import { initRealTimeSync } from '../../services/realTimeSync';
 
 const AuthContext = createContext();
 
@@ -32,6 +33,27 @@ export const AuthProvider = ({ children }) => {
 
     initAuth();
   }, []);
+
+  // Real-time synchronization for Account/Funding suspensions & status decisions
+  useEffect(() => {
+    const cleanup = initRealTimeSync((event) => {
+      if (event?.type === 'DATA_SYNC') {
+        if (
+          event.entity === 'ACCOUNT_STATUS_CHANGED' ||
+          event.entity === 'FUNDING_STATUS_CHANGED' ||
+          event.entity === 'REGISTRATION_DECISION'
+        ) {
+          const payload = event.payload || {};
+          const currentId = user?._id || user?.id;
+          if (!currentId || String(payload.userId) === String(currentId) || String(payload.id) === String(currentId)) {
+            console.log('[Investor SSE] Refreshing auth state on event:', event);
+            refreshMe();
+          }
+        }
+      }
+    });
+    return cleanup;
+  }, [user]);
 
   const login = async (identifier, password, remember = false) => {
     const res = await authService.login(identifier, password);

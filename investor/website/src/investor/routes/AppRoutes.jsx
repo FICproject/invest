@@ -47,7 +47,7 @@ export const AppRoutes = () => {
       {/* Auth Pages */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
-      <Route path="/verify-otp" element={<VerifyOTP />} />
+      <Route path="/verify-otp" element={<Navigate to="/approval-status" replace />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
 
       {/* Investor Protected Pages */}

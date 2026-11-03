@@ -32,6 +32,24 @@ export const requireCompanyAuth = asyncHandler(async (req, res, next) => {
       }
     }
 
+    if (!req.company) {
+      const company = await Company.findOne({
+        $or: [
+          { ownerUserId: user._id },
+          { userId: user._id },
+          { officialEmail: user.email.toLowerCase() },
+          { 'directors.email': user.email.toLowerCase() }
+        ]
+      });
+      if (company) {
+        req.company = company;
+        if (!user.companyId) {
+          user.companyId = company._id;
+          await user.save();
+        }
+      }
+    }
+
     next();
   } catch (error) {
     throw new ApiError(401, 'Invalid or expired session token');

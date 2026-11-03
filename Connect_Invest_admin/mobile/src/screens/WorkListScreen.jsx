@@ -53,6 +53,14 @@ export default function WorkListScreen({ onOpenSidebar }) {
   const [decisionReason, setDecisionReason] = useState('');
   const [submittingDecision, setSubmittingDecision] = useState(false);
 
+  // Suspend / Revoke Modal
+  const [suspendModalOpen, setSuspendModalOpen] = useState(false);
+  const [suspendItem, setSuspendItem] = useState(null);
+  const [suspendType, setSuspendType] = useState('funding'); // 'funding' | 'account'
+  const [suspendTargetStatus, setSuspendTargetStatus] = useState('Suspended');
+  const [suspendReason, setSuspendReason] = useState('');
+  const [submittingSuspend, setSubmittingSuspend] = useState(false);
+
   // Document Preview Modal
   const [previewDoc, setPreviewDoc] = useState(null);
 
@@ -135,6 +143,60 @@ export default function WorkListScreen({ onOpenSidebar }) {
       Alert.alert('Error', err.response?.data?.error || err.message || 'Failed to record decision');
     } finally {
       setSubmittingDecision(false);
+    }
+  };
+
+  const handleOpenSuspend = item => {
+    setSuspendItem(item);
+    setSuspendType('funding');
+    setSuspendTargetStatus('Suspended');
+    setSuspendReason('');
+    setSuspendModalOpen(true);
+  };
+
+  const handleSubmitSuspend = async () => {
+    if (!suspendReason.trim()) {
+      Alert.alert('Reason Required', 'Please enter a written reason for this suspension or revocation.');
+      return;
+    }
+    try {
+      setSubmittingSuspend(true);
+      const isInvestor = suspendItem.entityType === 'Investor';
+      const targetId = suspendItem.id || suspendItem._id;
+      if (isInvestor) {
+        if (suspendType === 'funding') {
+          await adminApi.suspendInvestorFunding(targetId, {
+            status: suspendTargetStatus,
+            reason: suspendReason.trim()
+          });
+        } else {
+          await adminApi.suspendInvestorAccount(targetId, {
+            status: suspendTargetStatus,
+            reason: suspendReason.trim()
+          });
+        }
+      } else {
+        if (suspendType === 'funding') {
+          await adminApi.suspendCompanyFunding(targetId, {
+            status: suspendTargetStatus,
+            reason: suspendReason.trim()
+          });
+        } else {
+          await adminApi.suspendCompanyAccount(targetId, {
+            status: suspendTargetStatus,
+            reason: suspendReason.trim()
+          });
+        }
+      }
+
+      Alert.alert('Status Updated', `Successfully updated ${suspendType} status to ${suspendTargetStatus}.`);
+      setSuspendModalOpen(false);
+      setSuspendItem(null);
+      fetchApprovals();
+    } catch (err) {
+      Alert.alert('Action Failed', err.response?.data?.error || err.message || 'Failed to update status');
+    } finally {
+      setSubmittingSuspend(false);
     }
   };
 
@@ -458,6 +520,15 @@ export default function WorkListScreen({ onOpenSidebar }) {
                     <XCircle size={14} color="#DC2626" />
                     <Text style={[styles.btnText, { color: '#DC2626' }]}>Reject</Text>
                   </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.btn, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B', borderWidth: 1 }]}
+                    onPress={() => handleOpenSuspend(item)}
+                    activeOpacity={0.8}
+                  >
+                    <ShieldCheck size={14} color="#D97706" />
+                    <Text style={[styles.btnText, { color: '#D97706' }]}>Privileges</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             );
@@ -538,6 +609,124 @@ export default function WorkListScreen({ onOpenSidebar }) {
         </Modal>
       )}
 
+      {/* Suspend / Revoke Modal */}
+      {suspendModalOpen && suspendItem && (
+        <Modal
+          visible={suspendModalOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setSuspendModalOpen(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Manage Access & Funding</Text>
+                <TouchableOpacity onPress={() => setSuspendModalOpen(false)}>
+                  <X size={20} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.modalSubtitle}>
+                Entity: {suspendItem.name} ({suspendItem.entityType})
+              </Text>
+
+              {/* Scope Selection */}
+              <Text style={styles.formLabel}>Action Scope:</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                <TouchableOpacity
+                  style={[
+                    styles.tabBtn,
+                    { flex: 1, paddingVertical: 8, borderRadius: 6, borderWidth: 1, alignItems: 'center' },
+                    suspendType === 'funding'
+                      ? { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }
+                      : { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }
+                  ]}
+                  onPress={() => {
+                    setSuspendType('funding');
+                    setSuspendTargetStatus('Suspended');
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: suspendType === 'funding' ? '#B45309' : '#64748B' }}>
+                    Funding
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.tabBtn,
+                    { flex: 1, paddingVertical: 8, borderRadius: 6, borderWidth: 1, alignItems: 'center' },
+                    suspendType === 'account'
+                      ? { backgroundColor: '#FEE2E2', borderColor: '#EF4444' }
+                      : { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }
+                  ]}
+                  onPress={() => {
+                    setSuspendType('account');
+                    setSuspendTargetStatus('Suspended');
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: suspendType === 'account' ? '#B91C1C' : '#64748B' }}>
+                    Account Login
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Status Selection */}
+              <Text style={styles.formLabel}>Set Target Status:</Text>
+              <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14 }}>
+                {(suspendType === 'funding' ? ['Allowed', 'Suspended', 'Revoked'] : ['Active', 'Suspended', 'Revoked']).map(st => (
+                  <TouchableOpacity
+                    key={st}
+                    style={[
+                      { flex: 1, paddingVertical: 6, borderRadius: 6, borderWidth: 1, alignItems: 'center' },
+                      suspendTargetStatus === st
+                        ? { backgroundColor: '#0047BA', borderColor: '#0047BA' }
+                        : { backgroundColor: '#FFFFFF', borderColor: '#CBD5E1' }
+                    ]}
+                    onPress={() => setSuspendTargetStatus(st)}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: suspendTargetStatus === st ? '#FFFFFF' : '#475569' }}>
+                      {st}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.formLabel}>Written Reason (Mandatory):</Text>
+              <TextInput
+                style={styles.textArea}
+                value={suspendReason}
+                onChangeText={setSuspendReason}
+                multiline
+                numberOfLines={3}
+                placeholder="Enter justification for administrative status change..."
+              />
+
+              <TouchableOpacity
+                onPress={handleSubmitSuspend}
+                disabled={submittingSuspend}
+                style={[
+                  styles.modalSubmitBtn,
+                  suspendTargetStatus === 'Revoked'
+                    ? { backgroundColor: '#DC2626' }
+                    : suspendTargetStatus === 'Suspended'
+                    ? { backgroundColor: '#D97706' }
+                    : { backgroundColor: '#16A34A' }
+                ]}
+                activeOpacity={0.8}
+              >
+                {submittingSuspend ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>
+                    Set to {suspendTargetStatus}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
+
       {/* Document Preview Modal */}
       {previewDoc && (
         <Modal
@@ -588,6 +777,124 @@ export default function WorkListScreen({ onOpenSidebar }) {
               >
                 <ExternalLink size={16} color="#FFFFFF" />
                 <Text style={styles.openExternalBtnText}>Open in Device Browser</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Suspend / Revoke Modal */}
+      {suspendModalOpen && suspendItem && (
+        <Modal
+          visible={suspendModalOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setSuspendModalOpen(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Manage Access & Funding</Text>
+                <TouchableOpacity onPress={() => setSuspendModalOpen(false)}>
+                  <X size={20} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.modalSubtitle}>
+                Entity: {suspendItem.name} ({suspendItem.entityType})
+              </Text>
+
+              {/* Scope Selection */}
+              <Text style={styles.formLabel}>Action Scope:</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                <TouchableOpacity
+                  style={[
+                    styles.tabBtn,
+                    { flex: 1, paddingVertical: 8, borderRadius: 6, borderWidth: 1, alignItems: 'center' },
+                    suspendType === 'funding'
+                      ? { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }
+                      : { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }
+                  ]}
+                  onPress={() => {
+                    setSuspendType('funding');
+                    setSuspendTargetStatus('Suspended');
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: suspendType === 'funding' ? '#B45309' : '#64748B' }}>
+                    Funding
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.tabBtn,
+                    { flex: 1, paddingVertical: 8, borderRadius: 6, borderWidth: 1, alignItems: 'center' },
+                    suspendType === 'account'
+                      ? { backgroundColor: '#FEE2E2', borderColor: '#EF4444' }
+                      : { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }
+                  ]}
+                  onPress={() => {
+                    setSuspendType('account');
+                    setSuspendTargetStatus('Suspended');
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: suspendType === 'account' ? '#B91C1C' : '#64748B' }}>
+                    Account Login
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Status Selection */}
+              <Text style={styles.formLabel}>Set Target Status:</Text>
+              <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14 }}>
+                {(suspendType === 'funding' ? ['Allowed', 'Suspended', 'Revoked'] : ['Active', 'Suspended', 'Revoked']).map(st => (
+                  <TouchableOpacity
+                    key={st}
+                    style={[
+                      { flex: 1, paddingVertical: 6, borderRadius: 6, borderWidth: 1, alignItems: 'center' },
+                      suspendTargetStatus === st
+                        ? { backgroundColor: '#0047BA', borderColor: '#0047BA' }
+                        : { backgroundColor: '#FFFFFF', borderColor: '#CBD5E1' }
+                    ]}
+                    onPress={() => setSuspendTargetStatus(st)}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: suspendTargetStatus === st ? '#FFFFFF' : '#475569' }}>
+                      {st}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.formLabel}>Written Reason (Mandatory):</Text>
+              <TextInput
+                style={styles.textArea}
+                value={suspendReason}
+                onChangeText={setSuspendReason}
+                multiline
+                numberOfLines={3}
+                placeholder="Enter justification for administrative status change..."
+              />
+
+              <TouchableOpacity
+                onPress={handleSubmitSuspend}
+                disabled={submittingSuspend}
+                style={[
+                  styles.modalSubmitBtn,
+                  suspendTargetStatus === 'Revoked'
+                    ? { backgroundColor: '#DC2626' }
+                    : suspendTargetStatus === 'Suspended'
+                    ? { backgroundColor: '#D97706' }
+                    : { backgroundColor: '#16A34A' }
+                ]}
+                activeOpacity={0.8}
+              >
+                {submittingSuspend ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>
+                    Set to {suspendTargetStatus}
+                  </Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>

@@ -41,6 +41,12 @@ export default function Companies() {
   const [decisionReason, setDecisionReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Company Suspension & Revocation Modal
+  const [suspendCompanyModal, setSuspendCompanyModal] = useState(null);
+  const [suspendCompType, setSuspendCompType] = useState('funding'); // 'funding' | 'account'
+  const [suspendCompTargetStatus, setSuspendCompTargetStatus] = useState('Suspended');
+  const [suspendCompReason, setSuspendCompReason] = useState('');
+
   const fetchCompanies = async () => {
     try {
       setLoading(true);
@@ -154,6 +160,36 @@ export default function Companies() {
     }
   };
 
+  const handleSuspendCompanySubmit = async () => {
+    if (!suspendCompReason.trim()) {
+      toast?.warning?.('A written reason is required when suspending or revoking corporate privileges');
+      return;
+    }
+    try {
+      setSubmitting(true);
+      if (suspendCompType === 'funding') {
+        await adminApi.suspendCompanyFunding(suspendCompanyModal._id, {
+          status: suspendCompTargetStatus,
+          reason: suspendCompReason.trim()
+        });
+        toast?.success?.(`Company fundraising privileges updated to ${suspendCompTargetStatus}`);
+      } else {
+        await adminApi.suspendCompanyAccount(suspendCompanyModal._id, {
+          status: suspendCompTargetStatus,
+          reason: suspendCompReason.trim()
+        });
+        toast?.success?.(`Company account access status updated to ${suspendCompTargetStatus}`);
+      }
+      setSuspendCompanyModal(null);
+      setSuspendCompReason('');
+      fetchCompanies();
+    } catch (err) {
+      toast?.error?.(err.response?.data?.error || err.response?.data?.message || 'Action failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Top Header */}
@@ -206,6 +242,8 @@ export default function Companies() {
                   <th>Owner</th>
                   <th style={{ textAlign: 'center' }}>KYB Status</th>
                   <th>Bank Account & Cooling-Off</th>
+                  <th style={{ textAlign: 'center' }}>Account Status</th>
+                  <th style={{ textAlign: 'center' }}>Fundraising Status</th>
                   <th style={{ textAlign: 'center' }}>Projects</th>
                   <th>Actions</th>
                 </tr>
@@ -257,22 +295,60 @@ export default function Companies() {
                         )}
                       </td>
                       <td style={{ textAlign: 'center' }}>
+                        {(() => {
+                          const accStatus = c.accountStatus || 'Active';
+                          if (accStatus === 'Revoked') return <span className="badge badge-rose">REVOKED</span>;
+                          if (accStatus === 'Suspended') return <span className="badge badge-amber">SUSPENDED</span>;
+                          return <span className="badge badge-emerald">ACTIVE</span>;
+                        })()}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        {(() => {
+                          const fundStatus = c.fundingStatus || 'Allowed';
+                          if (fundStatus === 'Revoked') return <span className="badge badge-rose">REVOKED</span>;
+                          if (fundStatus === 'Suspended') return <span className="badge badge-amber">SUSPENDED</span>;
+                          return <span className="badge badge-emerald">ALLOWED</span>;
+                        })()}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                           <Layers size={14} color="var(--text-muted)" />
                           <span style={{ fontWeight: 600 }}>{c.projectsCount || 0}</span>
                         </div>
                       </td>
                       <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           <button
                             onClick={() => {
                               setReviewCompany(c);
                               setDecisionReason(c.statusReason || '');
                             }}
                             className="btn-secondary"
-                            style={{ padding: '5px 10px', fontSize: '0.75rem' }}
+                            style={{ padding: '5px 8px', fontSize: '0.75rem' }}
                           >
                             Review KYB
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSuspendCompanyModal(c);
+                              setSuspendCompType('funding');
+                              setSuspendCompTargetStatus(c.fundingStatus === 'Suspended' ? 'Allowed' : 'Suspended');
+                              setSuspendCompReason(c.fundingSuspendedReason || '');
+                            }}
+                            className="btn-secondary"
+                            style={{
+                              padding: '5px 8px',
+                              fontSize: '0.75rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              borderColor: '#f59e0b',
+                              color: '#d97706'
+                            }}
+                            title="Suspend or Revoke company fundraising or account"
+                          >
+                            <ShieldAlert size={12} />
+                            Suspend/Revoke
                           </button>
                           <button
                             onClick={() => handleDeleteCompany(c)}
@@ -488,6 +564,206 @@ export default function Companies() {
               </button>
               <button disabled={submitting} onClick={() => handleKybDecision('Approved')} className="btn-primary">
                 Approve KYB
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Company Suspend or Revoke Privileges Modal */}
+      {suspendCompanyModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 60,
+          padding: '20px'
+        }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '520px', padding: '24px', background: 'var(--bg-modal)', borderRadius: '16px', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ShieldAlert size={22} color="#f59e0b" />
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>
+                  Manage Corporate Access & Fundraising
+                </h3>
+              </div>
+              <button
+                onClick={() => setSuspendCompanyModal(null)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+              Company: <strong>{suspendCompanyModal.legalName || suspendCompanyModal.name}</strong> ({suspendCompanyModal.regNo})
+            </p>
+
+            {/* Current Status Overview */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '10px',
+              padding: '12px',
+              backgroundColor: 'rgba(255, 255, 255, 0.03)',
+              borderRadius: '8px',
+              border: '1px solid var(--border-color)',
+              marginBottom: '18px'
+            }}>
+              <div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Account Access</div>
+                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: suspendCompanyModal.accountStatus === 'Suspended' ? '#f59e0b' : suspendCompanyModal.accountStatus === 'Revoked' ? '#ef4444' : '#10b981' }}>
+                  {suspendCompanyModal.accountStatus || 'Active'}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Fundraising Capability</div>
+                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: suspendCompanyModal.fundingStatus === 'Suspended' ? '#f59e0b' : suspendCompanyModal.fundingStatus === 'Revoked' ? '#ef4444' : '#10b981' }}>
+                  {suspendCompanyModal.fundingStatus || 'Allowed'}
+                </div>
+              </div>
+            </div>
+
+            {/* Action Scope Selection */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>
+                Select Action Scope:
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSuspendCompType('funding');
+                    setSuspendCompTargetStatus('Suspended');
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: suspendCompType === 'funding' ? '2px solid #f59e0b' : '1px solid var(--border-color)',
+                    background: suspendCompType === 'funding' ? 'rgba(245, 158, 11, 0.15)' : 'transparent',
+                    color: suspendCompType === 'funding' ? '#f59e0b' : 'var(--text-secondary)',
+                    fontWeight: 600,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Fundraising Privileges
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSuspendCompType('account');
+                    setSuspendCompTargetStatus('Suspended');
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: suspendCompType === 'account' ? '2px solid #ef4444' : '1px solid var(--border-color)',
+                    background: suspendCompType === 'account' ? 'rgba(239, 68, 68, 0.15)' : 'transparent',
+                    color: suspendCompType === 'account' ? '#ef4444' : 'var(--text-secondary)',
+                    fontWeight: 600,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Corporate Account Access
+                </button>
+              </div>
+            </div>
+
+            {/* Target Status Selection */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>
+                Set New Status:
+              </label>
+              {suspendCompType === 'funding' ? (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {['Allowed', 'Suspended', 'Revoked'].map(st => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => setSuspendCompTargetStatus(st)}
+                      style={{
+                        flex: 1,
+                        padding: '6px 10px',
+                        borderRadius: '6px',
+                        border: suspendCompTargetStatus === st ? '2px solid var(--primary-color)' : '1px solid var(--border-color)',
+                        background: suspendCompTargetStatus === st ? 'rgba(0, 71, 186, 0.15)' : 'transparent',
+                        fontWeight: suspendCompTargetStatus === st ? 700 : 500,
+                        fontSize: '0.8rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {st}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {['Active', 'Suspended', 'Revoked'].map(st => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => setSuspendCompTargetStatus(st)}
+                      style={{
+                        flex: 1,
+                        padding: '6px 10px',
+                        borderRadius: '6px',
+                        border: suspendCompTargetStatus === st ? '2px solid var(--primary-color)' : '1px solid var(--border-color)',
+                        background: suspendCompTargetStatus === st ? 'rgba(0, 71, 186, 0.15)' : 'transparent',
+                        fontWeight: suspendCompTargetStatus === st ? 700 : 500,
+                        fontSize: '0.8rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {st}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Mandatory Reason */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>
+                Administrative Reason (Mandatory):
+              </label>
+              <textarea
+                value={suspendCompReason}
+                onChange={e => setSuspendCompReason(e.target.value)}
+                placeholder="State the compliance, audit, or corporate rationale for this change..."
+                className="input-field"
+                rows={3}
+                style={{ width: '100%' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                disabled={submitting}
+                onClick={() => setSuspendCompanyModal(null)}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={submitting}
+                onClick={handleSuspendCompanySubmit}
+                className={suspendCompTargetStatus === 'Revoked' ? 'btn-danger' : 'btn-primary'}
+                style={{
+                  background: suspendCompTargetStatus === 'Revoked' ? '#ef4444' : suspendCompTargetStatus === 'Suspended' ? '#f59e0b' : '#10b981',
+                  borderColor: suspendCompTargetStatus === 'Revoked' ? '#ef4444' : suspendCompTargetStatus === 'Suspended' ? '#f59e0b' : '#10b981'
+                }}
+              >
+                {submitting ? 'Applying...' : `Confirm Set to ${suspendCompTargetStatus}`}
               </button>
             </div>
           </div>

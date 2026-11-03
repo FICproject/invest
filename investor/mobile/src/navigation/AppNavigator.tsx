@@ -5,6 +5,7 @@ import AuthNavigator from './AuthNavigator';
 import BottomTabNavigator from './BottomTabNavigator';
 import CompanyTabNavigator from './CompanyTabNavigator';
 import { ApprovalStatusScreen } from '../screens/auth/ApprovalStatusScreen';
+import { AccountSuspendedScreen } from '../screens/auth/AccountSuspendedScreen';
 import Loader from '../components/common/Loader';
 import { useAuthContext } from '../context/authContext';
 
@@ -18,12 +19,15 @@ export const AppNavigator = () => {
   const isCompanyUser =
     user?.role === 'company_admin' || user?.role === 'company_member' || !!user?.companyId;
 
+  const isSuspended = user?.accountStatus === 'Suspended' || user?.accountStatus === 'Revoked';
   const isApproved = user?.registrationStatus === 'Approved';
 
   return (
     <NavigationContainer ref={navigationRef}>
       {!isAuthenticated ? (
         <AuthNavigator />
+      ) : isSuspended ? (
+        <AccountSuspendedScreen />
       ) : !isApproved ? (
         <ApprovalStatusScreen />
       ) : isCompanyUser ? (

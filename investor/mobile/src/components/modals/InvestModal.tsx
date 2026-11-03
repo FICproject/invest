@@ -38,7 +38,7 @@ export const InvestModal: React.FC<InvestModalProps> = ({
   onSuccess,
   onNavigateToKyc,
 }) => {
-  const { kycStatus } = useAuthContext();
+  const { kycStatus, user } = useAuthContext();
   const { refreshAll } = usePortfolioContext();
 
   const [amount, setAmount] = useState<string>('');
@@ -84,6 +84,16 @@ export const InvestModal: React.FC<InvestModalProps> = ({
 
   const handleInvest = async () => {
     setError('');
+
+    // Check Funding Privileges
+    if (user?.fundingStatus === 'Suspended' || user?.fundingStatus === 'Revoked') {
+      Alert.alert(
+        `Funding Privileges ${user.fundingStatus}`,
+        user.fundingSuspendedReason || 'Your ability to execute investments has been suspended by Platform Administration.',
+        [{ text: 'OK', onPress: onClose }]
+      );
+      return;
+    }
 
     // Check KYC
     if (kycStatus !== 'APPROVED') {

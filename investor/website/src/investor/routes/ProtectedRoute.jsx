@@ -15,6 +15,11 @@ export const ProtectedRoute = ({ children }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Intercept users whose account is suspended or revoked
+  if (user && (user.accountStatus === 'Suspended' || user.accountStatus === 'Revoked')) {
+    return <Navigate to="/account-suspended" replace />;
+  }
+
   // Intercept users whose registration is not approved yet
   if (user && user.registrationStatus !== 'Approved') {
     return <Navigate to="/approval-status" replace />;

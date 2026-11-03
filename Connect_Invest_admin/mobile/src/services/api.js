@@ -107,6 +107,8 @@ export const adminApi = {
   getInvestors: params => api.get('/admin/investors', { params }),
   getAllInvestments: params => api.get('/admin/investments', { params }),
   setUserBlockStatus: (id, data) => api.post(`/admin/users/${id}/block`, data),
+  suspendInvestorFunding: (id, data) => api.post(`/admin/investors/${id}/suspend-funding`, data),
+  suspendInvestorAccount: (id, data) => api.post(`/admin/investors/${id}/suspend-account`, data),
   decideKyc: (id, data) => api.post(`/admin/kyc/${id}/decision`, data),
   decideKyb: (id, data) => api.post(`/admin/kyb/${id}/decision`, data),
 
@@ -120,6 +122,8 @@ export const adminApi = {
   createOffer: data => api.post('/admin/offers', data),
   getCompanies: params => api.get('/admin/companies', { params }),
   createCompany: data => api.post('/admin/companies', data),
+  suspendCompanyFunding: (id, data) => api.post(`/admin/companies/${id}/suspend-funding`, data),
+  suspendCompanyAccount: (id, data) => api.post(`/admin/companies/${id}/suspend-account`, data),
   publishOffer: (id, data) => api.post(`/admin/offers/${id}/publish`, data),
   activateOffer: id => api.post(`/admin/offers/${id}/activate`),
   toggleOfferHold: (id, data) => api.post(`/admin/offers/${id}/hold`, data),

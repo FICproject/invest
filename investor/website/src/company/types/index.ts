@@ -4,6 +4,15 @@ export interface User {
   email: string;
   role: 'company_admin' | 'company_member' | 'admin' | 'investor';
   companyId?: string;
+  registrationStatus?: 'Pending Approval' | 'Approved' | 'Rejected' | 'Resubmission Required';
+  rejectionReason?: string;
+  adminRemarks?: string;
+  accountStatus?: 'Active' | 'Suspended' | 'Revoked';
+  accountSuspendedReason?: string;
+  accountSuspendedAt?: string;
+  fundingStatus?: 'Allowed' | 'Suspended' | 'Revoked';
+  fundingSuspendedReason?: string;
+  fundingSuspendedAt?: string;
 }
 
 export interface Director {
@@ -41,7 +50,15 @@ export interface Company {
   paidUpCapital?: number;
   totalShares?: number;
   shareFaceValue?: number;
-  verificationStatus: 'Pending' | 'In Review' | 'Verified' | 'Rejected' | 'Action Required';
+  registrationStatus?: 'Pending Approval' | 'Approved' | 'Rejected' | 'Resubmission Required';
+  rejectionReason?: string;
+  accountStatus?: 'Active' | 'Suspended' | 'Revoked';
+  accountSuspendedReason?: string;
+  accountSuspendedAt?: string;
+  fundingStatus?: 'Allowed' | 'Suspended' | 'Revoked';
+  fundingSuspendedReason?: string;
+  fundingSuspendedAt?: string;
+  verificationStatus: 'Pending' | 'In Review' | 'Verified' | 'Rejected' | 'Action Required' | 'Active' | 'Pending Approval' | 'Approved' | 'Resubmission Required';
   verificationRemarks?: string;
 }
 
