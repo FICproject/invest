@@ -32,6 +32,11 @@ yarn-error.log*
 Thumbs.db
 desktop.ini
 
+# Java & Android compiled binaries
+*.class
+*.dex
+com/facebook/
+
 # Build / Output folders
 dist/
 build/
