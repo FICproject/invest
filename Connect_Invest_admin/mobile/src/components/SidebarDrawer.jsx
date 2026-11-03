@@ -59,6 +59,7 @@ export default function SidebarDrawer({
     { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
     { id: 'investors', label: 'Investor Management', icon: Users },
     { id: 'companies', label: 'Company Management', icon: Building2 },
+    { id: 'approvals', label: 'Registration Approvals', icon: ShieldCheck, badge: pendingKycCount },
     { id: 'offers', label: 'Investment Management', icon: Briefcase },
     { id: 'kyc', label: 'KYC Management', icon: ShieldCheck, badge: pendingKycCount },
     { id: 'investments_portfolio', label: 'Investments', icon: TrendingUp },
@@ -73,8 +74,8 @@ export default function SidebarDrawer({
 
   const handleSelect = id => {
     onClose();
-    // Maps 'kyc' to 'worklist' screen if using worklist component
-    setActiveTab(id === 'kyc' ? 'worklist' : id);
+    // Maps 'kyc' or 'approvals' to 'worklist' screen
+    setActiveTab(id === 'kyc' || id === 'approvals' ? 'worklist' : id);
   };
 
   const handleLogout = () => {

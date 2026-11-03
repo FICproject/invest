@@ -32,14 +32,20 @@ function MainApp() {
   const refreshPendingCount = async () => {
     if (!isAuthenticated) return;
     try {
-      const res = await adminApi.getWorkList();
-      if (res.data.success) {
-        const kycCount = (res.data.pendingKyc || []).length;
-        const kybCount = (res.data.pendingKyb || []).length;
-        setPendingApprovalsCount(kycCount + kybCount);
+      const res = await adminApi.getApprovals({ status: 'Pending Approval' });
+      if (res.data?.success) {
+        setPendingApprovalsCount(res.data.stats?.pending ?? (res.data.approvals || []).length);
       }
     } catch (err) {
-      // Non-critical background count
+      // Fallback
+      try {
+        const res2 = await adminApi.getWorkList();
+        if (res2.data?.success) {
+          const kycCount = (res2.data.pendingKyc || []).length;
+          const kybCount = (res2.data.pendingKyb || []).length;
+          setPendingApprovalsCount(kycCount + kybCount);
+        }
+      } catch (e) {}
     }
   };
 
@@ -77,7 +83,7 @@ function MainApp() {
         {activeTab === 'dashboard' && (
           <DashboardScreen setActiveTab={setActiveTab} onOpenSidebar={handleOpenSidebar} />
         )}
-        {activeTab === 'worklist' && (
+        {(activeTab === 'worklist' || activeTab === 'approvals') && (
           <WorkListScreen onOpenSidebar={handleOpenSidebar} />
         )}
         {activeTab === 'offers' && (

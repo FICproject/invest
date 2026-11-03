@@ -141,6 +141,20 @@ export const adminApi = {
   getBatches: () => api.get('/admin/payout-batches'),
   createPayoutBatch: data => api.post('/admin/payout-batches', data),
   approveAndSendBatch: id => api.post(`/admin/payout-batches/${id}/approve`),
-  retryPayout: id => api.post(`/admin/payouts/${id}/retry`)
+  retryPayout: id => api.post(`/admin/payouts/${id}/retry`),
+
+  // Registration & Compliance Approvals
+  getApprovals: params => api.get('/admin/approvals', { params }),
+  getApprovalById: id => api.get(`/admin/approvals/${id}`),
+  decideApproval: (id, data) => api.post(`/admin/approvals/${id}/decision`, data),
+  getDocumentPreviewUrl: filename => `${DEFAULT_HOST}/api/v1/admin/documents/${filename}`,
+  getDocumentDownloadUrl: filename => `${DEFAULT_HOST}/api/v1/admin/documents/${filename}/download`
 };
+
+export function resolveDocumentUrl(url) {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  const base = api.defaults.baseURL ? api.defaults.baseURL.replace(/\/api\/v1\/?$/, '') : DEFAULT_HOST;
+  return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+}
 
