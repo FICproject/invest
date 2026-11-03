@@ -1,12 +1,11 @@
 @echo off
 echo ========================================================
-echo  Starting Connect Invest Admin Website and Backend
+echo   Starting Connect Invest Admin Website & Unified Backend
 echo ========================================================
 
-start "Backend Server (Port 5000)" cmd /k "cd /d %~dp0backend && npm run start"
-start "Frontend Vite (Port 5173)" cmd /k "cd /d %~dp0frontend && npm run dev"
+start "Connect Invest Unified Backend (Port 5000)" cmd /k "cd /d %~dp0..\backend && npm run dev"
+start "Admin Web Console (Port 5173)" cmd /k "cd /d %~dp0Admin_Website && npm run dev"
 
 echo Servers started in separate windows!
 echo Web: http://localhost:5173
 echo API: http://localhost:5000
-

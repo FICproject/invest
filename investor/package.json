@@ -4,10 +4,18 @@
   "description": "Connect Invest - Investor Platform (MERN Stack)",
   "private": true,
   "scripts": {
-    "backend": "cd backend && npm run dev",
-    "backend:seed": "cd backend && npm run seed",
+    "backend": "cd ../backend && npm run dev",
+    "backend:seed": "cd ../backend && npm run seed",
     "frontend": "cd website && npm run dev",
+    "mobile": "cd mobile && npm run start",
     "start": "npm run backend"
   },
-  "keywords": ["investment", "mern", "investor-portal", "react", "mongodb", "express"]
+  "keywords": [
+    "investment",
+    "mern",
+    "investor-portal",
+    "react",
+    "mongodb",
+    "express"
+  ]
 }

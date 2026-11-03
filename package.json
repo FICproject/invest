@@ -1,0 +1,26 @@
+{
+  "name": "connect-invest-monorepo",
+  "version": "1.0.0",
+  "description": "Connect Invest - Unified Monorepo with Single Shared Backend, Admin Console & Investor Platform",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "npm --prefix backend run start",
+    "dev": "npm --prefix backend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:admin-web": "npm --prefix Connect_Invest_admin/Admin_Website run dev",
+    "dev:admin-mobile": "npm --prefix Connect_Invest_admin/mobile run start",
+    "dev:investor-web": "npm --prefix investor/website run dev",
+    "dev:investor-mobile": "npm --prefix investor/mobile run start",
+    "db:seed": "npm --prefix backend run db:seed",
+    "seed": "npm --prefix backend run db:seed"
+  },
+  "workspaces": [
+    "backend",
+    "Connect_Invest_admin/Admin_Website",
+    "Connect_Invest_admin/mobile",
+    "investor/website",
+    "investor/mobile"
+  ]
+}
+
