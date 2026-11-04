@@ -3968,7 +3968,7 @@ export async function getFundingRequests(req, res, next) {
     const {
       status = 'all',
       search = '',
-      investmentModel = 'all',
+      fundingDuration = 'all',
       investmentPurpose = 'all'
     } = req.query;
 
@@ -3990,8 +3990,8 @@ export async function getFundingRequests(req, res, next) {
       }
     }
 
-    if (investmentModel && investmentModel !== 'all') {
-      query.investmentModel = investmentModel;
+    if (fundingDuration && fundingDuration !== 'all') {
+      query.fundingDuration = fundingDuration;
     }
 
     if (investmentPurpose && investmentPurpose !== 'all') {
@@ -4012,7 +4012,7 @@ export async function getFundingRequests(req, res, next) {
         r.category?.toLowerCase().includes(s) ||
         r.entityOrProjectName?.toLowerCase().includes(s) ||
         r.investmentPurpose?.toLowerCase().includes(s) ||
-        r.investmentModel?.toLowerCase().includes(s)
+        r.fundingDuration?.toLowerCase().includes(s)
       );
     }
 
@@ -4113,7 +4113,7 @@ export async function decideFundingRequest(req, res, next) {
 
       const kind = request.investmentPurpose === 'Project Investment'
         ? 'project'
-        : (request.investmentModel === 'Equity' ? 'equity' : 'company');
+        : 'company';
 
       const targetPaise = Math.round((request.fundingTarget || 100000) * 100);
       const minTargetPaise = Math.round((request.minInvestment || (request.fundingTarget ? request.fundingTarget * 0.1 : 25000)) * 100);

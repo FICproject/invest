@@ -49,7 +49,7 @@ export default function InvestmentApprovals() {
 
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('pending'); // 'pending' | 'all' | 'resubmission' | 'approved' | 'rejected'
-  const [modelFilter, setModelFilter] = useState('all'); // 'all' | 'Fixed-Term' | 'Equity'
+  const [durationFilter, setDurationFilter] = useState('all'); // 'all' | 'Short-Term' | 'Long-Term'
   const [purposeFilter, setPurposeFilter] = useState('all'); // 'all' | 'Company Investment' | 'Project Investment'
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -76,7 +76,7 @@ export default function InvestmentApprovals() {
       const res = await adminApi.getFundingRequests({
         status: statusFilter,
         search: searchTerm,
-        investmentModel: modelFilter,
+        fundingDuration: durationFilter,
         investmentPurpose: purposeFilter
       });
 
@@ -98,7 +98,7 @@ export default function InvestmentApprovals() {
 
   useEffect(() => {
     fetchProposals();
-  }, [statusFilter, modelFilter, purposeFilter, searchTerm]);
+  }, [statusFilter, durationFilter, purposeFilter, searchTerm]);
 
   // Connect Real-Time SSE Stream for Instant Updates
   useEffect(() => {
@@ -113,7 +113,7 @@ export default function InvestmentApprovals() {
       }
     });
     return cleanup;
-  }, [statusFilter, modelFilter, purposeFilter, searchTerm]);
+  }, [statusFilter, durationFilter, purposeFilter, searchTerm]);
 
   // Open modal with pre-populated values
   const handleOpenReview = (request, defaultTab = 'resubmission') => {
@@ -669,12 +669,12 @@ export default function InvestmentApprovals() {
             )}
           </div>
 
-          {/* Model Filter */}
+          {/* Duration Filter */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748B' }}>Model:</span>
+            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748B' }}>Duration:</span>
             <select
-              value={modelFilter}
-              onChange={e => setModelFilter(e.target.value)}
+              value={durationFilter}
+              onChange={e => setDurationFilter(e.target.value)}
               style={{
                 padding: '8px 12px',
                 borderRadius: '10px',
@@ -686,9 +686,9 @@ export default function InvestmentApprovals() {
                 cursor: 'pointer'
               }}
             >
-              <option value="all">All Models</option>
-              <option value="Fixed-Term">Fixed-Term (Debt)</option>
-              <option value="Equity">Equity (Shares)</option>
+              <option value="all">All Durations</option>
+              <option value="Short-Term">Short-Term (&lt; 3 Yrs)</option>
+              <option value="Long-Term">Long-Term (3-5+ Yrs)</option>
             </select>
           </div>
 
@@ -731,7 +731,7 @@ export default function InvestmentApprovals() {
               No investment proposals found
             </h3>
             <p style={{ fontSize: '0.84rem', color: '#94A3B8' }}>
-              {searchTerm || statusFilter !== 'all' || modelFilter !== 'all'
+              {searchTerm || statusFilter !== 'all' || durationFilter !== 'all' || purposeFilter !== 'all'
                 ? 'Try adjusting your filters or search terms.'
                 : 'There are currently no proposals in this queue.'}
             </p>
@@ -742,7 +742,7 @@ export default function InvestmentApprovals() {
               <thead>
                 <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid var(--border-light)', color: '#475569' }}>
                   <th style={{ padding: '14px 18px', fontWeight: 700 }}>Company & Proposal Title</th>
-                  <th style={{ padding: '14px 18px', fontWeight: 700 }}>Model & Category</th>
+                  <th style={{ padding: '14px 18px', fontWeight: 700 }}>Purpose & Duration</th>
                   <th style={{ padding: '14px 18px', fontWeight: 700 }}>Requested Capital</th>
                   <th style={{ padding: '14px 18px', fontWeight: 700 }}>Interest / Return Rate</th>
                   <th style={{ padding: '14px 18px', fontWeight: 700 }}>Tenure / Duration</th>
@@ -809,7 +809,7 @@ export default function InvestmentApprovals() {
                         </div>
                       </td>
 
-                      {/* Model & Category */}
+                      {/* Purpose & Duration */}
                       <td style={{ padding: '14px 18px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <span
@@ -819,16 +819,16 @@ export default function InvestmentApprovals() {
                               borderRadius: '6px',
                               fontSize: '0.74rem',
                               fontWeight: 700,
-                              backgroundColor: req.investmentModel === 'Equity' ? '#F5F3FF' : '#EFF6FF',
-                              color: req.investmentModel === 'Equity' ? '#7C3AED' : '#1D4ED8',
-                              border: req.investmentModel === 'Equity' ? '1px solid #DDD6FE' : '1px solid #BFDBFE',
+                              backgroundColor: '#EFF6FF',
+                              color: '#0047BA',
+                              border: '1px solid #BFDBFE',
                               width: 'fit-content'
                             }}
                           >
-                            {req.investmentModel || 'Fixed-Term'}
-                          </span>
-                          <span style={{ fontSize: '0.75rem', color: '#64748B' }}>
                             {req.investmentPurpose || req.category || 'Company Investment'}
+                          </span>
+                          <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>
+                            {req.fundingDuration || 'Short-Term'} ({req.investmentPeriodYears || 2} Years)
                           </span>
                         </div>
                       </td>
@@ -1049,10 +1049,10 @@ export default function InvestmentApprovals() {
                       border: '1px solid #BFDBFE'
                     }}
                   >
-                    {selectedRequest.investmentModel}
+                    {selectedRequest.investmentPurpose || 'Company Investment'}
                   </span>
                   <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: 600 }}>
-                    {selectedRequest.investmentPurpose}
+                    {selectedRequest.fundingDuration || 'Short-Term'} ({selectedRequest.investmentPeriodYears || 2} Years)
                   </span>
                 </div>
                 <h2

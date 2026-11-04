@@ -22,7 +22,7 @@ const investmentRequestSchema = new mongoose.Schema(
     expectedReturnRate: { type: Number },
     investmentModel: {
       type: String,
-      enum: ['Fixed-Term', 'Equity'],
+      enum: ['Fixed-Term'],
       default: 'Fixed-Term',
       required: true,
       index: true
@@ -33,7 +33,7 @@ const investmentRequestSchema = new mongoose.Schema(
     raisedAmount: { type: Number, default: 0 },
     committedAmount: { type: Number, default: 0 },
 
-    // Fixed-term
+    // Fixed-term Debt
     durationMonths: { type: Number },
     agreedReturnRate: { type: Number },
     returnStructure: {
@@ -42,21 +42,6 @@ const investmentRequestSchema = new mongoose.Schema(
     },
     repaymentTerms: { type: String },
     maturityDate: { type: Date },
-
-    // Equity
-    preMoneyValuation: { type: Number },
-    equityOfferedPercentage: { type: Number },
-    pricePerShare: { type: Number },
-    totalSharesOffered: { type: Number },
-    shareClass: {
-      type: String,
-      enum: ['Equity Shares', 'Compulsorily Convertible Preference Shares (CCPS)', 'Ordinary Class B']
-    },
-    votingRights: {
-      type: String,
-      enum: ['Full Voting', 'Non-Voting', 'Observer']
-    },
-    dividendPolicy: { type: String },
 
     useOfFunds: { type: String, required: true },
     businessPlanUrl: { type: String },
@@ -126,4 +111,3 @@ const investmentRequestSchema = new mongoose.Schema(
 );
 
 export const InvestmentRequest = mongoose.model('InvestmentRequest', investmentRequestSchema);
-
