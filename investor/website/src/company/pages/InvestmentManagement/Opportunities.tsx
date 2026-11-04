@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, Badge, Loader } from '../../components/common';
 import { investmentService } from '../../services';
 import { Investment } from '../../types';
-import { Briefcase, Coins, TrendingUp, Filter, CheckCircle2, DollarSign } from 'lucide-react';
+import { Briefcase, Coins, TrendingUp, Filter, CheckCircle2, DollarSign, Search } from 'lucide-react';
 
 export const Opportunities: React.FC = () => {
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [filterModel, setFilterModel] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
+  const [searchTerm, setSearchTerm] = useState('');
   const [totals, setTotals] = useState({ committed: 0, received: 0 });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -38,6 +39,18 @@ export const Opportunities: React.FC = () => {
       maximumFractionDigits: 0,
     }).format(val || 0);
   };
+
+  const filteredInvestments = investments.filter((inv: any) => {
+    if (!searchTerm.trim()) return true;
+    const s = searchTerm.toLowerCase();
+    return (
+      inv.investorName?.toLowerCase().includes(s) ||
+      inv.investorEmail?.toLowerCase().includes(s) ||
+      inv.requestId?.title?.toLowerCase().includes(s) ||
+      inv.offerId?.title?.toLowerCase().includes(s) ||
+      inv.investmentModel?.toLowerCase().includes(s)
+    );
+  });
 
   return (
     <div className="space-y-6">
@@ -84,6 +97,18 @@ export const Opportunities: React.FC = () => {
           <span className="text-xs font-bold text-slate-700">Filter Pipeline:</span>
         </div>
 
+                {/* In-page Search Bar */}
+        <div className="relative flex-1 min-w-[220px]">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Search by investor name, email, or investment proposal..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-xs bg-white focus:outline-none focus:border-[#F4B41A]"
+          />
+        </div>
+
         <div className="flex flex-wrap items-center gap-3">
           <select
             value={filterModel}
@@ -92,7 +117,7 @@ export const Opportunities: React.FC = () => {
           >
             <option value="All">All Models</option>
             <option value="Fixed-Term">Fixed-Term</option>
-            <option value="Equity">Equity</option>
+            
           </select>
 
           <select
@@ -111,7 +136,7 @@ export const Opportunities: React.FC = () => {
       {/* Investments Table */}
       {isLoading ? (
         <Loader text="Loading ledger entries..." />
-      ) : investments.length === 0 ? (
+      ) : filteredInvestments.length === 0 ? (
         <Card className="p-12 text-center text-xs text-slate-500">
           No investment records matching filters.
         </Card>
@@ -132,7 +157,7 @@ export const Opportunities: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {investments.map((inv) => (
+                {filteredInvestments.map((inv) => (
                   <tr key={inv._id} className="hover:bg-slate-50">
                     <td className="p-4">
                       <p className="font-bold text-slate-900">{inv.investorName}</p>

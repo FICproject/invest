@@ -14,12 +14,14 @@ import {
   FileSpreadsheet,
   Handshake,
   ShieldCheck,
-  Filter
+  Filter,
+  Search
 } from 'lucide-react';
 
 export const DocumentManagement: React.FC = () => {
   const [documents, setDocuments] = useState<CompanyDocument[]>([]);
   const [activeCategory, setActiveCategory] = useState<'All' | 'Company' | 'Project' | 'Financial' | 'Agreements'>('All');
+  const [searchQuery, setSearchQuery] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -94,9 +96,16 @@ export const DocumentManagement: React.FC = () => {
     return 'Company';
   };
 
-  const filteredDocs = activeCategory === 'All'
-    ? documents
-    : documents.filter(doc => categorizeDoc(doc.documentType) === activeCategory);
+  const filteredDocs = documents
+    .filter(doc => activeCategory === 'All' || categorizeDoc(doc.documentType) === activeCategory)
+    .filter(doc => {
+      if (!searchQuery.trim()) return true;
+      const s = searchQuery.toLowerCase();
+      return (
+        doc.title?.toLowerCase().includes(s) ||
+        doc.documentType?.toLowerCase().includes(s)
+      );
+    });
 
   return (
     <div className="space-y-6">
@@ -115,28 +124,41 @@ export const DocumentManagement: React.FC = () => {
         </Button>
       </div>
 
-      {/* Category Pills Filter */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-[#F2EBD9] pb-3">
-        {[
-          { key: 'All', label: 'All Documents' },
-          { key: 'Company', label: 'Company Documents' },
-          { key: 'Project', label: 'Project Documents' },
-          { key: 'Financial', label: 'Financial Statements' },
-          { key: 'Agreements', label: 'Funding & Repayment Agreements' },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveCategory(tab.key as any)}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
-              activeCategory === tab.key
-                ? 'bg-[#F4B41A] text-[#1F2421] shadow-sm'
-                : 'bg-white border border-[#EFE8D8] text-slate-600 hover:border-[#DE8E0A]'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* In-page Category Pills & Search Filter */}
+      <Card className="p-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          {[
+            { key: 'All', label: 'All Documents' },
+            { key: 'Company', label: 'Company Documents' },
+            { key: 'Project', label: 'Project Documents' },
+            { key: 'Financial', label: 'Financial Statements' },
+            { key: 'Agreements', label: 'Agreements' },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveCategory(tab.key as any)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                activeCategory === tab.key
+                  ? 'bg-[#F4B41A] text-[#1F2421] shadow-sm'
+                  : 'bg-white border border-[#EFE8D8] text-slate-600 hover:border-[#DE8E0A]'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="relative flex-1 min-w-[220px] max-w-sm">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Search documents by title or type..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-1.5 rounded-xl border border-slate-200 text-xs bg-white focus:outline-none focus:border-[#F4B41A]"
+          />
+        </div>
+      </Card>
 
       {isLoading ? (
         <Loader text="Loading secure document repository..." />

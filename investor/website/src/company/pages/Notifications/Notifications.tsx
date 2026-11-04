@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, Badge, Loader } from '../../components/common';
 import { notificationService } from '../../services';
 import { NotificationItem } from '../../types';
-import { Bell, CheckCheck, Clock, ShieldCheck, Coins, AlertCircle } from 'lucide-react';
+import { Bell, CheckCheck, Clock, ShieldCheck, Coins, AlertCircle, Search } from 'lucide-react';
 
 export const Notifications: React.FC = () => {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchNotifs = async () => {
@@ -55,6 +56,12 @@ export const Notifications: React.FC = () => {
     }
   };
 
+  const filteredNotifications = notifications.filter(item => {
+    if (!searchQuery.trim()) return true;
+    const s = searchQuery.toLowerCase();
+    return item.title?.toLowerCase().includes(s) || item.message?.toLowerCase().includes(s) || item.category?.toLowerCase().includes(s);
+  });
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -75,15 +82,28 @@ export const Notifications: React.FC = () => {
         )}
       </div>
 
+
+      {/* In-page Search Bar */}
+      <div className="relative w-full">
+        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+        <input
+          type="text"
+          placeholder="Search notifications and alerts..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-xs bg-white focus:outline-none focus:border-[#F4B41A]"
+        />
+      </div>
+
       {isLoading ? (
         <Loader text="Retrieving notification dispatches..." />
-      ) : notifications.length === 0 ? (
+      ) : filteredNotifications.length === 0 ? (
         <Card className="p-12 text-center text-xs text-slate-500">
           No notifications in your corporate inbox.
         </Card>
       ) : (
         <div className="space-y-3">
-          {notifications.map((item) => (
+          {filteredNotifications.map((item) => (
             <Card
               key={item._id}
               className={`p-5 transition flex items-start justify-between gap-4 ${

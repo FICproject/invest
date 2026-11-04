@@ -179,7 +179,7 @@ export const TransactionList: React.FC = () => {
           >
             <option value="All">All Models</option>
             <option value="Fixed-Term">Fixed-Term</option>
-            <option value="Equity">Equity</option>
+            
           </select>
         </div>
       </Card>

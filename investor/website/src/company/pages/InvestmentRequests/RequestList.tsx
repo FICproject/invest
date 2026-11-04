@@ -12,13 +12,15 @@ import {
   ArrowRight,
   Clock,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Search
 } from 'lucide-react';
 
 export const RequestList: React.FC = () => {
   const [requests, setRequests] = useState<InvestmentRequest[]>([]);
   const [filterPurpose, setFilterPurpose] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
+  const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchRequests = async () => {
@@ -31,6 +33,15 @@ export const RequestList: React.FC = () => {
       if (filterPurpose !== 'All') {
         list = list.filter((r: any) => (r.investmentPurpose || r.category) === filterPurpose);
       }
+      if (searchTerm.trim()) {
+        const s = searchTerm.toLowerCase();
+        list = list.filter((r: any) =>
+          r.title?.toLowerCase().includes(s) ||
+          r.entityOrProjectName?.toLowerCase().includes(s) ||
+          r.shortDescription?.toLowerCase().includes(s) ||
+          r.category?.toLowerCase().includes(s)
+        );
+      }
       setRequests(list);
     } catch (e) {
       console.error(e);
@@ -41,7 +52,7 @@ export const RequestList: React.FC = () => {
 
   useEffect(() => {
     fetchRequests();
-  }, [filterPurpose, filterStatus]);
+  }, [filterPurpose, filterStatus, searchTerm]);
 
   const formatINR = (val: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -99,6 +110,18 @@ export const RequestList: React.FC = () => {
         <div className="flex items-center space-x-2">
           <Filter className="w-4 h-4 text-slate-400" />
           <span className="text-xs font-bold text-slate-700">Filter Requests:</span>
+        </div>
+
+                {/* In-page Search Bar */}
+        <div className="relative flex-1 min-w-[220px]">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Search requests by title, project or use of funds..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-xs bg-white focus:outline-none focus:border-[#F4B41A]"
+          />
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
