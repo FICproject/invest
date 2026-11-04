@@ -2168,6 +2168,82 @@ export async function retryPayout(req, res, next) {
   }
 }
 
+
+
+export async function togglePayoutHold(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body || {};
+
+    const payout = await Payout.findById(id)
+      .populate('investorId', 'name email')
+      .populate('offerId', 'title');
+
+    if (!payout) {
+      return res.status(404).json({ success: false, error: 'Return payout record not found' });
+    }
+
+    if (payout.status === Statuses.PAYOUT.PAID || payout.status === 'Paid') {
+      return res.status(400).json({ success: false, error: 'Cannot hold a return that has already been disbursed and paid.' });
+    }
+
+    const currentlyOnHold = payout.isHold || payout.status === Statuses.PAYOUT.ON_HOLD;
+    const nextHoldState = !currentlyOnHold;
+
+    if (nextHoldState) {
+      payout.isHold = true;
+      payout.status = Statuses.PAYOUT.ON_HOLD;
+      payout.holdReason = reason || 'Return held by platform administrator';
+      payout.heldAt = new Date();
+      payout.heldBy = req.user._id;
+    } else {
+      payout.isHold = false;
+      payout.status = Statuses.PAYOUT.READY;
+      payout.holdReason = null;
+      payout.heldAt = null;
+      payout.heldBy = null;
+    }
+
+    await payout.save();
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: nextHoldState ? 'PAYOUT_PLACED_ON_HOLD' : 'PAYOUT_RELEASED_FROM_HOLD',
+      targetEntity: 'Payout',
+      targetId: payout._id,
+      reason: payout.holdReason,
+      after: { status: payout.status, isHold: payout.isHold },
+      ipAddress: req.ip
+    });
+
+    broadcastSyncEvent('payout_hold_updated', { payoutId: payout._id, isHold: payout.isHold, status: payout.status });
+
+    return res.json({
+      success: true,
+      message: nextHoldState
+        ? ('Return for ' + (payout.investorId?.name || 'Investor') + ' placed ON HOLD. Auto-payouts paused.')
+        : ('Return for ' + (payout.investorId?.name || 'Investor') + ' released from hold and marked READY.'),
+      payout
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function triggerAutoMonthlyReturns(req, res, next) {
+  try {
+    const { processAutoMonthlyReturns } = await import('../../services/autoReturnsService.js');
+    await processAutoMonthlyReturns();
+    return res.json({
+      success: true,
+      message: 'Automated monthly returns evaluation executed successfully.'
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function getAllTransactions(req, res, next) {
   try {
     const { type, search, limit = 100 } = req.query;

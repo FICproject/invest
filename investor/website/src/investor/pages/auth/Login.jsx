@@ -538,48 +538,6 @@ export const Login = () => {
             </div>
           </form>
 
-          {/* Quick Demo Credentials Autofill Helper */}
-          <div
-            style={{
-              marginTop: '18px',
-              padding: '10px 14px',
-              backgroundColor: 'var(--bg-surface-subtle)',
-              borderRadius: '8px',
-              border: '1px dashed var(--border-color)',
-              fontSize: '12px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}
-          >
-            <div>
-              <span style={{ color: 'var(--text-muted)' }}>Demo Account: </span>
-              <strong>{activeRole === 'company' ? 'Nexus Technologies (Company)' : 'Rahul Sharma (Investor)'}</strong>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (activeRole === 'company') {
-                  setIdentifier('contact@nexustech.in');
-                  setPassword('Password123!');
-                } else {
-                  setIdentifier('rahul.sharma@investor.com');
-                  setPassword('Password@123');
-                }
-              }}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'var(--color-gold)',
-                fontWeight: '700',
-                cursor: 'pointer',
-                fontSize: '12px'
-              }}
-            >
-              Autofill
-            </button>
-          </div>
-
           {/* Sign Up Link with role preservation */}
           <div style={{ marginTop: '22px', textAlign: 'center', fontSize: '14px', color: 'var(--text-muted)' }}>
             Don't have an account?{' '}

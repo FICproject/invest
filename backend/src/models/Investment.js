@@ -154,6 +154,29 @@ const investmentSchema = new mongoose.Schema(
     investedAt: {
       type: Date,
       default: Date.now
+    },
+    // Maturity Release & Redemption tracking
+    principalReleaseStatus: {
+      type: String,
+      enum: ['Pending', 'Ready', 'Released', 'On Hold'],
+      default: 'Pending'
+    },
+    principalReleasedAt: {
+      type: Date,
+      default: null
+    },
+    principalReleaseUtr: {
+      type: String,
+      default: null
+    },
+    principalReleaseRemarks: {
+      type: String,
+      default: null
+    },
+    principalReleasedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
     }
   },
   {

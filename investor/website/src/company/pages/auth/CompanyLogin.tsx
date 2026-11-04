@@ -60,24 +60,6 @@ export const CompanyLogin: React.FC = () => {
           </div>
         )}
 
-        {/* Demo credentials hint */}
-        <div className="p-3 mb-6 rounded-xl bg-[#FFF9ED] border border-[#F4E9CD] flex items-center justify-between text-xs text-[#1F2421]">
-          <div>
-            <span className="font-bold text-[#B37400]">Demo Login:</span>
-            <p className="text-[11px] text-[#556171]">contact@nexustech.in / Password123!</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setEmail('contact@nexustech.in');
-              setPassword('Password123!');
-            }}
-            className="text-[11px] font-bold text-[#DE8E0A] hover:text-[#B37400] underline"
-          >
-            Auto-fill
-          </button>
-        </div>
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-[#1F2421] mb-1">Company Work Email</label>

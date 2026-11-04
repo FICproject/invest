@@ -113,6 +113,13 @@ export const adminApi = {
   createPayoutBatch: () => api.post('/admin/payout-batches'),
   approveAndSendBatch: id => api.post(`/admin/payout-batches/${id}/approve`),
   retryPayout: id => api.post(`/admin/payouts/${id}/retry`),
+  togglePayoutHold: (id, data) => api.post(`/admin/payouts/${id}/hold`, data),
+  triggerAutoMonthlyReturns: () => api.post('/admin/payouts/auto-process'),
+
+  // Investor Maturity Principal Releases (12+ Months Tenure Completion)
+  getMaturityReleases: params => api.get('/admin/maturity-releases', { params }),
+  releaseMaturityPrincipal: (id, data) => api.post(`/admin/maturity-releases/${id}/release`, data),
+  toggleMaturityReleaseHold: (id, data) => api.post(`/admin/maturity-releases/${id}/hold`, data),
 
   // Transactions Ledger
   getTransactions: params => api.get('/admin/transactions', { params }),

@@ -51,11 +51,6 @@ export default function LoginScreen() {
     }
   };
 
-  const handleFillAdmin = () => {
-    setEmail('admin@connectinvest.com');
-    setPassword('AdminPassword123!');
-  };
-
   const handleSaveServer = async () => {
     try {
       await setApiHost(serverUrl);
@@ -141,17 +136,6 @@ export default function LoginScreen() {
               ) : (
                 <Text style={styles.loginBtnText}>Sign In to Admin Console</Text>
               )}
-            </TouchableOpacity>
-
-            {/* Quick Fill Admin Credentials */}
-            <TouchableOpacity
-              onPress={handleFillAdmin}
-              style={{ alignItems: 'center', marginTop: 10, paddingVertical: 6 }}
-              activeOpacity={0.7}
-            >
-              <Text style={{ fontSize: 12, fontWeight: '700', color: '#0047BA' }}>
-                Fill Admin Credentials
-              </Text>
             </TouchableOpacity>
 
             {/* Server Config Switcher */}

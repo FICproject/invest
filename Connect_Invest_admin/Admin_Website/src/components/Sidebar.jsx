@@ -14,7 +14,8 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  CheckSquare
+  CheckSquare,
+  Send
 } from 'lucide-react';
 import { ForgeIndiaBrandHeader } from '../assets/ForgeIndiaLogo';
 import { useAuth } from '../context/AuthContext';
@@ -41,6 +42,7 @@ export default function Sidebar({
     { id: 'releases', label: 'Payments & Transactions', icon: CreditCard },
     { id: 'subscriptions', label: 'Subscriptions', icon: CreditCard },
     { id: 'payouts', label: 'Returns & Payouts', icon: Wallet },
+    { id: 'maturity_releases', label: 'Maturity Releases', icon: Send },
     { id: 'queries', label: 'Queries & Support', icon: MessageSquare },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'settings', label: 'Settings', icon: SettingsIcon }

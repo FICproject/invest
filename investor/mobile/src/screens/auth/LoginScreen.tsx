@@ -115,38 +115,6 @@ export const LoginScreen = ({ navigation }: any) => {
               <Text style={styles.forgotText}>Forgot password?</Text>
             </TouchableOpacity>
 
-            {/* Quick Demo Credentials Autofill */}
-            <View style={styles.demoCard}>
-              <Text style={styles.demoTitle}>QUICK DEMO AUTOFILL:</Text>
-              <View style={styles.demoBtnRow}>
-                <TouchableOpacity
-                  style={styles.demoBtn}
-                  onPress={() => {
-                    setIdentifier('rahul.sharma@investor.com');
-                    setPassword('Password@123');
-                    setError('');
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Icon name="user" size={14} color={COLORS.goldDark} />
-                  <Text style={styles.demoBtnText}>Investor Demo</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.demoBtn}
-                  onPress={() => {
-                    setIdentifier('contact@nexustech.in');
-                    setPassword('Password123!');
-                    setError('');
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Icon name="building" size={14} color={COLORS.goldDark} />
-                  <Text style={styles.demoBtnText}>Company Demo</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
             <CustomButton
               title="Sign In"
               onPress={handleLogin}

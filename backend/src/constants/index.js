@@ -76,7 +76,8 @@ export const Statuses = {
     IN_BATCH: 'In batch',
     APPROVED: 'Approved',
     PAID: 'Paid',
-    FAILED: 'Failed'
+    FAILED: 'Failed',
+    ON_HOLD: 'On Hold'
   },
   DIVIDEND: {
     DECLARED: 'Declared',

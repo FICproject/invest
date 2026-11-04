@@ -82,7 +82,7 @@ export default function Login() {
                 onChange={e => setEmail(e.target.value)}
                 className="input-field"
                 style={{ paddingLeft: '40px', paddingRight: '14px', height: '46px' }}
-                placeholder="admin@connectinvest.com"
+                placeholder="admin@example.com"
               />
               <Mail size={18} color="#94A3B8" style={{ position: 'absolute', left: '14px', top: '14px' }} />
             </div>

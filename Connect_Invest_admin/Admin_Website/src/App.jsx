@@ -20,6 +20,7 @@ import Settings from './pages/Settings';
 import RegistrationApprovals from './pages/RegistrationApprovals';
 import FundApprovals from './pages/FundApprovals';
 import InvestmentApprovals from './pages/InvestmentApprovals';
+import MaturityReleases from './pages/MaturityReleases';
 
 import { adminApi } from './services/api';
 
@@ -107,6 +108,7 @@ function MainApp() {
     releases: { title: 'Payments & Transactions', subtitle: 'Disbursement authorization to verified company accounts' },
     repayments: { title: 'Repayments & Dues', subtitle: 'Track collections, confirm receipts, and manage defaults' },
     payouts: { title: 'Returns & Payouts', subtitle: 'Compile, preview, and dispatch return distributions' },
+    maturity_releases: { title: 'Maturity Releases', subtitle: 'Disburse and return principal capital to investors upon completion of investment tenure (12+ Months)' },
     subscriptions: { title: 'Subscriptions & Billing', subtitle: 'Manage ₹500 monthly platform access fees for investors and companies' },
     queries: { title: 'Queries & Support', subtitle: 'Manage inbound payment issues, support requests, and resolutions from investors and companies' },
     settings: { title: 'Settings', subtitle: 'Manage administrator login ID, email address, and security password' }
@@ -151,6 +153,7 @@ function MainApp() {
           {activeTab === 'subscriptions' && <Subscriptions />}
           {activeTab === 'repayments' && <Repayments />}
           {activeTab === 'payouts' && <Payouts />}
+          {activeTab === 'maturity_releases' && <MaturityReleases />}
           {activeTab === 'queries' && <Queries />}
           {activeTab === 'settings' && <Settings />}
         </main>

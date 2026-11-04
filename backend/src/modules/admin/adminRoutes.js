@@ -35,6 +35,8 @@ import {
   createPayoutBatch,
   approveAndSendBatch,
   retryPayout,
+  togglePayoutHold,
+  triggerAutoMonthlyReturns,
   getAllTransactions,
   getAuditLogs,
   exportReport,
@@ -65,6 +67,11 @@ import {
   decideInvestorRequest
 } from './adminController.js';
 import { authenticate, requireAdmin } from '../../middleware/auth.js';
+import {
+  getMaturityReleases,
+  releaseMaturityPrincipal,
+  toggleMaturityReleaseHold
+} from './maturityReleaseController.js';
 
 const router = express.Router();
 
@@ -146,6 +153,13 @@ router.get('/payout-batches', getBatches);
 router.post('/payout-batches', createPayoutBatch);
 router.post('/payout-batches/:id/approve', approveAndSendBatch);
 router.post('/payouts/:id/retry', retryPayout);
+router.post('/payouts/:id/hold', togglePayoutHold);
+router.post('/payouts/auto-process', triggerAutoMonthlyReturns);
+
+// Investor Maturity Principal Releases (Tenure Completion Releases)
+router.get('/maturity-releases', getMaturityReleases);
+router.post('/maturity-releases/:id/release', releaseMaturityPrincipal);
+router.post('/maturity-releases/:id/hold', toggleMaturityReleaseHold);
 
 // Universal Master Transactions Log
 router.get('/transactions', getAllTransactions);

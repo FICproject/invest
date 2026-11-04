@@ -67,6 +67,27 @@ const payoutSchema = new mongoose.Schema(
     bankAccountEnding: {
       type: String,
       default: '4210'
+    },
+    isHold: {
+      type: Boolean,
+      default: false
+    },
+    holdReason: {
+      type: String,
+      default: null
+    },
+    heldAt: {
+      type: Date,
+      default: null
+    },
+    heldBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    autoPaid: {
+      type: Boolean,
+      default: false
     }
   },
   {

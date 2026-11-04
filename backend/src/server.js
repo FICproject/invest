@@ -109,6 +109,18 @@ async function bootstrap() {
     console.warn('[Bootstrap] Auto-seed check notice:', err.message);
   }
 
+  // Initialize automated monthly returns evaluator
+  try {
+    const { processAutoMonthlyReturns } = await import('./services/autoReturnsService.js');
+    // Run initial pass on startup
+    processAutoMonthlyReturns();
+    // Run periodic evaluation (every 10 minutes)
+    setInterval(processAutoMonthlyReturns, 10 * 60 * 1000);
+    console.log('[AutoReturnsScheduler] Monthly returns auto-payout scheduler initialized (10m interval)');
+  } catch (schedErr) {
+    console.warn('[AutoReturnsScheduler] Notice on init:', schedErr.message);
+  }
+
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`=============================================================`);
     console.log(`  CONNECT INVEST - UNIFIED MONOREPO BACKEND SERVER`);

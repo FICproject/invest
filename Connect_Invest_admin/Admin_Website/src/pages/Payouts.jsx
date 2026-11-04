@@ -13,7 +13,9 @@ import {
   CheckCheck,
   Filter,
   Info,
-  Search
+  Search,
+  Pause,
+  Play
 } from 'lucide-react';
 import { adminApi, formatINR } from '../services/api';
 import { useToast } from '../context/ToastContext';
@@ -56,6 +58,7 @@ export default function Payouts() {
     if (statusFilter === 'READY' && p.status !== 'Ready') return false;
     if (statusFilter === 'IN_BATCH' && !(p.status === 'In batch' || p.status === 'Approved')) return false;
     if (statusFilter === 'PAID' && p.status !== 'Paid') return false;
+    if (statusFilter === 'HOLD' && !(p.isHold || p.status === 'On Hold')) return false;
 
     if (!search.trim()) return true;
     const q = search.toLowerCase();
@@ -153,6 +156,46 @@ export default function Payouts() {
     }
   };
 
+  // Admin Hold / Unhold Return
+  const handleToggleHold = async (payout) => {
+    const isCurrentlyHold = payout.isHold || payout.status === 'On Hold';
+    const actionLabel = isCurrentlyHold ? 'release from hold' : 'place on hold';
+    const reason = !isCurrentlyHold
+      ? window.prompt('Reason for holding this investor return (optional):', 'Reviewing investor details / compliance hold')
+      : null;
+    
+    if (!isCurrentlyHold && reason === null) return; // cancelled prompt
+
+    try {
+      setSubmitting(true);
+      const res = await adminApi.togglePayoutHold(payout._id, { reason });
+      if (res.data.success) {
+        toast.success(res.data.message || `Return ${actionLabel} successfully.`);
+        fetchData();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || `Failed to ${actionLabel}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Trigger auto returns calculation
+  const handleTriggerAutoReturns = async () => {
+    try {
+      setSubmitting(true);
+      const res = await adminApi.triggerAutoMonthlyReturns();
+      if (res.data.success) {
+        toast.success(res.data.message || 'Auto-payouts processed for eligible monthly returns!');
+        fetchData();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to trigger auto returns');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleRetryPayout = async payoutId => {
     try {
       const res = await adminApi.retryPayout(payoutId);
@@ -216,23 +259,46 @@ export default function Payouts() {
           </div>
 
           {/* Quick Actions */}
-          {viewTab === 'verification' && pendingVerification.length > 0 && (
-            <button
-              onClick={handleVerifyAll}
-              disabled={submitting}
-              className="btn-secondary"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                borderColor: '#10B981',
-                color: '#059669',
-                fontWeight: 700
-              }}
-            >
-              <CheckCheck size={16} />
-              <span>Verify All ({pendingVerification.length})</span>
-            </button>
+          {viewTab === 'verification' && (
+            <>
+              <button
+                onClick={handleTriggerAutoReturns}
+                disabled={submitting}
+                className="btn-secondary"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderColor: '#3B82F6',
+                  color: '#1D4ED8',
+                  backgroundColor: '#EFF6FF',
+                  fontWeight: 700
+                }}
+                title="Evaluate and auto-pay due monthly returns to eligible investors"
+              >
+                <RefreshCw size={14} className={submitting ? 'animate-spin' : ''} />
+                <span>Run Monthly Auto-Payouts</span>
+              </button>
+
+              {pendingVerification.length > 0 && (
+                <button
+                  onClick={handleVerifyAll}
+                  disabled={submitting}
+                  className="btn-secondary"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    borderColor: '#10B981',
+                    color: '#059669',
+                    fontWeight: 700
+                  }}
+                >
+                  <CheckCheck size={16} />
+                  <span>Verify All ({pendingVerification.length})</span>
+                </button>
+              )}
+            </>
           )}
 
           <button
@@ -301,7 +367,8 @@ export default function Payouts() {
                 { id: 'PENDING', label: `Pending Verification (${pendingVerification.length})` },
                 { id: 'READY', label: `Verified Ready (${readyPayouts.length})` },
                 { id: 'IN_BATCH', label: 'In Batch' },
-                { id: 'PAID', label: 'Disbursed Paid' }
+                { id: 'PAID', label: 'Disbursed Paid' },
+                { id: 'HOLD', label: `On Hold (${payouts.filter(p => p.isHold || p.status === 'On Hold').length})` }
               ].map(f => (
                 <button
                   key={f.id}
