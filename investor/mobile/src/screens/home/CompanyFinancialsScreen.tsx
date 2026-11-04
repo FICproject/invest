@@ -17,8 +17,7 @@ import Loader from '../../components/common/Loader';
 import api from '../../services/api';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
-export const CompanyFinancialsScreen = ({ onBack, initialTab = 'transactions' }: { onBack?: () => void; initialTab?: 'financials' | 'transactions' }) => {
-  const [activeTab, setActiveTab] = useState<'financials' | 'transactions'>(initialTab);
+export const CompanyFinancialsScreen = ({ onBack }: { onBack?: () => void }) => {
   const [reports, setReports] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [metrics, setMetrics] = useState<any>(null);
@@ -80,89 +79,7 @@ export const CompanyFinancialsScreen = ({ onBack, initialTab = 'transactions' }:
         </View>
       </View>
 
-      {/* Tab Switcher */}
-      <View style={styles.tabBar}>
-        <TouchableOpacity
-          style={[styles.tabItem, activeTab === 'financials' && styles.tabItemActive]}
-          onPress={() => setActiveTab('financials')}
-        >
-          <Text
-            style={[styles.tabItemText, activeTab === 'financials' && styles.tabItemTextActive]}
-          >
-            P&L / Reports ({reports.length})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabItem, activeTab === 'transactions' && styles.tabItemActive]}
-          onPress={() => setActiveTab('transactions')}
-        >
-          <Text
-            style={[styles.tabItemText, activeTab === 'transactions' && styles.tabItemTextActive]}
-          >
-            Transactions ({transactions.length})
-          </Text>
-        </TouchableOpacity>
-      </View>
 
-      {activeTab === 'financials' ? (
-        <FlatList
-          data={reports}
-          keyExtractor={(item) => item._id || Math.random().toString()}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor="#C8963E"
-              colors={['#C8963E']}
-            />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyCard}>
-              <Icon name="file-text" size={38} color="#9CA3AF" />
-              <Text style={styles.emptyTitle}>No Financial Reports Yet</Text>
-              <Text style={styles.emptySub}>
-                Quarterly and annual statements submitted to Connect Invest will appear here.
-              </Text>
-            </View>
-          }
-          renderItem={({ item }) => (
-            <View style={styles.reportCard}>
-              <View style={styles.cardHeader}>
-                <View>
-                  <Text style={styles.reportPeriod}>{item.periodName || item.financialYear || 'Quarterly Period'}</Text>
-                  <Text style={styles.reportFY}>{item.financialYear} • {item.periodType || 'Financial Report'}</Text>
-                </View>
-                <View style={styles.statusPill}>
-                  <Text style={styles.statusPillText}>{item.auditStatus || 'Audited'}</Text>
-                </View>
-              </View>
-
-              <View style={styles.statsRow}>
-                <View style={styles.statBox}>
-                  <Text style={styles.statLabel}>Revenue</Text>
-                  <Text style={styles.statValSuccess}>{formatCurrency(item.revenue || 0)}</Text>
-                </View>
-                <View style={styles.statBox}>
-                  <Text style={styles.statLabel}>Expenses</Text>
-                  <Text style={styles.statValDanger}>{formatCurrency(item.operatingExpenses || 0)}</Text>
-                </View>
-                <View style={styles.statBox}>
-                  <Text style={styles.statLabel}>Net Profit</Text>
-                  <Text style={styles.statValGold}>{formatCurrency(item.netProfitOrLoss || 0)}</Text>
-                </View>
-              </View>
-
-              {item.notes ? (
-                <Text style={styles.reportNotes} numberOfLines={2}>
-                  Note: {item.notes}
-                </Text>
-              ) : null}
-            </View>
-          )}
-        />
-      ) : (
         <FlatList
           data={transactions}
           keyExtractor={(item) => item._id || Math.random().toString()}
@@ -207,7 +124,6 @@ export const CompanyFinancialsScreen = ({ onBack, initialTab = 'transactions' }:
             );
           }}
         />
-      )}
     </SafeAreaView>
   );
 };
