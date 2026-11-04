@@ -259,7 +259,7 @@ export const DocumentsComplianceScreen: React.FC<ScreenProps> = ({ onBack }) => 
           </TouchableOpacity>
         )}
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Documents & Compliance</Text>
+          <Text style={styles.headerTitle}>Documents</Text>
           <Text style={styles.headerSub}>Corporate charter, ROC filings and statutory compliance</Text>
         </View>
       </View>
@@ -432,6 +432,181 @@ export const SettingsScreen: React.FC<ScreenProps> = ({ onBack }) => {
           <View style={styles.rowBetween}>
             <Text style={styles.metaLabel}>Data Source</Text>
             <Text style={styles.metaValGold}>Live MongoDB Replica</Text>
+          </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+
+// 6. Investments Screen (Pipeline & Committed Subscriptions)
+export const InvestmentsScreen: React.FC<ScreenProps> = ({ onBack }) => {
+  const [investments, setInvestments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchInvestments = useCallback(async () => {
+    try {
+      const res: any = await api.get('/company/investments');
+      setInvestments(res.investments || []);
+    } catch (e) {
+      console.error('Failed to fetch investments', e);
+      setInvestments([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchInvestments();
+  }, [fetchInvestments]);
+
+  if (loading) return <Loader fullScreen message="Loading Investments Pipeline..." />;
+
+  const totalCommitted = investments.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" />
+      <View style={styles.header}>
+        {onBack && (
+          <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+            <Icon name="chevron-left" size={24} color="#1F2421" />
+          </TouchableOpacity>
+        )}
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerTitle}>Investments</Text>
+          <Text style={styles.headerSub}>Capital pipeline & committed investor subscriptions</Text>
+        </View>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.listPadding}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              fetchInvestments();
+            }}
+            tintColor="#B37400"
+          />
+        }
+      >
+        <View style={styles.heroCard}>
+          <Text style={styles.heroLabel}>TOTAL COMMITTED CAPITAL</Text>
+          <Text style={styles.heroAmount}>{formatCurrency(totalCommitted)}</Text>
+          <Text style={styles.heroSub}>{investments.length} Verified Investor Commitments</Text>
+        </View>
+
+        <Text style={styles.sectionHeading}>Committed Investor Ledger</Text>
+
+        {investments.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Icon name="layers" size={40} color="#94A3B8" />
+            <Text style={styles.emptyTitle}>No Subscriptions Yet</Text>
+            <Text style={styles.emptySub}>
+              Committed investor requests will appear here once backers invest.
+            </Text>
+          </View>
+        ) : (
+          investments.map((inv, idx) => (
+            <View key={inv._id || idx} style={styles.card}>
+              <View style={styles.rowBetween}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.itemTitle}>{inv.investorName || 'Accredited Investor'}</Text>
+                  <Text style={styles.itemSub}>{inv.investorEmail || 'investor@connectinvest.in'}</Text>
+                </View>
+                <View style={styles.badgeGreen}>
+                  <Text style={styles.badgeGreenText}>{inv.paymentStatus || 'Settled'}</Text>
+                </View>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.rowBetween}>
+                <Text style={styles.metaLabel}>Committed Amount</Text>
+                <Text style={styles.metaValGold}>{formatCurrency(inv.amount || 0)}</Text>
+              </View>
+            </View>
+          ))
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+// 7. Corporate Subscription Screen (₹500 / month platform fee)
+export const SubscriptionScreen: React.FC<ScreenProps> = ({ onBack }) => {
+  const currentMonth = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" />
+      <View style={styles.header}>
+        {onBack && (
+          <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+            <Icon name="chevron-left" size={24} color="#1F2421" />
+          </TouchableOpacity>
+        )}
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerTitle}>Subscription</Text>
+          <Text style={styles.headerSub}>Monthly company platform access fee (₹500 / month)</Text>
+        </View>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.listPadding} showsVerticalScrollIndicator={false}>
+        {/* Active Plan Card */}
+        <View style={styles.heroCard}>
+          <View style={styles.rowBetween}>
+            <Text style={styles.heroLabel}>MONTHLY PLATFORM FEE</Text>
+            <View style={styles.badgeGreen}>
+              <Text style={styles.badgeGreenText}>Active</Text>
+            </View>
+          </View>
+          <Text style={styles.heroAmount}>₹500 <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '400' }}>/ month</Text></Text>
+          <Text style={styles.heroSub}>Current Billing Cycle: {currentMonth}</Text>
+        </View>
+
+        {/* Features Included */}
+        <Text style={styles.sectionHeading}>Included Platform Privileges</Text>
+        <View style={styles.card}>
+          <View style={[styles.rowBetween, { paddingVertical: 4 }]}>
+            <Text style={styles.itemTitle}>• Active Investor Deal Syndication</Text>
+            <Icon name="check-circle" size={16} color="#059669" />
+          </View>
+          <View style={[styles.rowBetween, { paddingVertical: 4 }]}>
+            <Text style={styles.itemTitle}>• SEBI-compliant Escrow Ledger</Text>
+            <Icon name="check-circle" size={16} color="#059669" />
+          </View>
+          <View style={[styles.rowBetween, { paddingVertical: 4 }]}>
+            <Text style={styles.itemTitle}>• Automated Monthly GST Tax Invoices</Text>
+            <Icon name="check-circle" size={16} color="#059669" />
+          </View>
+          <View style={[styles.rowBetween, { paddingVertical: 4 }]}>
+            <Text style={styles.itemTitle}>• Priority Legal & Trustee Support</Text>
+            <Icon name="check-circle" size={16} color="#059669" />
+          </View>
+        </View>
+
+        {/* Billing History */}
+        <Text style={styles.sectionHeading}>Recent Subscription Payments</Text>
+        <View style={styles.card}>
+          <View style={styles.rowBetween}>
+            <View>
+              <Text style={styles.itemTitle}>October 2026 Platform Fee</Text>
+              <Text style={styles.itemSub}>Paid on 04 Oct 2026 • UPI Auto-Debit</Text>
+            </View>
+            <Text style={styles.metaValGold}>₹500</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.rowBetween}>
+            <View>
+              <Text style={styles.itemTitle}>September 2026 Platform Fee</Text>
+              <Text style={styles.itemSub}>Paid on 04 Sep 2026 • Net Banking</Text>
+            </View>
+            <Text style={styles.metaValGold}>₹500</Text>
           </View>
         </View>
       </ScrollView>

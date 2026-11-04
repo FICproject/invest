@@ -32,19 +32,21 @@ interface MenuItem {
 // Exactly 1:1 identical to website menuItems in Sidebar.tsx:
 // 1. Dashboard
 // 2. Request
-// 3. Financial Reports
+// 3. Investments
 // 4. Returns and Dividends
 // 5. Transactions
-// 6. Documents & Compliance
-// 7. Notifications
-// 8. Settings
+// 6. Documents
+// 7. Subscription
+// 8. Notifications
+// 9. Settings
 const WEBSITE_MENU_ITEMS: MenuItem[] = [
   { id: 'Dashboard', label: 'Dashboard', icon: 'dashboard' },
   { id: 'Request', label: 'Request', icon: 'briefcase' },
-  { id: 'FinancialReports', label: 'Financial Reports', icon: 'file-text' },
+  { id: 'Investments', label: 'Investments', icon: 'layers' },
   { id: 'ReturnsAndDividends', label: 'Returns and Dividends', icon: 'trending-up' },
   { id: 'Transactions', label: 'Transactions', icon: 'wallet' },
-  { id: 'DocumentsAndCompliance', label: 'Documents & Compliance', icon: 'shield' },
+  { id: 'Documents', label: 'Documents', icon: 'file-text' },
+  { id: 'Subscription', label: 'Subscription', icon: 'credit-card' },
   { id: 'Notifications', label: 'Notifications', icon: 'bell' },
   { id: 'Settings', label: 'Settings', icon: 'settings' },
 ];

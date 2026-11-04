@@ -10,6 +10,8 @@ import {
   FinancialReportsScreen,
   ReturnsAndDividendsScreen,
   DocumentsComplianceScreen,
+  InvestmentsScreen,
+  SubscriptionScreen,
   NotificationsScreen,
   SettingsScreen,
 } from '../screens/home/CompanySubScreens';
@@ -32,14 +34,16 @@ export const CompanyTabNavigator = () => {
       setCurrentSubScreen(null);
     } else if (routeKey === 'Request') {
       setCurrentSubScreen('Request');
-    } else if (routeKey === 'FinancialReports') {
-      setCurrentSubScreen('FinancialReports');
+    } else if (routeKey === 'Investments') {
+      setCurrentSubScreen('Investments');
     } else if (routeKey === 'ReturnsAndDividends') {
       setCurrentSubScreen('ReturnsAndDividends');
     } else if (routeKey === 'Transactions') {
       setCurrentSubScreen('Transactions');
-    } else if (routeKey === 'DocumentsAndCompliance') {
-      setCurrentSubScreen('DocumentsAndCompliance');
+    } else if (routeKey === 'Documents' || routeKey === 'DocumentsAndCompliance') {
+      setCurrentSubScreen('Documents');
+    } else if (routeKey === 'Subscription') {
+      setCurrentSubScreen('Subscription');
     } else if (routeKey === 'Notifications') {
       setCurrentSubScreen('Notifications');
     } else if (routeKey === 'Settings') {
@@ -60,8 +64,14 @@ export const CompanyTabNavigator = () => {
   if (currentSubScreen === 'Transactions') {
     return <CompanyFinancialsScreen onBack={() => setCurrentSubScreen(null)} />;
   }
-  if (currentSubScreen === 'DocumentsAndCompliance') {
+  if (currentSubScreen === 'Investments') {
+    return <InvestmentsScreen onBack={() => setCurrentSubScreen(null)} />;
+  }
+  if (currentSubScreen === 'Documents' || currentSubScreen === 'DocumentsAndCompliance') {
     return <DocumentsComplianceScreen onBack={() => setCurrentSubScreen(null)} />;
+  }
+  if (currentSubScreen === 'Subscription') {
+    return <SubscriptionScreen onBack={() => setCurrentSubScreen(null)} />;
   }
   if (currentSubScreen === 'Notifications') {
     return <NotificationsScreen onBack={() => setCurrentSubScreen(null)} />;
