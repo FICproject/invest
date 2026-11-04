@@ -1,23 +1,54 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, Bell, Menu, User, ShieldCheck } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Bell, Menu, User, ShieldCheck } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { useAuth } from '../../context/AuthContext';
 import { SystemAdaptabilityBar } from '../common/SystemAdaptabilityBar';
 
+const getTabMeta = (pathname) => {
+  if (pathname === '/investor/dashboard' || pathname === '/investor/dashboard/') {
+    return { title: 'Dashboard', subtitle: 'Overview, Portfolio Metrics & Highlights' };
+  }
+  if (pathname.startsWith('/investor/my-investments')) {
+    return { title: 'My Investments', subtitle: 'Active commitments, performance & contracts' };
+  }
+  if (pathname.startsWith('/investor/returns-payouts')) {
+    return { title: 'Portfolio & Returns', subtitle: 'Payout schedules, ROI & earnings summary' };
+  }
+  if (pathname.startsWith('/investor/transactions')) {
+    return { title: 'Transactions & Payments', subtitle: 'Payment logs, disbursements & verified ledger' };
+  }
+  if (pathname.startsWith('/investor/statements')) {
+    return { title: 'Statements & Reports', subtitle: 'Financial disclosures, tax notes & certificates' };
+  }
+  if (pathname.startsWith('/investor/notifications')) {
+    return { title: 'Notifications', subtitle: 'System alerts, payout updates & notices' };
+  }
+  if (pathname.startsWith('/investor/support')) {
+    return { title: 'Help & Support', subtitle: 'Investor assistance & ticket resolution' };
+  }
+  if (pathname.startsWith('/investor/profile')) {
+    return { title: 'Profile & Settings', subtitle: 'Account preferences, security & personal details' };
+  }
+  if (pathname.startsWith('/investor/kyc')) {
+    return { title: 'KYC Verification', subtitle: 'Identity credentials & regulatory compliance' };
+  }
+  if (pathname.startsWith('/investor/bank-details')) {
+    return { title: 'Bank Accounts', subtitle: 'Linked settlement & payout accounts' };
+  }
+  if (pathname.startsWith('/opportunities') || pathname.startsWith('/investor/opportunities')) {
+    return { title: 'Investment Opportunities', subtitle: 'Browse vetted high-yield corporate notes' };
+  }
+  return { title: 'Investor Portal', subtitle: 'Wealth Management Dashboard' };
+};
+
 export const DashboardLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const { user, kycStatus } = useAuth();
   const navigate = useNavigate();
-
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/opportunities?search=${encodeURIComponent(searchQuery.trim())}`);
-    }
-  };
+  const location = useLocation();
+  const tabMeta = getTabMeta(location.pathname);
 
   const handleToggleSidebar = () => {
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
@@ -63,8 +94,8 @@ export const DashboardLayout = ({ children }) => {
             gap: '12px'
           }}
         >
-          {/* Left: Mobile Toggle & Global Search */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, maxWidth: '480px', minWidth: 0 }}>
+          {/* Left: Mobile Toggle & Tab Title in Header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
             <button
               onClick={handleToggleSidebar}
               style={{
@@ -86,35 +117,38 @@ export const DashboardLayout = ({ children }) => {
               <Menu size={22} />
             </button>
 
-            <form onSubmit={handleSearchSubmit} style={{ width: '100%', position: 'relative', minWidth: 0 }}>
-              <Search
-                size={18}
-                color="var(--text-muted)"
-                style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
-              />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search investments, companies, projects..."
-                style={{
-                  width: '100%',
-                  height: '40px',
-                  paddingLeft: '38px',
-                  paddingRight: '14px',
-                  fontSize: '13.5px',
-                  borderRadius: '20px',
-                  border: '1px solid var(--border-color)',
-                  backgroundColor: 'var(--bg-surface-subtle)',
-                  color: 'var(--text-main)',
-                  outline: 'none'
-                }}
-              />
-            </form>
+            <div style={{ minWidth: 0 }}>
+              <h1 style={{
+                margin: 0,
+                fontSize: '18px',
+                fontWeight: 800,
+                color: 'var(--text-main)',
+                letterSpacing: '-0.02em',
+                lineHeight: 1.2,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                {tabMeta.title}
+              </h1>
+              {tabMeta.subtitle && (
+                <p style={{
+                  margin: '2px 0 0',
+                  fontSize: '11.5px',
+                  color: 'var(--text-muted)',
+                  lineHeight: 1,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}>
+                  {tabMeta.subtitle}
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Right: Notifications & Investor Profile Pill */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flexShrink: 0 }}>
             {/* Notification Bell */}
             <button
               onClick={() => navigate('/investor/notifications')}

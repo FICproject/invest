@@ -15,6 +15,7 @@ export default function Repayments() {
   const [repayments, setRepayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useState('');
 
   // Confirm Receipt Modal
   const [confirmReceiptTarget, setConfirmReceiptTarget] = useState(null);
@@ -30,7 +31,7 @@ export default function Repayments() {
       setLoading(true);
       const res = await adminApi.getRepayments({ status: statusFilter });
       if (res.data.success) {
-        setRepayments(res.data.repayments);
+        setRepayments(res.data.repayments || []);
       }
     } catch (err) {
       console.error('Failed to load repayments:', err);
@@ -68,14 +69,16 @@ export default function Repayments() {
 
   const handleMarkDefault = async () => {
     if (!defaultReason.trim()) {
-      toast.warning('Enter recovery steps & notes for 30-day default');
+      toast.warning('A reason / recovery notes are required to mark default');
       return;
     }
     try {
       setSubmitting(true);
-      const res = await adminApi.markDefault(defaultTarget._id, { reason: defaultReason.trim() });
+      const res = await adminApi.markRepaymentDefault(defaultTarget._id, {
+        reason: defaultReason.trim()
+      });
       if (res.data.success) {
-        toast.success('Repayment marked as DEFAULTED');
+        toast.success(res.data.message || 'Repayment marked as Defaulted');
         setDefaultTarget(null);
         setDefaultReason('');
         fetchRepayments();
@@ -87,6 +90,17 @@ export default function Repayments() {
     }
   };
 
+  const filteredRepayments = repayments.filter(rep => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    const offerTitle = (rep.offerId?.title || '').toLowerCase();
+    const company = (rep.offerId?.companyId?.name || '').toLowerCase();
+    const kind = (rep.kind || '').toLowerCase();
+    const status = (rep.status || '').toLowerCase();
+    const ref = (rep.receivedReference || '').toLowerCase();
+    return offerTitle.includes(q) || company.includes(q) || kind.includes(q) || status.includes(q) || ref.includes(q);
+  });
+
   return (
     <div className="page-container">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
@@ -97,19 +111,34 @@ export default function Repayments() {
           </p>
         </div>
 
-        <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
-          className="input-field"
-          style={{ width: '180px' }}
-        >
-          <option value="">All Statuses</option>
-          <option value="Upcoming">Upcoming</option>
-          <option value="Due">Due</option>
-          <option value="Received">Received</option>
-          <option value="Overdue">Overdue</option>
-          <option value="Defaulted">Defaulted</option>
-        </select>
+        {/* In-page Search and Status Filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', width: '280px' }}>
+            <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search offer, company, ref..."
+              className="input-field"
+              style={{ width: '100%', height: '38px', paddingLeft: '36px', fontSize: '0.825rem' }}
+            />
+          </div>
+
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            className="input-field"
+            style={{ width: '160px', height: '38px', fontSize: '0.825rem' }}
+          >
+            <option value="">All Statuses</option>
+            <option value="Upcoming">Upcoming</option>
+            <option value="Due">Due</option>
+            <option value="Received">Received</option>
+            <option value="Overdue">Overdue</option>
+            <option value="Defaulted">Defaulted</option>
+          </select>
+        </div>
       </div>
 
       <div className="glass-panel" style={{ padding: '24px' }}>
@@ -117,9 +146,9 @@ export default function Repayments() {
           <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
             Loading repayments from MongoDB...
           </div>
-        ) : repayments.length === 0 ? (
+        ) : filteredRepayments.length === 0 ? (
           <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
-            No repayment schedules found.
+            {search.trim() ? `No repayments match "${search}".` : 'No repayment schedules found.'}
           </div>
         ) : (
           <div className="data-table-container">
@@ -136,7 +165,7 @@ export default function Repayments() {
                 </tr>
               </thead>
               <tbody>
-                {repayments.map(rep => {
+                {filteredRepayments.map(rep => {
                   const isReceived = rep.status === 'Received';
                   const isOverdue = rep.status === 'Overdue';
                   const isDefaulted = rep.status === 'Defaulted';
@@ -161,21 +190,18 @@ export default function Repayments() {
                       </td>
                       <td>
                         <span className={`badge ${
-                          isReceived ? 'badge-emerald' :
-                          isOverdue ? 'badge-rose' :
-                          isDefaulted ? 'badge-rose' :
-                          rep.status === 'Due' ? 'badge-amber' : 'badge-slate'
+                          isReceived ? 'badge-emerald' : isOverdue ? 'badge-amber' : isDefaulted ? 'badge-rose' : 'badge-slate'
                         }`}>
                           {rep.status}
                         </span>
                       </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          {!isReceived && (
+                          {!isReceived && !isDefaulted && (
                             <button
                               onClick={() => {
                                 setConfirmReceiptTarget(rep);
-                                setBankRef(`UTR-IN-${Date.now().toString().slice(-6)}`);
+                                setBankRef(`UTR-REC-${Date.now().toString().slice(-6)}`);
                               }}
                               className="btn-primary"
                               style={{ padding: '5px 10px', fontSize: '0.75rem' }}
@@ -185,17 +211,14 @@ export default function Repayments() {
                           )}
                           {isReceived && (
                             <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
-                              Ref: {rep.reference}
+                              Ref: {rep.receivedReference}
                             </span>
                           )}
                           {isOverdue && !isDefaulted && (
                             <button
-                              onClick={() => {
-                                setDefaultTarget(rep);
-                                setDefaultReason('');
-                              }}
+                              onClick={() => setDefaultTarget(rep)}
                               className="btn-danger"
-                              style={{ padding: '5px 10px', fontSize: '0.75rem' }}
+                              style={{ padding: '5px 8px', fontSize: '0.75rem' }}
                             >
                               30d Default
                             </button>
@@ -237,7 +260,7 @@ export default function Repayments() {
             <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '8px', marginBottom: '16px' }}>
               <div><strong>Project:</strong> {confirmReceiptTarget.offerId?.title}</div>
               <div><strong>Company:</strong> {confirmReceiptTarget.offerId?.companyId?.name}</div>
-              <div><strong>Amount Due:</strong> <span style={{ color: '#34d399', fontWeight: 700 }}>{formatINR(confirmReceiptTarget.expectedPaise)}</span></div>
+              <div><strong>Amount Due:</strong> <span style={{ color: '#059669', fontWeight: 700 }}>{formatINR(confirmReceiptTarget.expectedPaise)}</span></div>
             </div>
 
             <div style={{ marginBottom: '18px' }}>

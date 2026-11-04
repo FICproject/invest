@@ -12,7 +12,8 @@ import {
   Check,
   CheckCheck,
   Filter,
-  Info
+  Info,
+  Search
 } from 'lucide-react';
 import { adminApi, formatINR } from '../services/api';
 import { useToast } from '../context/ToastContext';
@@ -24,6 +25,7 @@ export default function Payouts() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [search, setSearch] = useState('');
 
   // Tab switch within Returns & Payouts
   const [viewTab, setViewTab] = useState('verification'); // 'verification' (all returns) or 'batches'
@@ -50,12 +52,28 @@ export default function Payouts() {
 
   // Filtered return lines
   const filteredPayouts = payouts.filter(p => {
-    if (statusFilter === 'ALL') return true;
-    if (statusFilter === 'PENDING') return p.status === 'Calculated' || p.status === 'Failed';
-    if (statusFilter === 'READY') return p.status === 'Ready';
-    if (statusFilter === 'IN_BATCH') return p.status === 'In batch' || p.status === 'Approved';
-    if (statusFilter === 'PAID') return p.status === 'Paid';
-    return true;
+    if (statusFilter === 'PENDING' && !(p.status === 'Calculated' || p.status === 'Failed')) return false;
+    if (statusFilter === 'READY' && p.status !== 'Ready') return false;
+    if (statusFilter === 'IN_BATCH' && !(p.status === 'In batch' || p.status === 'Approved')) return false;
+    if (statusFilter === 'PAID' && p.status !== 'Paid') return false;
+
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    const investorName = (p.investorId?.name || '').toLowerCase();
+    const investorEmail = (p.investorId?.email || '').toLowerCase();
+    const offerTitle = (p.offerId?.title || '').toLowerCase();
+    const utr = (p.utrNumber || p.disbursementReference || '').toLowerCase();
+    const acct = (p.bankAccountEnding || '').toLowerCase();
+    return investorName.includes(q) || investorEmail.includes(q) || offerTitle.includes(q) || utr.includes(q) || acct.includes(q);
+  });
+
+  const filteredBatches = batches.filter(b => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    const batchId = (b.batchId || b._id || '').toLowerCase();
+    const ref = (b.reference || '').toLowerCase();
+    const admin = (b.adminId?.name || '').toLowerCase();
+    return batchId.includes(q) || ref.includes(q) || admin.includes(q);
   });
 
   const pendingVerification = payouts.filter(p => p.status === 'Calculated' || p.status === 'Failed');
@@ -160,11 +178,11 @@ export default function Payouts() {
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           {/* Subtabs Switcher */}
           <div style={{ display: 'flex', background: '#F1F5F9', borderRadius: '10px', padding: '4px' }}>
             <button
-              onClick={() => setViewTab('verification')}
+              onClick={() => { setViewTab('verification'); setSearch(''); }}
               style={{
                 padding: '8px 16px',
                 borderRadius: '8px',
@@ -180,7 +198,7 @@ export default function Payouts() {
               Verify Returns ({payouts.length})
             </button>
             <button
-              onClick={() => setViewTab('batches')}
+              onClick={() => { setViewTab('batches'); setSearch(''); }}
               style={{
                 padding: '8px 16px',
                 borderRadius: '8px',
@@ -274,12 +292,12 @@ export default function Payouts() {
 
       {/* Main Content Area */}
       <div className="glass-panel" style={{ padding: '24px' }}>
-        {/* Verification Filters Row */}
-        {viewTab === 'verification' && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+        {/* Verification Filters Row & In-Page Search */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
+          {viewTab === 'verification' ? (
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {[
-                { id: 'ALL', label: 'All Returns' },
+                { id: 'ALL', label: `All Returns (${payouts.length})` },
                 { id: 'PENDING', label: `Pending Verification (${pendingVerification.length})` },
                 { id: 'READY', label: `Verified Ready (${readyPayouts.length})` },
                 { id: 'IN_BATCH', label: 'In Batch' },
@@ -305,13 +323,25 @@ export default function Payouts() {
                 </button>
               ))}
             </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: '#64748B' }}>
-              <Info size={14} />
-              <span>Admin verification validates return calculation before bank release</span>
+          ) : (
+            <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0F172A' }}>
+              Disbursement Batches Queue
             </div>
+          )}
+
+          {/* In-page Search Input */}
+          <div style={{ position: 'relative', width: '320px' }}>
+            <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={viewTab === 'verification' ? "Search investor, offer, UTR..." : "Search batch ID, reference..."}
+              className="input-field"
+              style={{ width: '100%', height: '38px', paddingLeft: '36px', fontSize: '0.825rem' }}
+            />
           </div>
-        )}
+        </div>
 
         {loading ? (
           <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -320,7 +350,7 @@ export default function Payouts() {
         ) : viewTab === 'verification' ? (
           filteredPayouts.length === 0 ? (
             <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
-              No returns found matching the selected filter.
+              {search.trim() ? `No returns match "${search}". Try adjusting your query.` : 'No returns found matching the selected filter.'}
             </div>
           ) : (
             <div className="data-table-container">
@@ -350,67 +380,32 @@ export default function Payouts() {
                           {idx + 1}
                         </td>
                         <td>
-                          <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
-                            {p.investorId?.name || 'Verified Investor'}
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                            {p.investorId?.email || 'N/A'} • {p.investorId?.mobile || ''}
+                          <div style={{ fontWeight: 600 }}>{p.investorId?.name || 'Investor'}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{p.investorId?.email}</div>
+                        </td>
+                        <td>{p.offerId?.title || 'Offer'}</td>
+                        <td>
+                          <div style={{ fontSize: '0.825rem' }}>{p.dueDate ? new Date(p.dueDate).toLocaleDateString() : 'N/A'}</div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                            {p.repaymentId ? 'Monthly Return' : 'Scheduled Distribution'}
                           </div>
                         </td>
-                        <td>
-                          <div style={{ fontWeight: 600, color: '#0F172A' }}>
-                            {p.offerId?.title || 'Investment Offer'}
-                          </div>
-                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                            Type: {p.payoutType === 'dividend' ? 'Equity Dividend' : 'Monthly Project Return'}
-                          </div>
+                        <td style={{ fontWeight: 700, color: '#0047BA', fontSize: '0.95rem' }}>
+                          {formatINR(p.amountPaise)}
                         </td>
                         <td>
-                          <div>
-                            {p.repaymentId?.dueDate
-                              ? new Date(p.repaymentId.dueDate).toLocaleDateString()
-                              : 'Active Cycle'}
-                          </div>
-                          <div style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 600 }}>
-                            Company Repayment Confirmed
-                          </div>
-                        </td>
-                        <td>
-                          <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0047BA' }}>
-                            {formatINR(p.amountPaise)}
-                          </div>
-                        </td>
-                        <td>
-                          <span
-                            className={`badge ${isPaid ? 'badge-emerald' :
-                              isReady ? 'badge-cyan' :
-                                isInBatch ? 'badge-indigo' :
-                                  p.status === 'Failed' ? 'badge-rose' : 'badge-amber'
-                              }`}
-                          >
-                            {isPending ? 'Pending Verification' : isReady ? 'Verified (Ready)' : p.status}
+                          <span className={`badge ${
+                            isPaid ? 'badge-emerald' : isReady ? 'badge-indigo' : isInBatch ? 'badge-blue' : 'badge-amber'
+                          }`}>
+                            {p.status}
                           </span>
                         </td>
                         <td>
-                          {isPaid && (
-                            <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: '#059669' }}>
-                              {p.bankRef}
-                            </span>
-                          )}
-                          {isPending && (
-                            <span style={{ fontSize: '0.75rem', color: '#D97706', fontWeight: 600 }}>
-                              Awaiting admin confirmation
-                            </span>
-                          )}
-                          {isReady && (
-                            <span style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 600 }}>
-                              ✓ Approved for batch
-                            </span>
-                          )}
-                          {isInBatch && (
-                            <span style={{ fontSize: '0.75rem', color: '#4F46E5' }}>
-                              Queued in active batch
-                            </span>
+                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>
+                            {p.utrNumber || p.disbursementReference || 'Pending Batch'}
+                          </div>
+                          {p.remarks && (
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{p.remarks}</div>
                           )}
                         </td>
                         <td>
@@ -459,9 +454,9 @@ export default function Payouts() {
           )
         ) : (
           /* Batches History Tab */
-          batches.length === 0 ? (
+          filteredBatches.length === 0 ? (
             <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
-              No payout batches compiled yet. Verify returns to build the first batch.
+              {search.trim() ? `No disbursement batches match "${search}".` : 'No payout batches compiled yet. Verify returns to build the first batch.'}
             </div>
           ) : (
             <div className="data-table-container">
@@ -479,7 +474,7 @@ export default function Payouts() {
                   </tr>
                 </thead>
                 <tbody>
-                  {batches.map((b, idx) => (
+                  {filteredBatches.map((b, idx) => (
                     <tr key={b._id}>
                       <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--text-muted)' }}>
                         {idx + 1}

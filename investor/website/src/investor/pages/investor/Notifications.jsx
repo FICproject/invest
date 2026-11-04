@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, CheckCircle2, ShieldCheck, TrendingUp, Info } from 'lucide-react';
+import { Bell, CheckCircle2, ShieldCheck, TrendingUp, Info, Search } from 'lucide-react';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { Loader } from '../../components/common/Loader';
 import { EmptyState } from '../../components/common/EmptyState';
@@ -9,6 +9,8 @@ import { investorService } from '../../services/investorService';
 export const Notifications = () => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all'); // 'all' | 'unread' | 'read'
 
   useEffect(() => {
     let isMounted = true;
@@ -61,6 +63,14 @@ export const Notifications = () => {
     );
   }
 
+  const filteredNotifications = notifications.filter((n) => {
+    if (filter === 'unread' && n.isRead) return false;
+    if (filter === 'read' && !n.isRead) return false;
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (n.title || '').toLowerCase().includes(q) || (n.message || '').toLowerCase().includes(q);
+  });
+
   return (
     <DashboardLayout>
       <div style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -73,15 +83,78 @@ export const Notifications = () => {
           </p>
         </div>
 
-        {notifications.length === 0 ? (
+        {/* In-page Search & Filter Bar */}
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            backgroundColor: 'var(--bg-surface)',
+            borderRadius: '12px',
+            padding: '12px 16px',
+            border: '1px solid var(--border-color)'
+          }}
+        >
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {[
+              { id: 'all', label: 'All' },
+              { id: 'unread', label: 'Unread' },
+              { id: 'read', label: 'Read' }
+            ].map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setFilter(f.id)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  fontSize: '12.5px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  border: filter === f.id ? '1px solid var(--color-primary)' : '1px solid var(--border-color)',
+                  backgroundColor: filter === f.id ? 'var(--color-primary)' : 'transparent',
+                  color: filter === f.id ? '#FFFFFF' : 'var(--text-main)',
+                  transition: 'all 0.15s'
+                }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ position: 'relative', minWidth: '220px', flex: 1, maxWidth: '320px' }}>
+            <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search notifications..."
+              style={{
+                width: '100%',
+                height: '36px',
+                paddingLeft: '36px',
+                paddingRight: '12px',
+                fontSize: '13px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-color)',
+                backgroundColor: 'var(--bg-surface-subtle)',
+                color: 'var(--text-main)',
+                outline: 'none'
+              }}
+            />
+          </div>
+        </div>
+
+        {filteredNotifications.length === 0 ? (
           <EmptyState
             icon={Bell}
-            title="All caught up!"
-            description="You don't have any notifications at the moment."
+            title={search.trim() ? "No matching notifications" : "All caught up!"}
+            description={search.trim() ? `No alerts match "${search}". Try adjusting your keywords.` : "You don't have any notifications at the moment."}
           />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {notifications.map((n) => (
+            {filteredNotifications.map((n) => (
               <div
                 key={n._id}
                 onClick={() => !n.isRead && handleMarkRead(n._id)}

@@ -5,7 +5,8 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  Building2
+  Building2,
+  Search
 } from 'lucide-react';
 import { adminApi, formatINR } from '../services/api';
 import { useToast } from '../context/ToastContext';
@@ -17,13 +18,15 @@ export default function Releases() {
   const [selectedRelease, setSelectedRelease] = useState(null);
   const [disbursementRef, setDisbursementRef] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   const fetchReleases = async () => {
     try {
       setLoading(true);
       const res = await adminApi.getReleases();
       if (res.data.success) {
-        setReleases(res.data.releases);
+        setReleases(res.data.releases || []);
       }
     } catch (err) {
       console.error('Failed to load fund releases:', err);
@@ -59,6 +62,18 @@ export default function Releases() {
     }
   };
 
+  const filteredReleases = releases.filter((r) => {
+    if (statusFilter !== 'ALL' && r.status !== statusFilter) return false;
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    const title = (r.offerId?.title || '').toLowerCase();
+    const company = (r.companyId?.name || '').toLowerCase();
+    const acct = (r.companyId?.bankAccount?.accountNo || '').toLowerCase();
+    const ifsc = (r.companyId?.bankAccount?.ifsc || '').toLowerCase();
+    const ref = (r.reference || '').toLowerCase();
+    return title.includes(q) || company.includes(q) || acct.includes(q) || ifsc.includes(q) || ref.includes(q);
+  });
+
   return (
     <div className="page-container">
       <div>
@@ -73,13 +88,55 @@ export default function Releases() {
       </div>
 
       <div className="glass-panel" style={{ padding: '24px' }}>
+        {/* In-Page Filter Tabs and Search Bar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {[
+              { id: 'ALL', label: `All Releases (${releases.length})` },
+              { id: 'Pending', label: `Pending (${releases.filter(r => r.status === 'Pending').length})` },
+              { id: 'Released', label: `Completed (${releases.filter(r => r.status === 'Released').length})` }
+            ].map(f => (
+              <button
+                key={f.id}
+                onClick={() => setStatusFilter(f.id)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '8px',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  border: '1px solid',
+                  borderColor: statusFilter === f.id ? '#0047BA' : '#E2E8F0',
+                  backgroundColor: statusFilter === f.id ? '#EFF6FF' : '#FFFFFF',
+                  color: statusFilter === f.id ? '#0047BA' : '#64748B',
+                  transition: 'all 0.15s'
+                }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ position: 'relative', width: '320px' }}>
+            <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search offer, company, bank account, ref..."
+              className="input-field"
+              style={{ width: '100%', height: '38px', paddingLeft: '36px', fontSize: '0.825rem' }}
+            />
+          </div>
+        </div>
+
         {loading ? (
           <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
             Loading releases from MongoDB...
           </div>
-        ) : releases.length === 0 ? (
+        ) : filteredReleases.length === 0 ? (
           <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
-            No fund release requests pending.
+            {search.trim() ? `No releases match "${search}". Try adjusting your keywords.` : 'No fund release requests found.'}
           </div>
         ) : (
           <div className="data-table-container">
@@ -97,7 +154,7 @@ export default function Releases() {
                 </tr>
               </thead>
               <tbody>
-                {releases.map((r, idx) => {
+                {filteredReleases.map((r, idx) => {
                   const cooling = r.bankCoolingOff || {};
                   const isReleased = r.status === 'Released';
 
@@ -108,7 +165,7 @@ export default function Releases() {
                       </td>
                       <td style={{ fontWeight: 600 }}>{r.offerId?.title || 'Offer'}</td>
                       <td>{r.companyId?.name || 'Company'}</td>
-                      <td style={{ fontWeight: 700, color: '#34d399', fontSize: '1rem' }}>
+                      <td style={{ fontWeight: 700, color: '#059669', fontSize: '0.95rem' }}>
                         {formatINR(r.amountPaise)}
                       </td>
                       <td>
@@ -188,7 +245,7 @@ export default function Releases() {
             <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '16px', borderRadius: '10px', marginBottom: '18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div><strong>Project:</strong> {selectedRelease.offerId?.title}</div>
               <div><strong>Company:</strong> {selectedRelease.companyId?.name}</div>
-              <div><strong>Disbursement Amount:</strong> <span style={{ color: '#34d399', fontWeight: 700 }}>{formatINR(selectedRelease.amountPaise)}</span></div>
+              <div><strong>Disbursement Amount:</strong> <span style={{ color: '#059669', fontWeight: 700 }}>{formatINR(selectedRelease.amountPaise)}</span></div>
               <div><strong>Account Number:</strong> <span style={{ fontFamily: 'var(--font-mono)' }}>{selectedRelease.companyId?.bankAccount?.accountNo}</span></div>
               <div><strong>IFSC:</strong> {selectedRelease.companyId?.bankAccount?.ifsc}</div>
             </div>

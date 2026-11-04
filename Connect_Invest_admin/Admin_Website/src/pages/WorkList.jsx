@@ -12,7 +12,8 @@ import {
   Coins,
   Eye,
   Download,
-  FileText
+  FileText,
+  Search
 } from 'lucide-react';
 import { adminApi, formatINR } from '../services/api';
 import { useToast } from '../context/ToastContext';
@@ -27,6 +28,7 @@ export default function WorkList({ setActiveTab }) {
   const [decisionReason, setDecisionReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [previewDoc, setPreviewDoc] = useState(null);
+  const [search, setSearch] = useState('');
 
   const fetchWorkList = async () => {
     try {
@@ -95,19 +97,64 @@ export default function WorkList({ setActiveTab }) {
     (wl.pendingReleases?.length || 0) +
     (wl.failedPayouts?.length || 0);
 
+  const q = search.toLowerCase().trim();
+  const filteredKyc = (wl.pendingKyc || []).filter(p => {
+    if (!q) return true;
+    return (p.userId?.name || '').toLowerCase().includes(q) ||
+           (p.userId?.email || '').toLowerCase().includes(q) ||
+           (p.userId?.mobile || '').toLowerCase().includes(q) ||
+           (p.pan || '').toLowerCase().includes(q);
+  });
+  const filteredKyb = (wl.pendingKyb || []).filter(c => {
+    if (!q) return true;
+    return (c.name || '').toLowerCase().includes(q) ||
+           (c.regNo || '').toLowerCase().includes(q) ||
+           (c.ownerUserId?.name || '').toLowerCase().includes(q) ||
+           (c.ownerUserId?.email || '').toLowerCase().includes(q);
+  });
+  const filteredOffers = (wl.pendingOffers || []).filter(o => {
+    if (!q) return true;
+    return (o.title || '').toLowerCase().includes(q) ||
+           (o.companyId?.name || '').toLowerCase().includes(q);
+  });
+  const filteredFundingRequests = (wl.pendingFundingRequests || []).filter(r => {
+    if (!q) return true;
+    return (r.title || r.entityOrProjectName || '').toLowerCase().includes(q) ||
+           (r.companyId?.legalName || r.companyId?.name || '').toLowerCase().includes(q);
+  });
+  const filteredFailedPayouts = (wl.failedPayouts || []).filter(fp => {
+    if (!q) return true;
+    return (fp.investorId?.name || '').toLowerCase().includes(q) ||
+           (fp.offerId?.title || '').toLowerCase().includes(q) ||
+           (fp.failureReason || '').toLowerCase().includes(q);
+  });
+
   return (
     <div className="page-container">
       {/* Header bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h2 style={{ fontSize: '1.35rem', fontWeight: 700 }}>Action Items Work List</h2>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
             Consolidated inbox of all submissions, verifications, and approvals requiring administrative action.
           </p>
         </div>
-        <span className="badge badge-amber" style={{ padding: '6px 14px', fontSize: '0.85rem' }}>
-          {totalItems} Actionable Items
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', width: '280px' }}>
+            <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search investor, company, PAN..."
+              className="input-field"
+              style={{ width: '100%', height: '38px', paddingLeft: '36px', fontSize: '0.825rem' }}
+            />
+          </div>
+          <span className="badge badge-amber" style={{ padding: '8px 14px', fontSize: '0.85rem' }}>
+            {totalItems} Actionable Items
+          </span>
+        </div>
       </div>
 
       {totalItems === 0 ? (
@@ -121,12 +168,12 @@ export default function WorkList({ setActiveTab }) {
       ) : null}
 
       {/* 1. Pending Investor KYC Submissions */}
-      {wl.pendingKyc?.length > 0 && (
+      {filteredKyc.length > 0 && (
         <div className="glass-panel" style={{ padding: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Users size={18} color="var(--cyan-main)" />
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>Pending Investor KYC Reviews ({wl.pendingKyc.length})</h3>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>Pending Investor KYC Reviews ({filteredKyc.length})</h3>
             </div>
             <button onClick={() => setActiveTab('investors')} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.75rem' }}>
               View All Investors
@@ -146,7 +193,7 @@ export default function WorkList({ setActiveTab }) {
                 </tr>
               </thead>
               <tbody>
-                {wl.pendingKyc.map((p, idx) => (
+                {filteredKyc.map((p, idx) => (
                   <tr key={p._id}>
                     <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--text-muted)' }}>
                       {idx + 1}
@@ -180,12 +227,12 @@ export default function WorkList({ setActiveTab }) {
       )}
 
       {/* 2. Pending Company KYB Submissions */}
-      {wl.pendingKyb?.length > 0 && (
+      {filteredKyb.length > 0 && (
         <div className="glass-panel" style={{ padding: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Building2 size={18} color="var(--indigo-main)" />
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>Pending Company KYB Verifications ({wl.pendingKyb.length})</h3>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>Pending Company KYB Verifications ({filteredKyb.length})</h3>
             </div>
             <button onClick={() => setActiveTab('companies')} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.75rem' }}>
               Open Companies Console
@@ -204,7 +251,7 @@ export default function WorkList({ setActiveTab }) {
                 </tr>
               </thead>
               <tbody>
-                {wl.pendingKyb.map((c, idx) => (
+                {filteredKyb.map((c, idx) => (
                   <tr key={c._id}>
                     <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--text-muted)' }}>
                       {idx + 1}
@@ -233,12 +280,12 @@ export default function WorkList({ setActiveTab }) {
       )}
 
       {/* 3. Submitted Project Proposals */}
-      {wl.pendingOffers?.length > 0 && (
+      {filteredOffers.length > 0 && (
         <div className="glass-panel" style={{ padding: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Layers size={18} color="var(--emerald-main)" />
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>Project Drafts Awaiting Terms Configuration ({wl.pendingOffers.length})</h3>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>Project Drafts Awaiting Terms Configuration ({filteredOffers.length})</h3>
             </div>
             <button onClick={() => setActiveTab('offers')} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.75rem' }}>
               View Listings
@@ -258,7 +305,7 @@ export default function WorkList({ setActiveTab }) {
                 </tr>
               </thead>
               <tbody>
-                {wl.pendingOffers.map((o, idx) => (
+                {filteredOffers.map((o, idx) => (
                   <tr key={o._id}>
                     <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--text-muted)' }}>
                       {idx + 1}
@@ -285,12 +332,12 @@ export default function WorkList({ setActiveTab }) {
       )}
 
       {/* 3b. Pending Company Funding Requests */}
-      {wl.pendingFundingRequests?.length > 0 && (
+      {filteredFundingRequests.length > 0 && (
         <div className="glass-panel" style={{ padding: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Layers size={18} color="#0047BA" />
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>Company Funding Requests Awaiting Review ({wl.pendingFundingRequests.length})</h3>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>Company Funding Requests Awaiting Review ({filteredFundingRequests.length})</h3>
             </div>
             <button onClick={() => setActiveTab('offers')} className="btn-primary" style={{ padding: '6px 12px', fontSize: '0.75rem' }}>
               Review in Investment Management
@@ -311,7 +358,7 @@ export default function WorkList({ setActiveTab }) {
                 </tr>
               </thead>
               <tbody>
-                {wl.pendingFundingRequests.map((r, idx) => (
+                {filteredFundingRequests.map((r, idx) => (
                   <tr key={r._id}>
                     <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--text-muted)' }}>
                       {idx + 1}
@@ -341,12 +388,12 @@ export default function WorkList({ setActiveTab }) {
       )}
 
       {/* 4. Failed Payouts Retry Queue */}
-      {wl.failedPayouts?.length > 0 && (
+      {filteredFailedPayouts.length > 0 && (
         <div className="glass-panel" style={{ padding: '24px', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <AlertCircle size={18} color="var(--rose-main)" />
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#f87171' }}>Failed Payouts Retry Queue ({wl.failedPayouts.length})</h3>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#f87171' }}>Failed Payouts Retry Queue ({filteredFailedPayouts.length})</h3>
             </div>
             <button onClick={() => setActiveTab('payouts')} className="btn-danger" style={{ padding: '6px 12px', fontSize: '0.75rem' }}>
               Resolve in Payouts
@@ -365,7 +412,7 @@ export default function WorkList({ setActiveTab }) {
                 </tr>
               </thead>
               <tbody>
-                {wl.failedPayouts.map(fp => (
+                {filteredFailedPayouts.map(fp => (
                   <tr key={fp._id}>
                     <td>{fp.investorId?.name}</td>
                     <td>{fp.offerId?.title}</td>

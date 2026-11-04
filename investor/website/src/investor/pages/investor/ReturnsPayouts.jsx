@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Coins, Calendar, CheckCircle2, Clock, AlertCircle, ArrowUpRight } from 'lucide-react';
+import { Coins, Calendar, CheckCircle2, Clock, AlertCircle, ArrowUpRight, Search } from 'lucide-react';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { Loader } from '../../components/common/Loader';
 import { EmptyState } from '../../components/common/EmptyState';
@@ -11,6 +11,7 @@ export const ReturnsPayouts = () => {
   const [payoutData, setPayoutData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming' | 'completed'
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     let isMounted = true;
@@ -47,9 +48,19 @@ export const ReturnsPayouts = () => {
     completedCount: 2
   };
 
-  const currentList = activeTab === 'upcoming'
+  const baseList = activeTab === 'upcoming'
     ? payoutData?.upcomingPayouts || []
     : payoutData?.completedPayouts || [];
+
+  const currentList = baseList.filter((p) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    const title = (p.offerTitle || '').toLowerCase();
+    const type = (p.payoutType || '').toLowerCase();
+    const utr = (p.utrNumber || '').toLowerCase();
+    const bank = (p.bankAccountEnding || '').toLowerCase();
+    return title.includes(q) || type.includes(q) || utr.includes(q) || bank.includes(q);
+  });
 
   return (
     <DashboardLayout>
@@ -121,54 +132,82 @@ export const ReturnsPayouts = () => {
           </div>
         </div>
 
-        {/* Tab Selector */}
+        {/* Tab Selector & In-Page Search */}
         <div
           style={{
             display: 'flex',
-            gap: '8px',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
             borderBottom: '1px solid var(--border-color)',
             paddingBottom: '12px'
           }}
         >
-          <button
-            onClick={() => setActiveTab('upcoming')}
-            style={{
-              padding: '8px 18px',
-              borderRadius: '8px',
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: '700',
-              fontSize: '13.5px',
-              backgroundColor: activeTab === 'upcoming' ? 'var(--color-primary)' : 'transparent',
-              color: activeTab === 'upcoming' ? '#FFFFFF' : 'var(--text-muted)',
-              transition: 'all 0.15s'
-            }}
-          >
-            Upcoming Payout Schedule ({metrics.upcomingCount})
-          </button>
-          <button
-            onClick={() => setActiveTab('completed')}
-            style={{
-              padding: '8px 18px',
-              borderRadius: '8px',
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: '700',
-              fontSize: '13.5px',
-              backgroundColor: activeTab === 'completed' ? 'var(--color-primary)' : 'transparent',
-              color: activeTab === 'completed' ? '#FFFFFF' : 'var(--text-muted)',
-              transition: 'all 0.15s'
-            }}
-          >
-            Completed Distributions ({metrics.completedCount})
-          </button>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setActiveTab('upcoming')}
+              style={{
+                padding: '8px 18px',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: '700',
+                fontSize: '13.5px',
+                backgroundColor: activeTab === 'upcoming' ? 'var(--color-primary)' : 'transparent',
+                color: activeTab === 'upcoming' ? '#FFFFFF' : 'var(--text-muted)',
+                transition: 'all 0.15s'
+              }}
+            >
+              Upcoming Payout Schedule ({metrics.upcomingCount})
+            </button>
+            <button
+              onClick={() => setActiveTab('completed')}
+              style={{
+                padding: '8px 18px',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: '700',
+                fontSize: '13.5px',
+                backgroundColor: activeTab === 'completed' ? 'var(--color-primary)' : 'transparent',
+                color: activeTab === 'completed' ? '#FFFFFF' : 'var(--text-muted)',
+                transition: 'all 0.15s'
+              }}
+            >
+              Completed Distributions ({metrics.completedCount})
+            </button>
+          </div>
+
+          {/* In-page search bar */}
+          <div style={{ position: 'relative', minWidth: '240px' }}>
+            <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by opportunity, type, UTR..."
+              style={{
+                width: '100%',
+                height: '38px',
+                paddingLeft: '36px',
+                paddingRight: '12px',
+                fontSize: '13px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-color)',
+                backgroundColor: 'var(--bg-surface-subtle)',
+                color: 'var(--text-main)',
+                outline: 'none'
+              }}
+            />
+          </div>
         </div>
 
         {/* Payout List */}
         {currentList.length === 0 ? (
           <EmptyState
             title={`No ${activeTab} payouts found`}
-            description={`There are currently no records under ${activeTab} payouts.`}
+            description={search.trim() ? `No payout records match "${search}". Try adjusting your search query.` : `There are currently no records under ${activeTab} payouts.`}
           />
         ) : (
           <div
