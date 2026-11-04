@@ -78,6 +78,7 @@ export const adminApi = {
 
   // Offers & Term Sheets
   getOffers: params => api.get('/admin/offers', { params }),
+  getOfferInvestments: (id, params) => api.get(`/admin/offers/${id}/investments`, { params }),
   createOffer: data => api.post('/admin/offers', data),
   setOfferTerms: (id, data) => api.put(`/admin/offers/${id}/terms`, data),
   publishOffer: (id, data) => api.post(`/admin/offers/${id}/publish`, data),
@@ -89,6 +90,11 @@ export const adminApi = {
   getFundingRequests: params => api.get('/admin/funding-requests', { params }),
   getFundingRequestById: id => api.get(`/admin/funding-requests/${id}`),
   decideFundingRequest: (id, data) => api.post(`/admin/funding-requests/${id}/decision`, data),
+
+  // Investor Investment Requests (Investor Applications)
+  getInvestorRequests: params => api.get('/admin/investor-requests', { params }),
+  getInvestorRequestById: id => api.get(`/admin/investor-requests/${id}`),
+  decideInvestorRequest: (id, data) => api.post(`/admin/investor-requests/${id}/decision`, data),
 
   // Fund Releases
   getReleases: () => api.get('/admin/releases'),

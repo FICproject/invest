@@ -6,7 +6,9 @@ import {
   updateProfile,
   updateBankDetails,
   getNotifications,
-  markNotificationRead
+  markNotificationRead,
+  requestInvestment,
+  respondToInvestmentCounter
 } from '../controllers/investorController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { requireApprovedUser } from '../middleware/requireApprovedUser.js';
@@ -25,5 +27,7 @@ router.put('/notifications/:id/read', markNotificationRead);
 // Dashboard and investments strictly require Approved status
 router.get('/dashboard', requireApprovedUser, getDashboardSummary);
 router.get('/my-investments', requireApprovedUser, getMyInvestments);
+router.post('/request-investment', requireApprovedUser, requestInvestment);
+router.post('/investments/:id/respond', requireApprovedUser, respondToInvestmentCounter);
 
 export default router;

@@ -6,8 +6,7 @@ import {
   Clock,
   Play,
   Pause,
-  Trash2,
-  CheckCircle2,
+    CheckCircle2,
   DollarSign,
   TrendingUp,
   AlertCircle,
@@ -19,7 +18,8 @@ import {
   X,
   XCircle,
   AlertTriangle,
-  FolderKanban
+  FolderKanban,
+  Users
 } from 'lucide-react';
 import { adminApi, formatINR, rupeesToPaise } from '../services/api';
 import { useToast } from '../context/ToastContext';
@@ -27,7 +27,7 @@ import DocumentPreviewModal from '../components/DocumentPreviewModal';
 
 export default function Offers() {
   const toast = useToast();
-  const [activeSubTab, setActiveSubTab] = useState('requests'); // 'requests' | 'offers'
+  const [activeSubTab, setActiveSubTab] = useState('offers'); // 'requests' | 'offers'
   const [offers, setOffers] = useState([]);
   const [fundingRequests, setFundingRequests] = useState([]);
   const [companies, setCompanies] = useState([]);
@@ -39,6 +39,30 @@ export default function Offers() {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [requestFeedback, setRequestFeedback] = useState('');
   const [previewDoc, setPreviewDoc] = useState(null);
+
+  // Selected Offer Investors Modal
+  const [selectedOfferForInvestors, setSelectedOfferForInvestors] = useState(null);
+  const [offerInvestors, setOfferInvestors] = useState([]);
+  const [loadingInvestors, setLoadingInvestors] = useState(false);
+  const [investorSearch, setInvestorSearch] = useState('');
+
+  const handleViewInvestors = async (offer) => {
+    setSelectedOfferForInvestors(offer);
+    setOfferInvestors([]);
+    setInvestorSearch('');
+    setLoadingInvestors(true);
+    try {
+      const res = await adminApi.getOfferInvestments(offer._id || offer.id);
+      if (res.data && res.data.success) {
+        setOfferInvestors(res.data.investors || []);
+      }
+    } catch (err) {
+      console.warn('Failed to load offer investors:', err.message);
+      toast.error('Failed to load participating investors for this offer.');
+    } finally {
+      setLoadingInvestors(false);
+    }
+  };
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newOffer, setNewOffer] = useState({
@@ -77,7 +101,7 @@ export default function Offers() {
       const [offersRes, compRes, requestsRes] = await Promise.all([
         adminApi.getOffers(),
         adminApi.getCompanies(),
-        adminApi.getFundingRequests()
+        adminApi.getFundingRequests({ status: 'approved' })
       ]);
       if (offersRes.data?.success) {
         // Exclude equity from investment list per specification
@@ -86,7 +110,11 @@ export default function Offers() {
       }
       if (compRes.data?.success) setCompanies(compRes.data.companies);
       if (requestsRes.data?.success) {
-        setFundingRequests(requestsRes.data.requests || []);
+        // Only approved proposals appear in Investment Management
+        const approvedOnly = (requestsRes.data.requests || []).filter(r =>
+          ['Approved', 'Open for Investment', 'Funded', 'Funding Completed'].includes(r.status)
+        );
+        setFundingRequests(approvedOnly);
       }
     } catch (err) {
       console.error('Failed to load investment management data:', err);
@@ -256,21 +284,6 @@ export default function Offers() {
     }
   };
 
-  const handleActivateOffer = async offerId => {
-    try {
-      setSubmitting(true);
-      const res = await adminApi.activateOffer(offerId);
-      if (res.data.success) {
-        toast.success(res.data.message || 'Offer activated successfully!');
-        fetchOffers();
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to activate offer');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const handleToggleHold = async offer => {
     const isPaused = offer.status === 'Paused';
 
@@ -310,6 +323,8 @@ export default function Offers() {
   ).length;
 
   const filteredRequests = fundingRequests.filter(r => {
+    const isApproved = ['Approved', 'Open for Investment', 'Funded', 'Funding Completed'].includes(r.status);
+    if (!isApproved) return false;
     const s = search.toLowerCase();
     const matchesSearch =
       !search ||
@@ -326,6 +341,17 @@ export default function Offers() {
     const matchesSearch = !search || o.title?.toLowerCase().includes(search.toLowerCase()) || o.companyId?.name?.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = !statusFilter || o.status === statusFilter;
     return matchesSearch && matchesStatus;
+  });
+
+  const filteredOfferInvestors = offerInvestors.filter(i => {
+    if (!investorSearch.trim()) return true;
+    const s = investorSearch.trim().toLowerCase();
+    return (
+      (i.investorName && i.investorName.toLowerCase().includes(s)) ||
+      (i.investorEmail && i.investorEmail.toLowerCase().includes(s)) ||
+      (i.investorMobile && i.investorMobile.toLowerCase().includes(s)) ||
+      (i.certificateNumber && i.certificateNumber.toLowerCase().includes(s))
+    );
   });
 
   return (
@@ -361,12 +387,9 @@ export default function Offers() {
             <option value="">All Statuses</option>
             {activeSubTab === 'requests' ? (
               <>
-                <option value="Submitted">Submitted</option>
-                <option value="Under Review">Under Review</option>
                 <option value="Approved">Approved</option>
                 <option value="Open for Investment">Open for Investment</option>
-                <option value="Additional Information Required">More Info Required</option>
-                <option value="Rejected">Rejected</option>
+                <option value="Funded">Funded</option>
               </>
             ) : (
               <>
@@ -387,43 +410,8 @@ export default function Offers() {
         </div>
       </div>
 
-      {/* Sub-navigation Tabs: Company Funding Requests vs Marketplace Offers */}
+      {/* Sub-navigation Tabs: Marketplace Offers vs Approved Company Proposals */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid #E2E8F0', paddingBottom: '14px', marginTop: '4px' }}>
-        <button
-          onClick={() => { setActiveSubTab('requests'); setStatusFilter(''); }}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 18px',
-            borderRadius: '10px',
-            border: 'none',
-            backgroundColor: activeSubTab === 'requests' ? '#0047BA' : '#F1F5F9',
-            color: activeSubTab === 'requests' ? '#FFFFFF' : '#475569',
-            fontWeight: 700,
-            fontSize: '0.86rem',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease'
-          }}
-        >
-          <FolderKanban size={16} />
-          <span>Company Funding Requests</span>
-          {pendingRequestsCount > 0 && (
-            <span
-              style={{
-                backgroundColor: activeSubTab === 'requests' ? '#FFFFFF' : '#EF4444',
-                color: activeSubTab === 'requests' ? '#0047BA' : '#FFFFFF',
-                padding: '1px 8px',
-                borderRadius: '9999px',
-                fontSize: '0.72rem',
-                fontWeight: 800
-              }}
-            >
-              {pendingRequestsCount} Pending Review
-            </span>
-          )}
-        </button>
-
         <button
           onClick={() => { setActiveSubTab('offers'); setStatusFilter(''); }}
           style={{
@@ -444,6 +432,27 @@ export default function Offers() {
           <Layers size={16} />
           <span>Marketplace Investment Offers ({offers.length})</span>
         </button>
+
+        <button
+          onClick={() => { setActiveSubTab('requests'); setStatusFilter(''); }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 18px',
+            borderRadius: '10px',
+            border: 'none',
+            backgroundColor: activeSubTab === 'requests' ? '#0047BA' : '#F1F5F9',
+            color: activeSubTab === 'requests' ? '#FFFFFF' : '#475569',
+            fontWeight: 700,
+            fontSize: '0.86rem',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <FolderKanban size={16} />
+          <span>Approved Company Proposals ({filteredRequests.length})</span>
+        </button>
       </div>
 
       {/* Main Tab Content */}
@@ -457,10 +466,10 @@ export default function Offers() {
             <div style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--text-muted)' }}>
               <CheckCircle2 size={40} color="#16A34A" style={{ margin: '0 auto 12px' }} />
               <h4 style={{ margin: '0 0 6px', fontSize: '1.05rem', color: '#0F172A', fontWeight: 700 }}>
-                No Funding Requests Found
+                No Approved Funding Proposals
               </h4>
               <p style={{ margin: 0, fontSize: '0.85rem' }}>
-                There are currently no company funding requests matching your filter criteria.
+                Only company proposals approved in Fund Approvals will be listed here.
               </p>
             </div>
           ) : (
@@ -491,7 +500,14 @@ export default function Offers() {
                           {idx + 1}
                         </td>
                         <td>
-                          <div style={{ fontWeight: 700, color: '#0F172A' }}>{r.title || r.entityOrProjectName}</div>
+                          <div
+                            onClick={() => handleViewInvestors(r)}
+                            style={{ fontWeight: 700, color: '#0047BA', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                            title="Click to view participating investors"
+                          >
+                            <span>{r.title || r.entityOrProjectName}</span>
+                            <Users size={13} color="#2563EB" />
+                          </div>
                           <div style={{ fontSize: '0.74rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
                             <span style={{ padding: '1px 6px', borderRadius: '4px', backgroundColor: '#EFF6FF', color: '#1D4ED8', fontWeight: 700 }}>
                               {r.investmentModel || 'Fixed-Term'}
@@ -658,7 +674,21 @@ export default function Offers() {
                         {idx + 1}
                       </td>
                       <td>
-                        <div style={{ fontWeight: 600 }}>{o.title}</div>
+                        <div
+                          onClick={() => handleViewInvestors(o)}
+                          style={{
+                            fontWeight: 700,
+                            color: '#0047BA',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                          title="Click to view participating investors"
+                        >
+                          <span>{o.title}</span>
+                          <Users size={13} color="#2563EB" />
+                        </div>
                         <div style={{
                           fontSize: '0.75rem',
                           fontWeight: 600,
@@ -735,15 +765,27 @@ export default function Offers() {
                               Publish Open
                             </button>
                           )}
-                          {o.status === 'Open' && raised >= (o.minTargetPaise || 0) && (
-                            <button
-                              onClick={() => handleActivateOffer(o._id)}
-                              className="btn-primary"
-                              style={{ padding: '5px 10px', fontSize: '0.75rem', background: '#6366f1' }}
-                            >
-                              Activate Offer
-                            </button>
-                          )}
+
+                          {/* View Investors Button */}
+                          <button
+                            onClick={() => handleViewInvestors(o)}
+                            className="btn-secondary"
+                            style={{
+                              padding: '5px 10px',
+                              fontSize: '0.75rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              color: '#0047BA',
+                              borderColor: '#BFDBFE',
+                              background: '#EFF6FF',
+                              fontWeight: 700
+                            }}
+                            title="View participating investors and committed amounts"
+                          >
+                            <Users size={12} />
+                            <span>Investors</span>
+                          </button>
 
                           {/* Hold Funding / Resume Funding */}
                           {['Active', 'Open', 'Paused'].includes(o.status) && (
@@ -766,23 +808,6 @@ export default function Offers() {
                               {o.status === 'Paused' ? 'Resume' : 'Hold'}
                             </button>
                           )}
-
-                          {/* Delete Project */}
-                          <button
-                            onClick={() => handleDeleteOffer(o)}
-                            className="btn-danger"
-                            style={{
-                              padding: '5px 8px',
-                              fontSize: '0.75rem',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                            title="Delete project"
-                          >
-                            <Trash2 size={12} />
-                            Delete
-                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1493,6 +1518,262 @@ export default function Offers() {
               >
                 <CheckCircle2 size={15} />
                 <span>Approve & Go Live</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Participating Investors Modal */}
+      {selectedOfferForInvestors && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1050,
+            padding: '20px'
+          }}
+          onClick={() => setSelectedOfferForInvestors(null)}
+        >
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              width: '100%',
+              maxWidth: '850px',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              overflow: 'hidden',
+              border: '1px solid #E2E8F0'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '20px 24px',
+                borderBottom: '1px solid #E2E8F0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: 'linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '10px',
+                    backgroundColor: '#EFF6FF',
+                    color: '#0047BA',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <Users size={22} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0F172A' }}>
+                    Participating Investors
+                  </h3>
+                  <div style={{ fontSize: '0.8rem', color: '#64748B', marginTop: '2px' }}>
+                    {selectedOfferForInvestors.title || selectedOfferForInvestors.entityOrProjectName} • {selectedOfferForInvestors.companyId?.legalName || selectedOfferForInvestors.companyId?.name || 'Company'}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedOfferForInvestors(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#64748B',
+                  cursor: 'pointer',
+                  padding: '6px',
+                  borderRadius: '8px'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Summary KPI Cards */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '14px',
+                padding: '16px 24px',
+                backgroundColor: '#F8FAFC',
+                borderBottom: '1px solid #E2E8F0'
+              }}
+            >
+              <div style={{ backgroundColor: '#FFFFFF', padding: '12px 16px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>Total Investors</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0047BA', marginTop: '2px' }}>
+                  {offerInvestors.length}
+                </div>
+              </div>
+              <div style={{ backgroundColor: '#FFFFFF', padding: '12px 16px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>Total Capital Committed</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#059669', marginTop: '2px' }}>
+                  ₹{Number(offerInvestors.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)).toLocaleString('en-IN')}
+                </div>
+              </div>
+              <div style={{ backgroundColor: '#FFFFFF', padding: '12px 16px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>Target Funding</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0F172A', marginTop: '2px' }}>
+                  ₹{Number(selectedOfferForInvestors.targetRupees || (selectedOfferForInvestors.targetPaise ? selectedOfferForInvestors.targetPaise / 100 : 0)).toLocaleString('en-IN')}
+                </div>
+              </div>
+            </div>
+
+            {/* In-Modal Search Bar */}
+            <div style={{ padding: '12px 24px', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+                <input
+                  type="text"
+                  placeholder="Filter by investor name, email, mobile or cert #..."
+                  value={investorSearch}
+                  onChange={e => setInvestorSearch(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px 8px 36px',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    fontSize: '0.84rem'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Modal Body / Investors Table */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
+              {loadingInvestors ? (
+                <div style={{ textAlign: 'center', padding: '48px 0', color: '#64748B' }}>
+                  <div style={{ fontSize: '0.92rem', fontWeight: 600 }}>Loading participating investors...</div>
+                </div>
+              ) : filteredOfferInvestors.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '48px 0', color: '#64748B' }}>
+                  <Users size={36} color="#CBD5E1" style={{ margin: '0 auto 10px', display: 'block' }} />
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#334155' }}>No Investors Found</div>
+                  <div style={{ fontSize: '0.82rem', marginTop: '4px' }}>
+                    {investorSearch ? 'No investors match your filter query.' : 'No investors have committed funds to this opportunity yet.'}
+                  </div>
+                </div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #E2E8F0', color: '#64748B', textAlign: 'left' }}>
+                      <th style={{ padding: '8px 12px', width: '40px' }}>#</th>
+                      <th style={{ padding: '8px 16px' }}>Investor Details</th>
+                      <th style={{ padding: '8px 16px', textAlign: 'right' }}>Amount Invested</th>
+                      <th style={{ padding: '8px 16px' }}>Date</th>
+                      <th style={{ padding: '8px 16px' }}>Certificate / Ref</th>
+                      <th style={{ padding: '8px 16px', textAlign: 'center' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredOfferInvestors.map((inv, i) => (
+                      <tr key={inv._id || i} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                        <td style={{ padding: '12px 12px', color: '#94A3B8', fontWeight: 600 }}>{i + 1}</td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                backgroundColor: '#EFF6FF',
+                                color: '#0047BA',
+                                fontWeight: 700,
+                                fontSize: '0.84rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifySelf: 'center',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              {(inv.investorName || 'I')[0].toUpperCase()}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 700, color: '#0F172A' }}>{inv.investorName}</div>
+                              <div style={{ fontSize: '0.74rem', color: '#64748B' }}>
+                                {inv.investorEmail} {inv.investorMobile !== '—' ? '• ' + inv.investorMobile : ''}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                          <span style={{ fontSize: '0.94rem', fontWeight: 800, color: '#059669' }}>
+                            ₹{Number(inv.amount || 0).toLocaleString('en-IN')}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px', color: '#64748B' }}>
+                          {inv.date ? new Date(inv.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontSize: '0.76rem', color: '#475569' }}>
+                          {inv.certificateNumber || '—'}
+                        </td>
+                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                          <span
+                            style={{
+                              padding: '3px 8px',
+                              borderRadius: '9999px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              backgroundColor: inv.status === 'Allotted' ? '#ECFDF5' : '#EFF6FF',
+                              color: inv.status === 'Allotted' ? '#059669' : '#0047BA'
+                            }}
+                          >
+                            {inv.status || 'Active'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div
+              style={{
+                padding: '14px 24px',
+                borderTop: '1px solid #E2E8F0',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                backgroundColor: '#F8FAFC'
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setSelectedOfferForInvestors(null)}
+                style={{
+                  padding: '8px 18px',
+                  borderRadius: '10px',
+                  border: '1px solid #CBD5E1',
+                  backgroundColor: '#FFFFFF',
+                  color: '#475569',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Close
               </button>
             </div>
           </div>

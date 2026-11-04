@@ -289,3 +289,119 @@ export const markNotificationRead = asyncHandler(async (req, res) => {
     message: 'Notification marked as read.'
   });
 });
+
+
+// @route   POST /api/investor/request-investment
+// @desc    Submit an investment request for admin review and approval
+export const requestInvestment = asyncHandler(async (req, res) => {
+  const { offerId, amount, investorNote } = req.body;
+  const numAmount = Number(amount);
+
+  if (!offerId || !numAmount || numAmount <= 0) {
+    return res.status(400).json({ success: false, error: 'Valid offerId and amount are required.' });
+  }
+
+  const offer = await InvestmentOffer.findById(offerId);
+  if (!offer) {
+    return res.status(404).json({ success: false, error: 'Investment offer not found.' });
+  }
+
+  const min = offer.minInvestment || 1000;
+  const max = offer.maxInvestment || 10000000;
+  if (numAmount < min) {
+    return res.status(400).json({ success: false, error: `Minimum investment amount is ₹${min.toLocaleString('en-IN')}` });
+  }
+  if (max && numAmount > max) {
+    return res.status(400).json({ success: false, error: `Maximum allowed investment is ₹${max.toLocaleString('en-IN')}` });
+  }
+
+  const annualRate = offer.returnRate || (offer.rateBps ? offer.rateBps / 100 : 12);
+  const tenureMonths = offer.tenureMonths || (offer.tenures ? offer.tenures[0] : 12);
+  const totalInterest = Math.round((numAmount * annualRate * (tenureMonths / 12)) / 100);
+  const totalMaturity = numAmount + totalInterest;
+
+  const investment = await Investment.create({
+    investorId: req.user._id,
+    offerId: offer._id,
+    amountInvested: numAmount,
+    amount: numAmount,
+    amountPaise: Math.round(numAmount * 100),
+    returnRate: annualRate,
+    tenureMonths,
+    expectedReturns: totalMaturity,
+    returnsReceived: 0,
+    startDate: new Date(),
+    status: 'Pending Review',
+    investorNote: (investorNote || '').trim(),
+    payoutFrequency: offer.payoutFrequency || 'Monthly'
+  });
+
+  res.status(201).json({
+    success: true,
+    message: 'Investment request submitted successfully. Awaiting platform administrator approval.',
+    data: investment
+  });
+});
+
+// @route   POST /api/investor/investments/:id/respond
+// @desc    Investor accepts or counter-proposes to admin changes
+export const respondToInvestmentCounter = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { action, updatedAmount, note } = req.body; // action: 'accept' | 'resubmit' | 'withdraw'
+
+  const investment = await Investment.findOne({ _id: id, investorId: req.user._id }).populate('offerId');
+  if (!investment) {
+    return res.status(404).json({ success: false, error: 'Investment request not found.' });
+  }
+
+  if (action === 'accept') {
+    // Investor accepts admin's proposedAmount
+    if (investment.proposedAmount) {
+      investment.amountInvested = investment.proposedAmount;
+      investment.amount = investment.proposedAmount;
+      investment.amountPaise = Math.round(investment.proposedAmount * 100);
+      
+      const annualRate = investment.returnRate || 12;
+      const tenureMonths = investment.tenureMonths || 12;
+      const totalInterest = Math.round((investment.amountInvested * annualRate * (tenureMonths / 12)) / 100);
+      investment.expectedReturns = investment.amountInvested + totalInterest;
+    }
+    investment.status = 'Pending Review';
+    investment.investorNote = note ? `${investment.investorNote ? investment.investorNote + ' | ' : ''}Accepted counter-proposal: ${note}` : 'Investor accepted proposed amount.';
+    await investment.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'You have accepted the revised terms. Request updated for admin confirmation.',
+      data: investment
+    });
+  } else if (action === 'resubmit') {
+    const num = Number(updatedAmount);
+    if (!num || num <= 0) {
+      return res.status(400).json({ success: false, error: 'Please enter a valid revised amount.' });
+    }
+    investment.amountInvested = num;
+    investment.amount = num;
+    investment.amountPaise = Math.round(num * 100);
+    investment.status = 'Pending Review';
+    investment.investorNote = (note || '').trim() || 'Investor submitted revised amount.';
+    await investment.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Revised investment amount submitted for admin review.',
+      data: investment
+    });
+  } else if (action === 'withdraw') {
+    investment.status = 'Cancelled';
+    await investment.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Investment request withdrawn.',
+      data: investment
+    });
+  } else {
+    return res.status(400).json({ success: false, error: 'Invalid response action.' });
+  }
+});

@@ -27,5 +27,13 @@ export const investorService = {
 
   async markNotificationRead(id) {
     return await api.put(`/investor/notifications/${id}/read`);
+  },
+
+  async requestInvestment(data) {
+    return await api.post('/investor/request-investment', data);
+  },
+
+  async respondToCounter(id, data) {
+    return await api.post(`/investor/investments/${id}/respond`, data);
   }
 };

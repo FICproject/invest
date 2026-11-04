@@ -96,6 +96,48 @@ const investmentSchema = new mongoose.Schema(
       type: Number,
       default: 1
     },
+    // Approval Workflow fields (Investor Investment Request)
+    proposedAmount: {
+      type: Number,
+      default: null
+    },
+    proposedAmountPaise: {
+      type: Number,
+      default: null
+    },
+    adminSuggestions: {
+      type: String,
+      default: ''
+    },
+    adminFeedback: {
+      type: String,
+      default: ''
+    },
+    rejectionReason: {
+      type: String,
+      default: ''
+    },
+    investorNote: {
+      type: String,
+      default: ''
+    },
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    reviewedAt: {
+      type: Date
+    },
+    revisionHistory: [
+      {
+        amount: Number,
+        proposedAmount: Number,
+        feedback: String,
+        decision: String,
+        date: { type: Date, default: Date.now },
+        changedBy: { type: String, default: 'admin' }
+      }
+    ],
     status: {
       type: String,
       enum: Object.values(Statuses.INVESTMENT),
@@ -126,6 +168,12 @@ investmentSchema.pre('save', function (next) {
   } else if (this.amountPaise && !this.amount) {
     this.amount = this.amountPaise / 100;
     this.amountInvested = this.amount;
+  }
+
+  if (this.proposedAmount && !this.proposedAmountPaise) {
+    this.proposedAmountPaise = Math.round(this.proposedAmount * 100);
+  } else if (this.proposedAmountPaise && !this.proposedAmount) {
+    this.proposedAmount = this.proposedAmountPaise / 100;
   }
 
   if (this.sharesAllocated && !this.sharesAllotted) {

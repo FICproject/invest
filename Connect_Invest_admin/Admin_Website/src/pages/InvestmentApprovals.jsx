@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  CheckSquare,
-  Building2,
   TrendingUp,
   Search,
   Filter,
@@ -10,29 +8,27 @@ import {
   AlertTriangle,
   Clock,
   Eye,
-  Download,
-  FileText,
-  Calendar,
-  DollarSign,
-  Briefcase,
-  Layers,
-  ArrowRight,
   RefreshCw,
   Sliders,
-  Percent,
-  Coins,
-  History,
-  ShieldAlert,
+  DollarSign,
+  Briefcase,
+  User,
+  ShieldCheck,
+  Calendar,
+  Layers,
+  ArrowRight,
   Send,
   X,
   Check,
   ChevronRight,
-  Info
+  Info,
+  Building2,
+  FileText,
+  History
 } from 'lucide-react';
-import { adminApi, formatINR, rupeesToPaise } from '../services/api';
+import { adminApi, formatINR } from '../services/api';
 import { initRealTimeSync } from '../services/realTimeSync';
 import { useToast } from '../context/ToastContext';
-import DocumentPreviewModal from '../components/DocumentPreviewModal';
 
 export default function InvestmentApprovals() {
   const toast = useToast();
@@ -41,43 +37,35 @@ export default function InvestmentApprovals() {
   const [stats, setStats] = useState({
     total: 0,
     totalPending: 0,
+    changesRequested: 0,
     totalApproved: 0,
-    resubmissionsNeeded: 0,
     totalRejected: 0,
     pendingCapitalPaise: 0
   });
 
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('pending'); // 'pending' | 'all' | 'resubmission' | 'approved' | 'rejected'
-  const [durationFilter, setDurationFilter] = useState('all'); // 'all' | 'Short-Term' | 'Long-Term'
-  const [purposeFilter, setPurposeFilter] = useState('all'); // 'all' | 'Company Investment' | 'Project Investment'
+  const [statusFilter, setStatusFilter] = useState('pending'); // 'pending' | 'changes_requested' | 'approved' | 'rejected' | 'all'
+  const [kindFilter, setKindFilter] = useState('all'); // 'all' | 'company' | 'project'
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Selected Proposal for Review & Decision Modal
+  // Selected Investor Application for Review & Decision Modal
   const [selectedRequest, setSelectedRequest] = useState(null);
-  const [decisionTab, setDecisionTab] = useState('resubmission'); // 'resubmission' | 'approve' | 'reject'
+  const [decisionTab, setDecisionTab] = useState('changes_requested'); // 'changes_requested' | 'approve' | 'reject'
 
   // Counter-Proposal / Revision Form State
-  const [proposedFundingTarget, setProposedFundingTarget] = useState('');
-  const [proposedReturnRate, setProposedReturnRate] = useState('');
-  const [proposedDurationMonths, setProposedDurationMonths] = useState('');
-  const [proposedMinInvestment, setProposedMinInvestment] = useState('');
+  const [proposedAmount, setProposedAmount] = useState('');
   const [feedback, setFeedback] = useState('');
-  const [publishToMarketplace, setPublishToMarketplace] = useState(true);
+  const [rejectionReason, setRejectionReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Document preview modal state
-  const [previewDoc, setPreviewDoc] = useState(null);
-
-  // Fetch proposals from API
-  const fetchProposals = async (silent = false) => {
+  // Fetch investor requests from API
+  const fetchRequests = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const res = await adminApi.getFundingRequests({
+      const res = await adminApi.getInvestorRequests({
         status: statusFilter,
         search: searchTerm,
-        fundingDuration: durationFilter,
-        investmentPurpose: purposeFilter
+        kind: kindFilter
       });
 
       if (res.data?.success) {
@@ -87,7 +75,7 @@ export default function InvestmentApprovals() {
         }
       }
     } catch (err) {
-      console.error('Failed to load investment approvals:', err);
+      console.error('Failed to load investor investment requests:', err);
       if (!silent) {
         toast.error(err.response?.data?.error || 'Failed to load investment requests');
       }
@@ -97,236 +85,192 @@ export default function InvestmentApprovals() {
   };
 
   useEffect(() => {
-    fetchProposals();
-  }, [statusFilter, durationFilter, purposeFilter, searchTerm]);
+    fetchRequests();
+  }, [statusFilter, kindFilter]);
 
-  // Connect Real-Time SSE Stream for Instant Updates
+  // Real-time synchronization
   useEffect(() => {
-    const cleanup = initRealTimeSync(event => {
+    const unsub = initRealTimeSync((eventType, payload) => {
       if (
-        event?.type === 'DATA_SYNC' &&
-        (event.entity === 'INVESTMENT_APPROVAL' ||
-          event.entity === 'FUNDING_REQUEST_DECISION' ||
-          event.entity === 'INVESTMENT_REQUEST')
+        eventType === 'INVESTMENT_DECISION' ||
+        eventType === 'INVESTMENT_UPDATED' ||
+        eventType === 'INVESTOR_REQUEST_DECIDED'
       ) {
-        fetchProposals(true);
+        fetchRequests(true);
       }
     });
-    return cleanup;
-  }, [statusFilter, durationFilter, purposeFilter, searchTerm]);
+    return () => {
+      if (typeof unsub === 'function') unsub();
+    };
+  }, []);
 
-  // Open modal with pre-populated values
-  const handleOpenReview = (request, defaultTab = 'resubmission') => {
-    setSelectedRequest(request);
+  // Handle open review modal
+  const handleOpenReview = (reqItem, defaultTab = 'changes_requested') => {
+    setSelectedRequest(reqItem);
     setDecisionTab(defaultTab);
-
-    // Pre-populate fields with existing or proposed values
-    setProposedFundingTarget(
-      request.proposedFundingTarget !== null && request.proposedFundingTarget !== undefined
-        ? String(request.proposedFundingTarget)
-        : String(request.fundingTarget || '')
-    );
-    setProposedReturnRate(
-      request.proposedReturnRate !== null && request.proposedReturnRate !== undefined
-        ? String(request.proposedReturnRate)
-        : String(request.expectedReturnRate || request.agreedReturnRate || '')
-    );
-    setProposedDurationMonths(
-      request.proposedDurationMonths !== null && request.proposedDurationMonths !== undefined
-        ? String(request.proposedDurationMonths)
-        : String(request.durationMonths || (request.investmentPeriodYears ? request.investmentPeriodYears * 12 : 24))
-    );
-    setProposedMinInvestment(
-      request.proposedMinInvestment !== null && request.proposedMinInvestment !== undefined
-        ? String(request.proposedMinInvestment)
-        : String(request.minInvestment || '')
-    );
-    setFeedback(request.reviewerFeedback || '');
-    setPublishToMarketplace(true);
+    const existingProposed = reqItem.proposedAmount || reqItem.amountInvested || reqItem.amount || '';
+    setProposedAmount(existingProposed ? String(existingProposed) : '');
+    setFeedback(reqItem.adminSuggestions || reqItem.adminFeedback || '');
+    setRejectionReason(reqItem.rejectionReason || '');
   };
 
-  // Submit decision
-  const handleSubmitDecision = async (decisionOverride = null) => {
+  const handleCloseModal = () => {
+    setSelectedRequest(null);
+    setProposedAmount('');
+    setFeedback('');
+    setRejectionReason('');
+  };
+
+  // Submit Admin Decision (Approve / Reject / Changes Requested)
+  const handleSubmitDecision = async () => {
     if (!selectedRequest) return;
-    const targetDecision = decisionOverride || (
-      decisionTab === 'approve'
-        ? 'Approved'
-        : decisionTab === 'reject'
-        ? 'Rejected'
-        : 'Resubmission Required'
-    );
 
-    const trimmedFeedback = feedback.trim();
-
-    if (targetDecision === 'Rejected' && !trimmedFeedback) {
-      toast.warning('Please provide an underwriting rejection reason for the borrowing company.');
-      return;
-    }
-
-    if (targetDecision === 'Resubmission Required') {
-      if (!trimmedFeedback) {
-        toast.warning('Please provide detailed review comments explaining the requested changes.');
+    if (decisionTab === 'changes_requested') {
+      const numProposed = Number(proposedAmount);
+      if (!numProposed || numProposed <= 0) {
+        toast.warning('Please enter a valid counter-proposed investment amount.');
         return;
       }
-      if (!proposedFundingTarget || Number(proposedFundingTarget) <= 0) {
-        toast.warning('Please specify a valid proposed funding amount in Rupees.');
+      if (!feedback.trim()) {
+        toast.warning('Please provide instructions/feedback for the investor explaining the revised amount.');
+        return;
+      }
+    }
+
+    if (decisionTab === 'reject') {
+      if (!rejectionReason.trim()) {
+        toast.warning('Please provide a reason for rejecting this investment request.');
         return;
       }
     }
 
     try {
       setSubmitting(true);
+      const decisionType =
+        decisionTab === 'approve'
+          ? 'Approved'
+          : decisionTab === 'reject'
+          ? 'Rejected'
+          : 'Changes Requested';
+
       const payload = {
-        decision: targetDecision,
-        feedback: trimmedFeedback,
-        publishToMarketplace,
-        proposedFundingTarget: proposedFundingTarget ? Number(proposedFundingTarget) : undefined,
-        proposedReturnRate: proposedReturnRate ? Number(proposedReturnRate) : undefined,
-        proposedDurationMonths: proposedDurationMonths ? Number(proposedDurationMonths) : undefined,
-        proposedMinInvestment: proposedMinInvestment ? Number(proposedMinInvestment) : undefined
+        decision: decisionType,
+        feedback: feedback.trim(),
+        proposedAmount: decisionTab === 'changes_requested' ? Number(proposedAmount) : undefined,
+        rejectionReason: decisionTab === 'reject' ? rejectionReason.trim() : undefined
       };
 
-      const res = await adminApi.decideFundingRequest(selectedRequest._id, payload);
+      const res = await adminApi.decideInvestorRequest(selectedRequest._id, payload);
+
       if (res.data?.success) {
-        toast.success(
-          targetDecision === 'Approved'
-            ? 'Investment request approved successfully!'
-            : targetDecision === 'Rejected'
-            ? 'Investment request rejected.'
-            : 'Resubmission request sent to company with proposed changes!'
-        );
-        setSelectedRequest(null);
-        fetchProposals(true);
+        toast.success(res.data.message || `Investment request has been marked as ${decisionType}.`);
+        handleCloseModal();
+        fetchRequests();
+      } else {
+        toast.error(res.data?.error || 'Failed to process decision.');
       }
     } catch (err) {
-      toast.error(err.response?.data?.error || err.message || 'Failed to submit decision');
+      console.error('Decision submission error:', err);
+      toast.error(err.response?.data?.error || 'An error occurred while submitting decision.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Helper for status badge presentation
-  const getStatusBadge = status => {
-    switch (status) {
-      case 'Approved':
-      case 'Open for Investment':
-      case 'Funded':
-      case 'Funding Completed':
-        return {
-          bg: '#DCFCE7',
-          color: '#15803D',
-          border: '#86EFAC',
-          icon: CheckCircle2,
-          label: status === 'Open for Investment' ? 'Live in Marketplace' : status
-        };
-      case 'Rejected':
-      case 'Cancelled':
-        return {
-          bg: '#FEE2E2',
-          color: '#B91C1C',
-          border: '#FCA5A5',
-          icon: XCircle,
-          label: status
-        };
-      case 'Resubmission Required':
-      case 'Changes Requested':
-      case 'Additional Information Required':
-        return {
-          bg: '#FEF3C7',
-          color: '#B45309',
-          border: '#FCD34D',
-          icon: AlertTriangle,
-          label: 'Changes Requested / Resubmission'
-        };
-      default:
-        return {
-          bg: '#DBEAFE',
-          color: '#1D4ED8',
-          border: '#93C5FD',
-          icon: Clock,
-          label: 'Pending Review'
-        };
+  // Helper formatting
+  const getDisplayAmount = (reqItem) => {
+    const val = reqItem.amountInvested || reqItem.amount || 0;
+    return Number(val);
+  };
+
+  const getStatusBadge = (status) => {
+    const s = (status || '').toLowerCase();
+    if (s.includes('approved') || s.includes('confirmed') || s.includes('active')) {
+      return {
+        bg: '#ECFDF5',
+        color: '#065F46',
+        border: '#A7F3D0',
+        label: 'Approved / Active',
+        icon: <CheckCircle2 size={13} color="#059669" />
+      };
     }
+    if (s.includes('changes') || s.includes('resubmission')) {
+      return {
+        bg: '#FFFBEB',
+        color: '#92400E',
+        border: '#FDE68A',
+        label: 'Changes Requested',
+        icon: <AlertTriangle size={13} color="#D97706" />
+      };
+    }
+    if (s.includes('reject')) {
+      return {
+        bg: '#FEF2F2',
+        color: '#991B1B',
+        border: '#FECACA',
+        label: 'Rejected',
+        icon: <XCircle size={13} color="#DC2626" />
+      };
+    }
+    return {
+      bg: '#EFF6FF',
+      color: '#1E40AF',
+      border: '#BFDBFE',
+      label: 'Pending Review',
+      icon: <Clock size={13} color="#2563EB" />
+    };
   };
 
   return (
-    <div className="page-container" style={{ padding: '24px 28px' }}>
-      {/* Top Banner & Header */}
+    <div style={{ padding: '24px 32px', maxWidth: '1600px', margin: '0 auto' }}>
+      {/* Page Header */}
       <div
         style={{
           display: 'flex',
-          alignItems: 'center',
           justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          marginBottom: '24px',
           flexWrap: 'wrap',
-          gap: '16px',
-          marginBottom: '24px'
+          gap: '16px'
         }}
       >
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div
+            style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '14px',
+              backgroundColor: '#EFF6FF',
+              border: '1px solid #BFDBFE',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#0047BA'
+            }}
+          >
+            <TrendingUp size={24} />
+          </div>
+          <div>
+            <h1
               style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '12px',
-                backgroundColor: '#0047BA',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#FFFFFF'
+                fontSize: '1.65rem',
+                fontWeight: 800,
+                color: '#0F172A',
+                margin: 0,
+                fontFamily: 'var(--font-heading)'
               }}
             >
-              <CheckSquare size={22} />
-            </div>
-            <div>
-              <h1
-                style={{
-                  fontSize: '1.65rem',
-                  fontWeight: 800,
-                  color: '#0F172A',
-                  margin: 0,
-                  fontFamily: 'var(--font-heading)'
-                }}
-              >
-                Investment Approvals
-              </h1>
-              <p style={{ fontSize: '0.86rem', color: '#64748B', margin: '2px 0 0 0' }}>
-                Underwriting evaluation, compliance checks, and approval workflow for company capital raising proposals
-              </p>
-            </div>
+              Investment Approvals
+            </h1>
+            <p style={{ fontSize: '0.86rem', color: '#64748B', margin: '2px 0 0 0' }}>
+              Review, approve, reject, or request resubmission on investor investment applications across corporate and project offerings.
+            </p>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {/* Live Sync Pill */}
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 12px',
-              borderRadius: '9999px',
-              backgroundColor: '#ECFDF5',
-              border: '1px solid #A7F3D0',
-              color: '#059669',
-              fontSize: '0.78rem',
-              fontWeight: 700
-            }}
-          >
-            <span
-              style={{
-                width: '7px',
-                height: '7px',
-                borderRadius: '50%',
-                backgroundColor: '#10B981',
-                boxShadow: '0 0 0 2px #6EE7B7'
-              }}
-            />
-            Live Sync Connected
-          </div>
-
           <button
-            onClick={() => fetchProposals(false)}
+            onClick={() => fetchRequests()}
             disabled={loading}
             style={{
               display: 'inline-flex',
@@ -334,16 +278,17 @@ export default function InvestmentApprovals() {
               gap: '6px',
               padding: '8px 14px',
               borderRadius: '10px',
-              border: '1px solid var(--border-light)',
               backgroundColor: '#FFFFFF',
-              color: '#475569',
-              fontSize: '0.84rem',
+              border: '1px solid var(--border-light)',
+              color: '#334155',
+              fontSize: '0.82rem',
               fontWeight: 600,
-              cursor: 'pointer'
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
             }}
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            <span>Refresh</span>
+            <RefreshCw size={14} className={loading ? 'spin' : ''} />
+            Refresh
           </button>
         </div>
       </div>
@@ -354,229 +299,164 @@ export default function InvestmentApprovals() {
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
           gap: '16px',
-          marginBottom: '24px'
+          marginBottom: '28px'
         }}
       >
-        {/* Card 1: Pending Review */}
+        {/* 1. Pending Review */}
         <div
-          className="forge-card"
           onClick={() => setStatusFilter('pending')}
           style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '14px',
             padding: '18px 20px',
-            cursor: 'pointer',
             border: statusFilter === 'pending' ? '2px solid #0047BA' : '1px solid var(--border-light)',
-            backgroundColor: statusFilter === 'pending' ? '#F0F7FF' : '#FFFFFF',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+            cursor: 'pointer',
             transition: 'all 0.15s ease'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0047BA', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
               Pending Review
             </span>
-            <div
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                backgroundColor: '#DBEAFE',
-                color: '#1D4ED8',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <Clock size={16} />
+            <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Clock size={15} color="#0047BA" />
             </div>
           </div>
-          <div style={{ marginTop: '10px' }}>
-            <span style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>
-              {stats.totalPending || 0}
-            </span>
-            <span style={{ fontSize: '0.76rem', color: '#64748B', marginLeft: '6px' }}>awaiting decision</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.2 }}>
+            {stats.totalPending}
           </div>
+          <span style={{ fontSize: '0.75rem', color: '#64748B' }}>awaiting decision</span>
         </div>
 
-        {/* Card 2: Changes / Resubmission Required */}
+        {/* 2. Changes Requested */}
         <div
-          className="forge-card"
-          onClick={() => setStatusFilter('resubmission')}
+          onClick={() => setStatusFilter('changes_requested')}
           style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '14px',
             padding: '18px 20px',
+            border: statusFilter === 'changes_requested' ? '2px solid #D97706' : '1px solid var(--border-light)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
             cursor: 'pointer',
-            border: statusFilter === 'resubmission' ? '2px solid #F59E0B' : '1px solid var(--border-light)',
-            backgroundColor: statusFilter === 'resubmission' ? '#FEFCE8' : '#FFFFFF',
             transition: 'all 0.15s ease'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#D97706', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
               Changes Requested
             </span>
-            <div
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                backgroundColor: '#FEF3C7',
-                color: '#B45309',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <AlertTriangle size={16} />
+            <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: '#FFFBEB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <AlertTriangle size={15} color="#D97706" />
             </div>
           </div>
-          <div style={{ marginTop: '10px' }}>
-            <span style={{ fontSize: '1.75rem', fontWeight: 800, color: '#B45309', lineHeight: 1 }}>
-              {stats.resubmissionsNeeded || 0}
-            </span>
-            <span style={{ fontSize: '0.76rem', color: '#64748B', marginLeft: '6px' }}>with companies</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#D97706', lineHeight: 1.2 }}>
+            {stats.changesRequested}
           </div>
+          <span style={{ fontSize: '0.75rem', color: '#64748B' }}>with investors</span>
         </div>
 
-        {/* Card 3: Approved / Live */}
+        {/* 3. Approved / Active */}
         <div
-          className="forge-card"
           onClick={() => setStatusFilter('approved')}
           style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '14px',
             padding: '18px 20px',
+            border: statusFilter === 'approved' ? '2px solid #059669' : '1px solid var(--border-light)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
             cursor: 'pointer',
-            border: statusFilter === 'approved' ? '2px solid #10B981' : '1px solid var(--border-light)',
-            backgroundColor: statusFilter === 'approved' ? '#F0FDF4' : '#FFFFFF',
             transition: 'all 0.15s ease'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-              Approved / Live
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#059669', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              Approved / Active
             </span>
-            <div
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                backgroundColor: '#DCFCE7',
-                color: '#15803D',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <CheckCircle2 size={16} />
+            <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CheckCircle2 size={15} color="#059669" />
             </div>
           </div>
-          <div style={{ marginTop: '10px' }}>
-            <span style={{ fontSize: '1.75rem', fontWeight: 800, color: '#15803D', lineHeight: 1 }}>
-              {stats.totalApproved || 0}
-            </span>
-            <span style={{ fontSize: '0.76rem', color: '#64748B', marginLeft: '6px' }}>funded / active</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#059669', lineHeight: 1.2 }}>
+            {stats.totalApproved}
           </div>
+          <span style={{ fontSize: '0.75rem', color: '#64748B' }}>allocated & live</span>
         </div>
 
-        {/* Card 4: Rejected */}
+        {/* 4. Rejected */}
         <div
-          className="forge-card"
           onClick={() => setStatusFilter('rejected')}
           style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '14px',
             padding: '18px 20px',
+            border: statusFilter === 'rejected' ? '2px solid #DC2626' : '1px solid var(--border-light)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
             cursor: 'pointer',
-            border: statusFilter === 'rejected' ? '2px solid #EF4444' : '1px solid var(--border-light)',
-            backgroundColor: statusFilter === 'rejected' ? '#FEF2F2' : '#FFFFFF',
             transition: 'all 0.15s ease'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#DC2626', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
               Rejected
             </span>
-            <div
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                backgroundColor: '#FEE2E2',
-                color: '#B91C1C',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <XCircle size={16} />
+            <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <XCircle size={15} color="#DC2626" />
             </div>
           </div>
-          <div style={{ marginTop: '10px' }}>
-            <span style={{ fontSize: '1.75rem', fontWeight: 800, color: '#B91C1C', lineHeight: 1 }}>
-              {stats.totalRejected || 0}
-            </span>
-            <span style={{ fontSize: '0.76rem', color: '#64748B', marginLeft: '6px' }}>ineligible</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#DC2626', lineHeight: 1.2 }}>
+            {stats.totalRejected}
           </div>
+          <span style={{ fontSize: '0.75rem', color: '#64748B' }}>ineligible</span>
         </div>
 
-        {/* Card 5: Pending Capital Demand */}
+        {/* 5. Pending Capital Demand */}
         <div
-          className="forge-card"
           style={{
-            padding: '18px 20px',
             backgroundColor: '#FFFFFF',
-            border: '1px solid var(--border-light)'
+            borderRadius: '14px',
+            padding: '18px 20px',
+            border: '1px solid var(--border-light)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0F172A', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
               Pending Capital
             </span>
-            <div
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                backgroundColor: '#FEF9C3',
-                color: '#854D0E',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <Coins size={16} />
+            <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: '#FFFBEB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <DollarSign size={15} color="#D97706" />
             </div>
           </div>
-          <div style={{ marginTop: '10px' }}>
-            <span style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>
-              {stats.pendingCapitalPaise ? formatINR(stats.pendingCapitalPaise) : '₹0'}
-            </span>
-            <div style={{ fontSize: '0.74rem', color: '#64748B', marginTop: '4px' }}>across pending requests</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.2 }}>
+            {formatINR(stats.pendingCapitalPaise)}
           </div>
+          <span style={{ fontSize: '0.75rem', color: '#64748B' }}>across pending requests</span>
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
+      {/* Filter Tabs & In-Page Search Bar */}
       <div
-        className="forge-card"
         style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: '16px',
+          border: '1px solid var(--border-light)',
           padding: '16px 20px',
           marginBottom: '20px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
           display: 'flex',
           flexDirection: 'column',
-          gap: '14px'
+          gap: '16px'
         }}
       >
-        {/* Status Tab Navigation */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            overflowX: 'auto',
-            paddingBottom: '4px'
-          }}
-        >
+        {/* Status Tabs */}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '14px' }}>
           {[
             { id: 'pending', label: 'Pending Review', count: stats.totalPending },
-            { id: 'resubmission', label: 'Changes Requested', count: stats.resubmissionsNeeded },
+            { id: 'changes_requested', label: 'Changes Requested', count: stats.changesRequested },
             { id: 'approved', label: 'Approved & Live', count: stats.totalApproved },
             { id: 'rejected', label: 'Rejected', count: stats.totalRejected },
-            { id: 'all', label: 'All Proposals', count: stats.total }
+            { id: 'all', label: 'All Requests', count: stats.total }
           ].map(tab => {
             const isActive = statusFilter === tab.id;
             return (
@@ -587,27 +467,26 @@ export default function InvestmentApprovals() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '8px',
-                  padding: '7px 14px',
+                  padding: '8px 16px',
                   borderRadius: '10px',
-                  border: isActive ? '1px solid #0047BA' : '1px solid var(--border-light)',
-                  backgroundColor: isActive ? '#0047BA' : '#FFFFFF',
+                  border: 'none',
+                  backgroundColor: isActive ? '#0047BA' : '#F1F5F9',
                   color: isActive ? '#FFFFFF' : '#475569',
                   fontSize: '0.84rem',
-                  fontWeight: isActive ? 700 : 500,
+                  fontWeight: 700,
                   cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  whiteSpace: 'nowrap'
+                  transition: 'all 0.15s ease'
                 }}
               >
                 <span>{tab.label}</span>
                 <span
                   style={{
-                    backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : '#F1F5F9',
-                    color: isActive ? '#FFFFFF' : '#64748B',
-                    borderRadius: '9999px',
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    padding: '2px 7px'
+                    backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : '#E2E8F0',
+                    color: isActive ? '#FFFFFF' : '#475569',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    padding: '2px 8px',
+                    borderRadius: '9999px'
                   }}
                 >
                   {tab.count}
@@ -617,18 +496,10 @@ export default function InvestmentApprovals() {
           })}
         </div>
 
-        {/* Search & Dropdown Filters */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '12px'
-          }}
-        >
-          {/* Search Box */}
-          <div style={{ position: 'relative', flex: 1, minWidth: '260px' }}>
+        {/* Controls: Search and Kind Select */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+          {/* In-page Search Bar */}
+          <div style={{ position: 'relative', flex: '1', minWidth: '280px', maxWidth: '520px' }}>
             <Search
               size={16}
               color="#94A3B8"
@@ -636,45 +507,32 @@ export default function InvestmentApprovals() {
             />
             <input
               type="text"
+              placeholder="Search by investor name, email, PAN, opportunity, or company..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              placeholder="Search by proposal title, company name, legal CIN, or category..."
+              onKeyDown={e => {
+                if (e.key === 'Enter') fetchRequests();
+              }}
               style={{
                 width: '100%',
                 padding: '9px 12px 9px 36px',
                 borderRadius: '10px',
                 border: '1px solid var(--border-light)',
-                fontSize: '0.86rem',
-                outline: 'none',
                 backgroundColor: '#F8FAFC',
-                boxSizing: 'border-box'
+                fontSize: '0.84rem',
+                color: '#1E293B',
+                outline: 'none',
+                transition: 'border-color 0.15s ease'
               }}
             />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm('')}
-                style={{
-                  position: 'absolute',
-                  right: '10px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#94A3B8'
-                }}
-              >
-                <X size={14} />
-              </button>
-            )}
           </div>
 
-          {/* Duration Filter */}
+          {/* Kind Filter */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748B' }}>Duration:</span>
+            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748B' }}>Target Type:</span>
             <select
-              value={durationFilter}
-              onChange={e => setDurationFilter(e.target.value)}
+              value={kindFilter}
+              onChange={e => setKindFilter(e.target.value)}
               style={{
                 padding: '8px 12px',
                 borderRadius: '10px',
@@ -686,226 +544,209 @@ export default function InvestmentApprovals() {
                 cursor: 'pointer'
               }}
             >
-              <option value="all">All Durations</option>
-              <option value="Short-Term">Short-Term (&lt; 3 Yrs)</option>
-              <option value="Long-Term">Long-Term (3-5+ Yrs)</option>
-            </select>
-          </div>
-
-          {/* Purpose Filter */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748B' }}>Purpose:</span>
-            <select
-              value={purposeFilter}
-              onChange={e => setPurposeFilter(e.target.value)}
-              style={{
-                padding: '8px 12px',
-                borderRadius: '10px',
-                border: '1px solid var(--border-light)',
-                backgroundColor: '#FFFFFF',
-                fontSize: '0.84rem',
-                color: '#334155',
-                outline: 'none',
-                cursor: 'pointer'
-              }}
-            >
-              <option value="all">All Purposes</option>
-              <option value="Company Investment">Company Investment</option>
-              <option value="Project Investment">Project Investment</option>
+              <option value="all">All Opportunities</option>
+              <option value="company">Company Debt Investment</option>
+              <option value="project">Project Investment</option>
             </select>
           </div>
         </div>
       </div>
 
-      {/* Proposals Table */}
-      <div className="forge-card" style={{ overflow: 'hidden' }}>
+      {/* Investor Requests Table */}
+      <div
+        style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: '16px',
+          border: '1px solid var(--border-light)',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+          overflow: 'hidden'
+        }}
+      >
         {loading ? (
           <div style={{ padding: '60px 20px', textAlign: 'center', color: '#64748B' }}>
-            <RefreshCw size={28} className="animate-spin" style={{ margin: '0 auto 12px auto', color: '#0047BA' }} />
-            <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>Loading investment requests...</p>
+            <RefreshCw size={24} className="spin" style={{ margin: '0 auto 12px', display: 'block', color: '#0047BA' }} />
+            <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Loading investor investment requests...</span>
           </div>
         ) : requests.length === 0 ? (
-          <div style={{ padding: '60px 20px', textAlign: 'center', color: '#64748B' }}>
-            <CheckSquare size={36} color="#CBD5E1" style={{ margin: '0 auto 12px auto' }} />
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#1E293B', marginBottom: '4px' }}>
-              No investment proposals found
+          <div style={{ padding: '64px 20px', textAlign: 'center' }}>
+            <div
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                backgroundColor: '#F1F5F9',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px',
+                color: '#94A3B8'
+              }}
+            >
+              <TrendingUp size={28} />
+            </div>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0F172A', margin: '0 0 6px 0' }}>
+              No investment applications found
             </h3>
-            <p style={{ fontSize: '0.84rem', color: '#94A3B8' }}>
-              {searchTerm || statusFilter !== 'all' || durationFilter !== 'all' || purposeFilter !== 'all'
-                ? 'Try adjusting your filters or search terms.'
-                : 'There are currently no proposals in this queue.'}
+            <p style={{ fontSize: '0.84rem', color: '#64748B', maxWidth: '440px', margin: '0 auto' }}>
+              No investor requests match your current filters. As investors apply to participate in live company or project opportunities, their requests will appear here for underwriting approval.
             </p>
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '950px' }}>
               <thead>
-                <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid var(--border-light)', color: '#475569' }}>
-                  <th style={{ padding: '14px 18px', fontWeight: 700 }}>Company & Proposal Title</th>
-                  <th style={{ padding: '14px 18px', fontWeight: 700 }}>Purpose & Duration</th>
-                  <th style={{ padding: '14px 18px', fontWeight: 700 }}>Requested Capital</th>
-                  <th style={{ padding: '14px 18px', fontWeight: 700 }}>Interest / Return Rate</th>
-                  <th style={{ padding: '14px 18px', fontWeight: 700 }}>Tenure / Duration</th>
-                  <th style={{ padding: '14px 18px', fontWeight: 700 }}>Status</th>
-                  <th style={{ padding: '14px 18px', fontWeight: 700, textAlign: 'right' }}>Actions</th>
+                <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid var(--border-light)' }}>
+                  <th style={{ padding: '14px 18px', fontSize: '0.74rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Investor
+                  </th>
+                  <th style={{ padding: '14px 18px', fontSize: '0.74rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Opportunity / Target
+                  </th>
+                  <th style={{ padding: '14px 18px', fontSize: '0.74rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Requested Amount
+                  </th>
+                  <th style={{ padding: '14px 18px', fontSize: '0.74rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Terms
+                  </th>
+                  <th style={{ padding: '14px 18px', fontSize: '0.74rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Status
+                  </th>
+                  <th style={{ padding: '14px 18px', fontSize: '0.74rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right' }}>
+                    Action
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {requests.map(req => {
-                  const badge = getStatusBadge(req.status);
-                  const BadgeIcon = badge.icon;
-                  const companyName = req.companyId?.name || req.companyId?.legalName || 'Registered Enterprise';
-                  const hasProposedChanges =
-                    req.proposedFundingTarget !== null &&
-                    req.proposedFundingTarget !== undefined &&
-                    (req.status === 'Resubmission Required' || req.status === 'Changes Requested');
+                {requests.map(reqItem => {
+                  const investor = reqItem.investorId;
+                  const offer = reqItem.offerId;
+                  const badge = getStatusBadge(reqItem.status);
+                  const amount = getDisplayAmount(reqItem);
+                  const hasProposed = reqItem.proposedAmount && reqItem.proposedAmount !== amount;
 
                   return (
                     <tr
-                      key={req._id}
+                      key={reqItem._id}
                       style={{
-                        borderBottom: '1px solid #F1F5F9',
-                        transition: 'background 0.15s ease'
+                        borderBottom: '1px solid var(--border-subtle)',
+                        transition: 'background-color 0.15s ease'
                       }}
                       onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
-                      onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                      onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
                     >
-                      {/* Company & Title */}
-                      <td style={{ padding: '14px 18px' }}>
+                      {/* 1. Investor Info */}
+                      <td style={{ padding: '16px 18px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <div
                             style={{
-                              width: '36px',
-                              height: '36px',
+                              width: '38px',
+                              height: '38px',
                               borderRadius: '10px',
                               backgroundColor: '#EFF6FF',
                               border: '1px solid #BFDBFE',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              color: '#0047BA',
                               fontWeight: 800,
-                              fontSize: '0.85rem',
-                              flexShrink: 0
+                              color: '#0047BA',
+                              fontSize: '0.9rem'
                             }}
                           >
-                            {companyName.charAt(0).toUpperCase()}
+                            {(investor?.name || 'I')[0].toUpperCase()}
                           </div>
                           <div>
-                            <div style={{ fontWeight: 700, color: '#0F172A', fontSize: '0.88rem' }}>
-                              {req.title || req.entityOrProjectName || 'Capital Raise'}
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                              <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: 600 }}>
-                                {companyName}
-                              </span>
-                              {req.companyId?.cin && (
-                                <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>
-                                  ({req.companyId.cin})
+                            <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span>{investor?.name || 'Verified Investor'}</span>
+                              {reqItem.investorKycStatus === 'Approved' && (
+                                <span title="KYC Compliant" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                                  <ShieldCheck size={14} color="#059669" />
                                 </span>
                               )}
                             </div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
+                              {investor?.email || '—'}
+                            </div>
+                            {reqItem.investorPan && (
+                              <div style={{ fontSize: '0.7rem', color: '#94A3B8', fontWeight: 600 }}>
+                                PAN: {reqItem.investorPan}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>
 
-                      {/* Purpose & Duration */}
-                      <td style={{ padding: '14px 18px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <span
-                            style={{
-                              display: 'inline-block',
-                              padding: '2px 8px',
-                              borderRadius: '6px',
-                              fontSize: '0.74rem',
-                              fontWeight: 700,
-                              backgroundColor: '#EFF6FF',
-                              color: '#0047BA',
-                              border: '1px solid #BFDBFE',
-                              width: 'fit-content'
-                            }}
-                          >
-                            {req.investmentPurpose || req.category || 'Company Investment'}
-                          </span>
-                          <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>
-                            {req.fundingDuration || 'Short-Term'} ({req.investmentPeriodYears || 2} Years)
-                          </span>
+                      {/* 2. Opportunity Details */}
+                      <td style={{ padding: '16px 18px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0F172A' }}>
+                            {offer ? offer.title || offer.companyName : 'Direct Corporate Opportunity'}
+                          </div>
+                          <div style={{ fontSize: '0.76rem', color: '#0047BA', fontWeight: 600 }}>
+                            {offer ? offer.companyName : 'Registered Entity'}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                            <span
+                              style={{
+                                fontSize: '0.68rem',
+                                fontWeight: 700,
+                                textTransform: 'uppercase',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                backgroundColor: offer?.kind === 'project' ? '#EFF6FF' : '#F5F3FF',
+                                color: offer?.kind === 'project' ? '#1D4ED8' : '#6D28D9'
+                              }}
+                            >
+                              {offer?.kind === 'project' ? 'Project' : 'Company'}
+                            </span>
+                          </div>
                         </div>
                       </td>
 
-                      {/* Requested Capital */}
-                      <td style={{ padding: '14px 18px' }}>
-                        <div>
-                          <span style={{ fontWeight: 800, color: '#0F172A', fontSize: '0.92rem' }}>
-                            {formatINR(req.fundingTarget * 100)}
+                      {/* 3. Requested Amount */}
+                      <td style={{ padding: '16px 18px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontSize: '0.96rem', fontWeight: 800, color: '#0F172A' }}>
+                            ₹{amount.toLocaleString('en-IN')}
                           </span>
-                          {hasProposedChanges && (
-                            <div
+                          {hasProposed && (
+                            <span
                               style={{
-                                marginTop: '4px',
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px',
                                 fontSize: '0.72rem',
-                                color: '#B45309',
-                                backgroundColor: '#FEF3C7',
-                                padding: '2px 6px',
-                                borderRadius: '4px',
-                                fontWeight: 700
+                                fontWeight: 700,
+                                color: '#D97706',
+                                marginTop: '2px'
                               }}
-                              title="Counter amount proposed by admin"
                             >
-                              Proposed: {formatINR(req.proposedFundingTarget * 100)}
-                            </div>
+                              Counter: ₹{Number(reqItem.proposedAmount).toLocaleString('en-IN')}
+                            </span>
                           )}
-                        </div>
-                      </td>
-
-                      {/* Interest / Return Rate */}
-                      <td style={{ padding: '14px 18px' }}>
-                        <div>
-                          <span style={{ fontWeight: 700, color: '#059669', fontSize: '0.9rem' }}>
-                            {req.expectedReturnRate || req.agreedReturnRate || 0}% p.a.
+                          <span style={{ fontSize: '0.7rem', color: '#94A3B8' }}>
+                            {new Date(reqItem.createdAt).toLocaleDateString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric'
+                            })}
                           </span>
-                          {req.returnStructure && (
-                            <div style={{ fontSize: '0.72rem', color: '#64748B', marginTop: '2px' }}>
-                              {req.returnStructure}
-                            </div>
-                          )}
-                          {hasProposedChanges && req.proposedReturnRate && (
-                            <div
-                              style={{
-                                marginTop: '4px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                fontSize: '0.72rem',
-                                color: '#B45309',
-                                backgroundColor: '#FEF3C7',
-                                padding: '2px 6px',
-                                borderRadius: '4px',
-                                fontWeight: 700
-                              }}
-                              title="Counter interest rate proposed by admin"
-                            >
-                              Proposed: {req.proposedReturnRate}% p.a.
-                            </div>
-                          )}
                         </div>
                       </td>
 
-                      {/* Tenure / Duration */}
-                      <td style={{ padding: '14px 18px' }}>
-                        <div style={{ color: '#334155', fontWeight: 600 }}>
-                          {req.durationMonths ? `${req.durationMonths} Months` : `${req.investmentPeriodYears || 2} Years`}
+                      {/* 4. Terms */}
+                      <td style={{ padding: '16px 18px' }}>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
+                          <span style={{ color: '#059669', fontWeight: 700 }}>
+                            {reqItem.returnRate || offer?.returnRate || 12}% p.a.
+                          </span>
                         </div>
-                        <div style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: '2px' }}>
-                          Min: {formatINR((req.minInvestment || 25000) * 100)}
+                        <div style={{ fontSize: '0.74rem', color: '#64748B' }}>
+                          Tenure: {reqItem.tenureMonths || offer?.tenureMonths || 12} Mos
                         </div>
                       </td>
 
-                      {/* Status Badge */}
-                      <td style={{ padding: '14px 18px' }}>
+                      {/* 5. Status Badge */}
+                      <td style={{ padding: '16px 18px' }}>
                         <span
                           style={{
                             display: 'inline-flex',
@@ -913,80 +754,40 @@ export default function InvestmentApprovals() {
                             gap: '5px',
                             padding: '4px 10px',
                             borderRadius: '9999px',
-                            backgroundColor: badge.bg,
-                            color: badge.color,
-                            border: `1px solid ${badge.border}`,
                             fontSize: '0.76rem',
                             fontWeight: 700,
-                            whiteSpace: 'nowrap'
+                            backgroundColor: badge.bg,
+                            color: badge.color,
+                            border: `1px solid ${badge.border}`
                           }}
                         >
-                          <BadgeIcon size={13} />
+                          {badge.icon}
                           {badge.label}
                         </span>
                       </td>
 
-                      {/* Actions */}
-                      <td style={{ padding: '14px 18px', textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                          <button
-                            onClick={() => handleOpenReview(req, 'resubmission')}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '5px',
-                              padding: '6px 12px',
-                              borderRadius: '8px',
-                              border: '1px solid #0047BA',
-                              backgroundColor: '#EFF6FF',
-                              color: '#0047BA',
-                              fontSize: '0.8rem',
-                              fontWeight: 700,
-                              cursor: 'pointer'
-                            }}
-                          >
-                            <Eye size={13} />
-                            <span>Review & Decide</span>
-                          </button>
-
-                          {['Submitted', 'Under Review'].includes(req.status) && (
-                            <>
-                              <button
-                                onClick={() => handleOpenReview(req, 'resubmission')}
-                                style={{
-                                  padding: '6px 10px',
-                                  borderRadius: '8px',
-                                  border: '1px solid #FCD34D',
-                                  backgroundColor: '#FEF3C7',
-                                  color: '#B45309',
-                                  fontSize: '0.8rem',
-                                  fontWeight: 700,
-                                  cursor: 'pointer'
-                                }}
-                                title="Ask for Resubmission with Changes"
-                              >
-                                Changes
-                              </button>
-
-                              <button
-                                onClick={() => handleOpenReview(req, 'approve')}
-                                style={{
-                                  padding: '6px 10px',
-                                  borderRadius: '8px',
-                                  border: 'none',
-                                  backgroundColor: '#10B981',
-                                  color: '#FFFFFF',
-                                  fontSize: '0.8rem',
-                                  fontWeight: 700,
-                                  cursor: 'pointer'
-                                }}
-                                title="Quick Approve"
-                              >
-                                Approve
-                              </button>
-                            </>
-                          )}
-                        </div>
+                      {/* 6. Review Action */}
+                      <td style={{ padding: '16px 18px', textAlign: 'right' }}>
+                        <button
+                          onClick={() => handleOpenReview(reqItem, 'changes_requested')}
+                          style={{
+                            padding: '8px 14px',
+                            borderRadius: '10px',
+                            backgroundColor: '#0047BA',
+                            border: 'none',
+                            color: '#FFFFFF',
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <Sliders size={13} />
+                          Review Application
+                        </button>
                       </td>
                     </tr>
                   );
@@ -1003,26 +804,29 @@ export default function InvestmentApprovals() {
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.7)',
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
             backdropFilter: 'blur(4px)',
-            zIndex: 1000,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            zIndex: 100,
             padding: '20px'
+          }}
+          onClick={e => {
+            if (e.target === e.currentTarget) handleCloseModal();
           }}
         >
           <div
             style={{
               backgroundColor: '#FFFFFF',
               borderRadius: '20px',
-              maxWidth: '900px',
+              maxWidth: '850px',
               width: '100%',
               maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 20px 40px -15px rgba(0,0,0,0.25)',
               display: 'flex',
-              flexDirection: 'column',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              overflow: 'hidden'
+              flexDirection: 'column'
             }}
           >
             {/* Modal Header */}
@@ -1033,669 +837,371 @@ export default function InvestmentApprovals() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                backgroundColor: '#F8FAFC'
+                position: 'sticky',
+                top: 0,
+                backgroundColor: '#FFFFFF',
+                zIndex: 10
               }}
             >
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span
-                    style={{
-                      padding: '2px 8px',
-                      borderRadius: '6px',
-                      fontSize: '0.72rem',
-                      fontWeight: 700,
-                      backgroundColor: '#EFF6FF',
-                      color: '#0047BA',
-                      border: '1px solid #BFDBFE'
-                    }}
-                  >
-                    {selectedRequest.investmentPurpose || 'Company Investment'}
-                  </span>
-                  <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: 600 }}>
-                    {selectedRequest.fundingDuration || 'Short-Term'} ({selectedRequest.investmentPeriodYears || 2} Years)
-                  </span>
-                </div>
-                <h2
-                  style={{
-                    fontSize: '1.25rem',
-                    fontWeight: 800,
-                    color: '#0F172A',
-                    margin: '4px 0 0 0'
-                  }}
-                >
-                  {selectedRequest.title || selectedRequest.entityOrProjectName}
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0047BA', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Underwriting & Capital Allocation
+                </span>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0F172A', margin: '2px 0 0 0' }}>
+                  Review Investor Application
                 </h2>
-                <div style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '2px' }}>
-                  Submitted by{' '}
-                  <strong style={{ color: '#1E293B' }}>
-                    {selectedRequest.companyId?.name || selectedRequest.companyId?.legalName}
-                  </strong>
-                </div>
               </div>
-
               <button
-                onClick={() => setSelectedRequest(null)}
+                onClick={handleCloseModal}
                 style={{
-                  background: '#F1F5F9',
-                  border: 'none',
-                  borderRadius: '10px',
                   width: '32px',
                   height: '32px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: '#F1F5F9',
+                  color: '#64748B',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: '#64748B'
+                  cursor: 'pointer'
                 }}
               >
                 <X size={18} />
               </button>
             </div>
 
-            {/* Modal Scrollable Content */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
-              {/* Proposal Overview Grid */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                  gap: '12px',
-                  padding: '16px',
-                  borderRadius: '14px',
-                  backgroundColor: '#F8FAFC',
-                  border: '1px solid #E2E8F0'
-                }}
-              >
-                <div>
-                  <span style={{ fontSize: '0.74rem', color: '#64748B', fontWeight: 600, display: 'block' }}>
-                    Requested Target
-                  </span>
-                  <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0F172A' }}>
-                    {formatINR((selectedRequest.fundingTarget || 0) * 100)}
-                  </span>
-                </div>
-
-                <div>
-                  <span style={{ fontSize: '0.74rem', color: '#64748B', fontWeight: 600, display: 'block' }}>
-                    Offered Return / Interest
-                  </span>
-                  <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#059669' }}>
-                    {selectedRequest.expectedReturnRate || selectedRequest.agreedReturnRate || 0}% p.a.
-                  </span>
-                </div>
-
-                <div>
-                  <span style={{ fontSize: '0.74rem', color: '#64748B', fontWeight: 600, display: 'block' }}>
-                    Tenure / Duration
-                  </span>
-                  <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1E293B' }}>
-                    {selectedRequest.durationMonths
-                      ? `${selectedRequest.durationMonths} Months`
-                      : `${selectedRequest.investmentPeriodYears || 2} Years`}
-                  </span>
-                </div>
-
-                <div>
-                  <span style={{ fontSize: '0.74rem', color: '#64748B', fontWeight: 600, display: 'block' }}>
-                    Ticket Limits
-                  </span>
-                  <span style={{ fontSize: '0.86rem', fontWeight: 700, color: '#334155' }}>
-                    Min: {formatINR((selectedRequest.minInvestment || 25000) * 100)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Company Details & Use of Funds */}
+            {/* Modal Body */}
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Applicant & Opportunity Summary Cards */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div style={{ border: '1px solid #E2E8F0', borderRadius: '12px', padding: '14px 16px' }}>
-                  <h4 style={{ margin: '0 0 10px 0', fontSize: '0.85rem', fontWeight: 700, color: '#1E293B' }}>
-                    Enterprise Verification
-                  </h4>
-                  <div style={{ fontSize: '0.82rem', color: '#475569', lineHeight: 1.6 }}>
-                    <div><strong>Legal Name:</strong> {selectedRequest.companyId?.legalName || selectedRequest.companyId?.name}</div>
-                    <div><strong>CIN / Reg No:</strong> {selectedRequest.companyId?.cin || 'Verified in KYB'}</div>
-                    <div><strong>PAN:</strong> {selectedRequest.companyId?.pan || 'Verified'}</div>
-                    <div><strong>Sector / Industry:</strong> {selectedRequest.companyId?.profile?.sector || selectedRequest.category}</div>
-                    <div><strong>Contact Email:</strong> {selectedRequest.companyId?.ownerUserId?.email || selectedRequest.companyId?.contactEmail || 'N/A'}</div>
+                {/* Investor Box */}
+                <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: '#F8FAFC', border: '1px solid var(--border-light)' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: '8px' }}>
+                    Investor Profile
+                  </div>
+                  <div style={{ fontSize: '0.98rem', fontWeight: 700, color: '#0F172A' }}>
+                    {selectedRequest.investorId?.name || 'Verified Investor'}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#64748B', marginTop: '2px' }}>
+                    {selectedRequest.investorId?.email || '—'}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#64748B' }}>
+                    Mobile: {selectedRequest.investorId?.mobile || '—'}
+                  </div>
+                  <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span
+                      style={{
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        backgroundColor: selectedRequest.investorKycStatus === 'Approved' ? '#ECFDF5' : '#FFFBEB',
+                        color: selectedRequest.investorKycStatus === 'Approved' ? '#065F46' : '#92400E'
+                      }}
+                    >
+                      KYC: {selectedRequest.investorKycStatus || 'Pending'}
+                    </span>
+                    {selectedRequest.investorPan && (
+                      <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 600 }}>
+                        PAN: {selectedRequest.investorPan}
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                <div style={{ border: '1px solid #E2E8F0', borderRadius: '12px', padding: '14px 16px' }}>
-                  <h4 style={{ margin: '0 0 10px 0', fontSize: '0.85rem', fontWeight: 700, color: '#1E293B' }}>
-                    Capital Deployment Plan
-                  </h4>
-                  <p style={{ fontSize: '0.82rem', color: '#475569', margin: 0, lineHeight: 1.5 }}>
-                    {selectedRequest.useOfFunds || selectedRequest.shortDescription || 'Operational scaling and capital expenditures'}
-                  </p>
-                  {selectedRequest.detailedDescription && (
-                    <p style={{ fontSize: '0.8rem', color: '#64748B', marginTop: '8px', lineHeight: 1.4 }}>
-                      {selectedRequest.detailedDescription}
-                    </p>
+                {/* Target Opportunity Box */}
+                <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: '#F8FAFC', border: '1px solid var(--border-light)' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: '8px' }}>
+                    Target Opportunity
+                  </div>
+                  <div style={{ fontSize: '0.98rem', fontWeight: 700, color: '#0F172A' }}>
+                    {selectedRequest.offerId?.title || 'Corporate Opportunity'}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#0047BA', fontWeight: 600, marginTop: '2px' }}>
+                    {selectedRequest.offerId?.companyName || 'Enterprise Partner'}
+                  </div>
+                  <div style={{ marginTop: '8px', display: 'flex', gap: '16px' }}>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', color: '#64748B' }}>Return Rate</div>
+                      <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#059669' }}>
+                        {selectedRequest.returnRate || selectedRequest.offerId?.returnRate || 12}% p.a.
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', color: '#64748B' }}>Tenure</div>
+                      <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0F172A' }}>
+                        {selectedRequest.tenureMonths || selectedRequest.offerId?.tenureMonths || 12} Months
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Application Details */}
+              <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1E40AF', textTransform: 'uppercase' }}>
+                      Requested Investment Amount
+                    </span>
+                    <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0047BA' }}>
+                      ₹{getDisplayAmount(selectedRequest).toLocaleString('en-IN')}
+                    </div>
+                  </div>
+                  {selectedRequest.proposedAmount && (
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#D97706', textTransform: 'uppercase' }}>
+                        Admin Counter Offer
+                      </span>
+                      <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#D97706' }}>
+                        ₹{Number(selectedRequest.proposedAmount).toLocaleString('en-IN')}
+                      </div>
+                    </div>
                   )}
                 </div>
+                {selectedRequest.investorNote && (
+                  <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #DBEAFE', fontSize: '0.82rem', color: '#1E293B' }}>
+                    <strong>Investor's Note:</strong> {selectedRequest.investorNote}
+                  </div>
+                )}
               </div>
 
-              {/* Supporting Documents */}
-              {selectedRequest.supportingDocuments && selectedRequest.supportingDocuments.length > 0 && (
-                <div>
-                  <h4 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', fontWeight: 700, color: '#1E293B' }}>
-                    Uploaded Documentation & Attachments ({selectedRequest.supportingDocuments.length})
-                  </h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px' }}>
-                    {selectedRequest.supportingDocuments.map((doc, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          padding: '10px 12px',
-                          borderRadius: '10px',
-                          border: '1px solid #E2E8F0',
-                          backgroundColor: '#F8FAFC',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                          <FileText size={16} color="#0047BA" />
-                          <span
-                            style={{
-                              fontSize: '0.8rem',
-                              fontWeight: 600,
-                              color: '#334155',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap'
-                            }}
-                          >
-                            {doc.name || `Document #${idx + 1}`}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setPreviewDoc(doc.fileUrl)}
-                          style={{
-                            padding: '4px 8px',
-                            borderRadius: '6px',
-                            border: '1px solid #0047BA',
-                            backgroundColor: '#FFFFFF',
-                            color: '#0047BA',
-                            fontSize: '0.74rem',
-                            fontWeight: 700,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Preview
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Revision History Log if previously modified */}
+              {/* Revision History (if previously negotiated) */}
               {selectedRequest.revisionHistory && selectedRequest.revisionHistory.length > 0 && (
-                <div style={{ backgroundColor: '#FFFBEB', borderRadius: '12px', border: '1px solid #FDE68A', padding: '14px 16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                    <History size={16} color="#B45309" />
-                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#92400E' }}>
-                      Previous Underwriting Revisions ({selectedRequest.revisionHistory.length})
-                    </span>
+                <div style={{ padding: '14px 16px', borderRadius: '12px', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', fontWeight: 700, color: '#92400E', marginBottom: '8px' }}>
+                    <History size={14} />
+                    <span>Previous Revision Rounds</span>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {selectedRequest.revisionHistory.map((rev, i) => (
-                      <div key={i} style={{ fontSize: '0.78rem', color: '#78350F', borderLeft: '2px solid #F59E0B', paddingLeft: '8px' }}>
-                        <div>
-                          <strong>{rev.decision}</strong> on {new Date(rev.suggestedAt).toLocaleDateString('en-IN')}:
-                        </div>
-                        <div style={{ marginTop: '2px' }}>{rev.feedback}</div>
-                        {rev.proposedFundingTarget && (
-                          <div style={{ marginTop: '2px', fontWeight: 600 }}>
-                            Proposed: {formatINR(rev.proposedFundingTarget * 100)} @ {rev.proposedReturnRate}% p.a.
-                          </div>
-                        )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {selectedRequest.revisionHistory.map((rev, idx) => (
+                      <div key={idx} style={{ fontSize: '0.78rem', color: '#78350F' }}>
+                        Round {idx + 1}: Proposed ₹{Number(rev.proposedAmount || 0).toLocaleString('en-IN')} — <em>"{rev.feedback || 'Revision requested'}"</em>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* UNDERWRITING DECISION HUB */}
-              <div
-                style={{
-                  border: '1px solid #CBD5E1',
-                  borderRadius: '16px',
-                  backgroundColor: '#FFFFFF',
-                  padding: '18px 20px',
-                  marginTop: '6px'
-                }}
-              >
-                <div style={{ marginBottom: '16px' }}>
-                  <h3 style={{ margin: '0 0 4px 0', fontSize: '1rem', fontWeight: 800, color: '#0F172A' }}>
-                    Underwriting Decision & Action
-                  </h3>
-                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748B' }}>
-                    Approve proposal, decline with reasons, or return to company for resubmission with adjusted interest and funding amounts.
-                  </p>
-                </div>
-
-                {/* Decision Tabs */}
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '18px' }}>
+              {/* Decision Tabs */}
+              <div>
+                <label style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0F172A', display: 'block', marginBottom: '8px' }}>
+                  Select Underwriting Decision:
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
                   <button
                     type="button"
-                    onClick={() => setDecisionTab('resubmission')}
+                    onClick={() => setDecisionTab('changes_requested')}
                     style={{
-                      flex: 1,
-                      padding: '10px 14px',
+                      padding: '12px',
                       borderRadius: '10px',
-                      border: decisionTab === 'resubmission' ? '2px solid #F59E0B' : '1px solid #E2E8F0',
-                      backgroundColor: decisionTab === 'resubmission' ? '#FEF3C7' : '#FFFFFF',
-                      color: decisionTab === 'resubmission' ? '#B45309' : '#475569',
-                      fontWeight: decisionTab === 'resubmission' ? 800 : 600,
-                      fontSize: '0.84rem',
+                      border: decisionTab === 'changes_requested' ? '2px solid #D97706' : '1px solid var(--border-light)',
+                      backgroundColor: decisionTab === 'changes_requested' ? '#FFFBEB' : '#FFFFFF',
+                      color: decisionTab === 'changes_requested' ? '#92400E' : '#475569',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '8px',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease'
+                      cursor: 'pointer'
                     }}
                   >
-                    <Sliders size={16} />
-                    <span>Ask for Resubmission with Changes</span>
+                    <Sliders size={15} color={decisionTab === 'changes_requested' ? '#D97706' : '#64748B'} />
+                    Request Changes
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setDecisionTab('approve')}
                     style={{
-                      flex: 1,
-                      padding: '10px 14px',
+                      padding: '12px',
                       borderRadius: '10px',
-                      border: decisionTab === 'approve' ? '2px solid #10B981' : '1px solid #E2E8F0',
-                      backgroundColor: decisionTab === 'approve' ? '#DCFCE7' : '#FFFFFF',
-                      color: decisionTab === 'approve' ? '#15803D' : '#475569',
-                      fontWeight: decisionTab === 'approve' ? 800 : 600,
-                      fontSize: '0.84rem',
+                      border: decisionTab === 'approve' ? '2px solid #059669' : '1px solid var(--border-light)',
+                      backgroundColor: decisionTab === 'approve' ? '#ECFDF5' : '#FFFFFF',
+                      color: decisionTab === 'approve' ? '#065F46' : '#475569',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '8px',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease'
+                      cursor: 'pointer'
                     }}
                   >
-                    <CheckCircle2 size={16} />
-                    <span>Approve Proposal</span>
+                    <CheckCircle2 size={15} color={decisionTab === 'approve' ? '#059669' : '#64748B'} />
+                    Approve / Accept
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setDecisionTab('reject')}
                     style={{
-                      flex: 1,
-                      padding: '10px 14px',
+                      padding: '12px',
                       borderRadius: '10px',
-                      border: decisionTab === 'reject' ? '2px solid #EF4444' : '1px solid #E2E8F0',
-                      backgroundColor: decisionTab === 'reject' ? '#FEE2E2' : '#FFFFFF',
-                      color: decisionTab === 'reject' ? '#B91C1C' : '#475569',
-                      fontWeight: decisionTab === 'reject' ? 800 : 600,
-                      fontSize: '0.84rem',
+                      border: decisionTab === 'reject' ? '2px solid #DC2626' : '1px solid var(--border-light)',
+                      backgroundColor: decisionTab === 'reject' ? '#FEF2F2' : '#FFFFFF',
+                      color: decisionTab === 'reject' ? '#991B1B' : '#475569',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '8px',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease'
+                      cursor: 'pointer'
                     }}
                   >
-                    <XCircle size={16} />
-                    <span>Reject Proposal</span>
+                    <XCircle size={15} color={decisionTab === 'reject' ? '#DC2626' : '#64748B'} />
+                    Reject Application
                   </button>
                 </div>
+              </div>
 
-                {/* FORM FOR TAB 1: ASK FOR RESUBMISSION WITH CHANGES */}
-                {decisionTab === 'resubmission' && (
-                  <div
-                    style={{
-                      backgroundColor: '#FFFBEB',
-                      border: '1px solid #FDE68A',
-                      borderRadius: '12px',
-                      padding: '16px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '14px'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <AlertTriangle size={18} color="#D97706" />
-                      <div>
-                        <strong style={{ fontSize: '0.86rem', color: '#92400E' }}>
-                          Propose Counter Parameters for Resubmission
-                        </strong>
-                        <p style={{ fontSize: '0.76rem', color: '#78350F', margin: '2px 0 0 0' }}>
-                          The company will be notified to adjust their proposal according to your counter-parameters and resubmit for final approval.
-                        </p>
-                      </div>
-                    </div>
+              {/* Form Content Based on Selected Decision */}
+              {decisionTab === 'changes_requested' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '16px', borderRadius: '12px', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A' }}>
+                  <div>
+                    <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#92400E', display: 'block', marginBottom: '6px' }}>
+                      Counter-Proposed Investment Amount (₹) *
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 50000"
+                      value={proposedAmount}
+                      onChange={e => setProposedAmount(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: '10px',
+                        border: '1px solid #FCD34D',
+                        backgroundColor: '#FFFFFF',
+                        fontSize: '0.95rem',
+                        fontWeight: 700,
+                        color: '#0F172A',
+                        outline: 'none'
+                      }}
+                    />
+                    <span style={{ fontSize: '0.72rem', color: '#B45309', marginTop: '4px', display: 'block' }}>
+                      Original requested amount: ₹{getDisplayAmount(selectedRequest).toLocaleString('en-IN')}. Set a revised maximum or suitable participation sum.
+                    </span>
+                  </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                      {/* Proposed Fund Amount */}
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#78350F', marginBottom: '6px' }}>
-                          Proposed Fund Amount (₹):
-                        </label>
-                        <div style={{ position: 'relative' }}>
-                          <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: '#92400E' }}>
-                            ₹
-                          </span>
-                          <input
-                            type="number"
-                            value={proposedFundingTarget}
-                            onChange={e => setProposedFundingTarget(e.target.value)}
-                            placeholder="e.g. 5000000"
-                            style={{
-                              width: '100%',
-                              padding: '9px 12px 9px 28px',
-                              borderRadius: '8px',
-                              border: '1px solid #FCD34D',
-                              backgroundColor: '#FFFFFF',
-                              fontSize: '0.86rem',
-                              fontWeight: 700,
-                              outline: 'none',
-                              boxSizing: 'border-box'
-                            }}
-                          />
-                        </div>
-                        <span style={{ fontSize: '0.72rem', color: '#B45309', marginTop: '3px', display: 'block' }}>
-                          Original requested: {formatINR((selectedRequest.fundingTarget || 0) * 100)}
-                        </span>
-                      </div>
+                  <div>
+                    <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#92400E', display: 'block', marginBottom: '6px' }}>
+                      Instructions / Notes for Investor *
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder="Explain to the investor why the amount is being revised (e.g. round cap limits, allocation tiers, or diversification guidelines)..."
+                      value={feedback}
+                      onChange={e => setFeedback(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '10px',
+                        border: '1px solid #FCD34D',
+                        backgroundColor: '#FFFFFF',
+                        fontSize: '0.84rem',
+                        color: '#0F172A',
+                        outline: 'none',
+                        resize: 'vertical'
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
 
-                      {/* Proposed Interest Rate */}
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#78350F', marginBottom: '6px' }}>
-                          Proposed Interest / Return Rate (% p.a.):
-                        </label>
-                        <div style={{ position: 'relative' }}>
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={proposedReturnRate}
-                            onChange={e => setProposedReturnRate(e.target.value)}
-                            placeholder="e.g. 11.5"
-                            style={{
-                              width: '100%',
-                              padding: '9px 28px 9px 12px',
-                              borderRadius: '8px',
-                              border: '1px solid #FCD34D',
-                              backgroundColor: '#FFFFFF',
-                              fontSize: '0.86rem',
-                              fontWeight: 700,
-                              outline: 'none',
-                              boxSizing: 'border-box'
-                            }}
-                          />
-                          <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: '#92400E' }}>
-                            %
-                          </span>
-                        </div>
-                        <span style={{ fontSize: '0.72rem', color: '#B45309', marginTop: '3px', display: 'block' }}>
-                          Original requested: {selectedRequest.expectedReturnRate || selectedRequest.agreedReturnRate || 0}%
-                        </span>
-                      </div>
-
-                      {/* Proposed Tenure */}
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#78350F', marginBottom: '6px' }}>
-                          Proposed Tenure Duration (Months):
-                        </label>
-                        <input
-                          type="number"
-                          value={proposedDurationMonths}
-                          onChange={e => setProposedDurationMonths(e.target.value)}
-                          placeholder="e.g. 24"
-                          style={{
-                            width: '100%',
-                            padding: '9px 12px',
-                            borderRadius: '8px',
-                            border: '1px solid #FCD34D',
-                            backgroundColor: '#FFFFFF',
-                            fontSize: '0.86rem',
-                            fontWeight: 700,
-                            outline: 'none',
-                            boxSizing: 'border-box'
-                          }}
-                        />
-                      </div>
-
-                      {/* Proposed Min Investment */}
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#78350F', marginBottom: '6px' }}>
-                          Proposed Min Investment (₹):
-                        </label>
-                        <div style={{ position: 'relative' }}>
-                          <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: '#92400E' }}>
-                            ₹
-                          </span>
-                          <input
-                            type="number"
-                            value={proposedMinInvestment}
-                            onChange={e => setProposedMinInvestment(e.target.value)}
-                            placeholder="e.g. 25000"
-                            style={{
-                              width: '100%',
-                              padding: '9px 12px 9px 28px',
-                              borderRadius: '8px',
-                              border: '1px solid #FCD34D',
-                              backgroundColor: '#FFFFFF',
-                              fontSize: '0.86rem',
-                              fontWeight: 700,
-                              outline: 'none',
-                              boxSizing: 'border-box'
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Resubmission Instructions / Feedback */}
+              {decisionTab === 'approve' && (
+                <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: '#ECFDF5', border: '1px solid #A7F3D0', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <CheckCircle2 size={20} color="#059669" style={{ flexShrink: 0, marginTop: '2px' }} />
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#78350F', marginBottom: '6px' }}>
-                        Specific Underwriting Instructions & Reason for Changes (Required):
-                      </label>
-                      <textarea
-                        value={feedback}
-                        onChange={e => setFeedback(e.target.value)}
-                        placeholder="Provide clear reasons for the modified terms (e.g. 'Debt service coverage ratios indicate safety at ₹50 Lakhs and 11.5% interest. Please adjust your target funding and updated pro-forma statements before resubmitting.')..."
-                        rows={3}
-                        style={{
-                          width: '100%',
-                          padding: '10px 12px',
-                          borderRadius: '8px',
-                          border: '1px solid #FCD34D',
-                          backgroundColor: '#FFFFFF',
-                          fontSize: '0.84rem',
-                          outline: 'none',
-                          boxSizing: 'border-box',
-                          fontFamily: 'inherit'
-                        }}
-                      />
+                      <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#065F46' }}>
+                        Ready to Allocate Investment
+                      </div>
+                      <p style={{ fontSize: '0.78rem', color: '#047857', margin: '2px 0 0 0' }}>
+                        Approving will confirm the investment of <strong>₹{getDisplayAmount(selectedRequest).toLocaleString('en-IN')}</strong>, update total funds raised for <strong>{selectedRequest.offerId?.title || 'the opportunity'}</strong>, create the ledger transaction record, and initiate scheduled return payouts.
+                      </p>
                     </div>
                   </div>
-                )}
 
-                {/* FORM FOR TAB 2: APPROVE PROPOSAL */}
-                {decisionTab === 'approve' && (
-                  <div
-                    style={{
-                      backgroundColor: '#F0FDF4',
-                      border: '1px solid #BBF7D0',
-                      borderRadius: '12px',
-                      padding: '16px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '14px'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <CheckCircle2 size={18} color="#16A34A" />
-                      <div>
-                        <strong style={{ fontSize: '0.86rem', color: '#14532D' }}>
-                          Approve and Authorize Opportunity
-                        </strong>
-                        <p style={{ fontSize: '0.76rem', color: '#166534', margin: '2px 0 0 0' }}>
-                          Confirm approval terms. An active investment opportunity will be generated and made available to verified investors.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#14532D', marginBottom: '6px' }}>
-                          Approved Fund Target (₹):
-                        </label>
-                        <input
-                          type="number"
-                          value={proposedFundingTarget}
-                          onChange={e => setProposedFundingTarget(e.target.value)}
-                          style={{
-                            width: '100%',
-                            padding: '9px 12px',
-                            borderRadius: '8px',
-                            border: '1px solid #86EFAC',
-                            backgroundColor: '#FFFFFF',
-                            fontSize: '0.86rem',
-                            fontWeight: 700,
-                            outline: 'none',
-                            boxSizing: 'border-box'
-                          }}
-                        />
-                      </div>
-
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#14532D', marginBottom: '6px' }}>
-                          Approved Interest Rate (% p.a.):
-                        </label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={proposedReturnRate}
-                          onChange={e => setProposedReturnRate(e.target.value)}
-                          style={{
-                            width: '100%',
-                            padding: '9px 12px',
-                            borderRadius: '8px',
-                            border: '1px solid #86EFAC',
-                            backgroundColor: '#FFFFFF',
-                            fontSize: '0.86rem',
-                            fontWeight: 700,
-                            outline: 'none',
-                            boxSizing: 'border-box'
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Publish to Marketplace Checkbox */}
-                    <label
+                  <div>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#065F46', display: 'block', marginBottom: '4px' }}>
+                      Approval Remarks (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Verified compliance, allocated full requested ticket size."
+                      value={feedback}
+                      onChange={e => setFeedback(e.target.value)}
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        cursor: 'pointer',
+                        width: '100%',
+                        padding: '9px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #A7F3D0',
+                        backgroundColor: '#FFFFFF',
                         fontSize: '0.84rem',
-                        fontWeight: 600,
-                        color: '#14532D'
+                        color: '#0F172A',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {decisionTab === 'reject' && (
+                <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#991B1B', display: 'block', marginBottom: '6px' }}>
+                      Reason for Rejection *
+                    </label>
+                    <select
+                      value={rejectionReason}
+                      onChange={e => setRejectionReason(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '9px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #FCA5A5',
+                        backgroundColor: '#FFFFFF',
+                        fontSize: '0.84rem',
+                        color: '#0F172A',
+                        outline: 'none',
+                        marginBottom: '8px',
+                        cursor: 'pointer'
                       }}
                     >
-                      <input
-                        type="checkbox"
-                        checked={publishToMarketplace}
-                        onChange={e => setPublishToMarketplace(e.target.checked)}
-                        style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                      />
-                      <span>Publish immediately to Investment Marketplace (Open for investor participation)</span>
-                    </label>
+                      <option value="">Select a common reason...</option>
+                      <option value="Maximum capital limit reached for this offering">Maximum capital limit reached for this offering</option>
+                      <option value="Risk suitability threshold not satisfied">Risk suitability threshold not satisfied</option>
+                      <option value="Investor KYC / documentation pending verification">Investor KYC / documentation pending verification</option>
+                      <option value="Opportunity round closed to further commitments">Opportunity round closed to further commitments</option>
+                      <option value="Custom underwriting determination">Other / Custom determination</option>
+                    </select>
 
-                    {/* Approval Remarks */}
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#14532D', marginBottom: '6px' }}>
-                        Compliance Remarks (Optional):
-                      </label>
-                      <textarea
-                        value={feedback}
-                        onChange={e => setFeedback(e.target.value)}
-                        placeholder="e.g. Underwriting and legal compliance verified. Approved for public participation."
-                        rows={2}
-                        style={{
-                          width: '100%',
-                          padding: '10px 12px',
-                          borderRadius: '8px',
-                          border: '1px solid #86EFAC',
-                          backgroundColor: '#FFFFFF',
-                          fontSize: '0.84rem',
-                          outline: 'none',
-                          boxSizing: 'border-box',
-                          fontFamily: 'inherit'
-                        }}
-                      />
-                    </div>
+                    <textarea
+                      rows={2}
+                      placeholder="Provide specific details or custom rejection notes sent to the investor..."
+                      value={rejectionReason}
+                      onChange={e => setRejectionReason(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '9px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #FCA5A5',
+                        backgroundColor: '#FFFFFF',
+                        fontSize: '0.84rem',
+                        color: '#0F172A',
+                        outline: 'none',
+                        resize: 'vertical'
+                      }}
+                    />
                   </div>
-                )}
-
-                {/* FORM FOR TAB 3: REJECT PROPOSAL */}
-                {decisionTab === 'reject' && (
-                  <div
-                    style={{
-                      backgroundColor: '#FEF2F2',
-                      border: '1px solid #FECACA',
-                      borderRadius: '12px',
-                      padding: '16px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '14px'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <XCircle size={18} color="#DC2626" />
-                      <div>
-                        <strong style={{ fontSize: '0.86rem', color: '#991B1B' }}>
-                          Decline Investment Proposal
-                        </strong>
-                        <p style={{ fontSize: '0.76rem', color: '#7F1D1D', margin: '2px 0 0 0' }}>
-                          This will mark the proposal as rejected. The company will be notified with your feedback remarks.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#991B1B', marginBottom: '6px' }}>
-                        Reason for Rejection (Required):
-                      </label>
-                      <textarea
-                        value={feedback}
-                        onChange={e => setFeedback(e.target.value)}
-                        placeholder="Detail the underwriting deficiencies or regulatory reasons for declining this proposal..."
-                        rows={3}
-                        style={{
-                          width: '100%',
-                          padding: '10px 12px',
-                          borderRadius: '8px',
-                          border: '1px solid #FCA5A5',
-                          backgroundColor: '#FFFFFF',
-                          fontSize: '0.84rem',
-                          outline: 'none',
-                          boxSizing: 'border-box',
-                          fontFamily: 'inherit'
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
-            {/* Modal Actions Footer */}
+            {/* Modal Actions */}
             <div
               style={{
                 padding: '16px 24px',
@@ -1704,17 +1210,19 @@ export default function InvestmentApprovals() {
                 alignItems: 'center',
                 justifyContent: 'flex-end',
                 gap: '12px',
-                backgroundColor: '#F8FAFC'
+                backgroundColor: '#F8FAFC',
+                borderBottomLeftRadius: '20px',
+                borderBottomRightRadius: '20px'
               }}
             >
               <button
                 type="button"
+                onClick={handleCloseModal}
                 disabled={submitting}
-                onClick={() => setSelectedRequest(null)}
                 style={{
-                  padding: '9px 18px',
+                  padding: '9px 16px',
                   borderRadius: '10px',
-                  border: '1px solid #CBD5E1',
+                  border: '1px solid var(--border-light)',
                   backgroundColor: '#FFFFFF',
                   color: '#475569',
                   fontSize: '0.84rem',
@@ -1725,93 +1233,56 @@ export default function InvestmentApprovals() {
                 Cancel
               </button>
 
-              {decisionTab === 'resubmission' && (
-                <button
-                  type="button"
-                  disabled={submitting}
-                  onClick={() => handleSubmitDecision('Resubmission Required')}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '9px 18px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    backgroundColor: '#D97706',
-                    color: '#FFFFFF',
-                    fontSize: '0.84rem',
-                    fontWeight: 700,
-                    cursor: submitting ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 2px 4px rgba(217, 119, 6, 0.25)'
-                  }}
-                >
-                  <Send size={15} />
-                  <span>{submitting ? 'Transmitting...' : 'Send Resubmission Request'}</span>
-                </button>
-              )}
-
-              {decisionTab === 'approve' && (
-                <button
-                  type="button"
-                  disabled={submitting}
-                  onClick={() => handleSubmitDecision('Approved')}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '9px 18px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    backgroundColor: '#10B981',
-                    color: '#FFFFFF',
-                    fontSize: '0.84rem',
-                    fontWeight: 700,
-                    cursor: submitting ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 2px 4px rgba(16, 185, 129, 0.25)'
-                  }}
-                >
-                  <Check size={16} />
-                  <span>{submitting ? 'Approving...' : 'Confirm & Approve Investment'}</span>
-                </button>
-              )}
-
-              {decisionTab === 'reject' && (
-                <button
-                  type="button"
-                  disabled={submitting}
-                  onClick={() => handleSubmitDecision('Rejected')}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '9px 18px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    backgroundColor: '#DC2626',
-                    color: '#FFFFFF',
-                    fontSize: '0.84rem',
-                    fontWeight: 700,
-                    cursor: submitting ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 2px 4px rgba(220, 38, 38, 0.25)'
-                  }}
-                >
-                  <XCircle size={15} />
-                  <span>{submitting ? 'Rejecting...' : 'Confirm Rejection'}</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleSubmitDecision}
+                disabled={submitting}
+                style={{
+                  padding: '9px 20px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  backgroundColor:
+                    decisionTab === 'approve'
+                      ? '#059669'
+                      : decisionTab === 'reject'
+                      ? '#DC2626'
+                      : '#D97706',
+                  color: '#FFFFFF',
+                  fontSize: '0.84rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+                }}
+              >
+                {submitting ? (
+                  <>
+                    <RefreshCw size={14} className="spin" />
+                    <span>Processing...</span>
+                  </>
+                ) : decisionTab === 'approve' ? (
+                  <>
+                    <Check size={16} />
+                    <span>Confirm & Approve Investment</span>
+                  </>
+                ) : decisionTab === 'reject' ? (
+                  <>
+                    <X size={16} />
+                    <span>Reject Application</span>
+                  </>
+                ) : (
+                  <>
+                    <Send size={15} />
+                    <span>Send Resubmission with Changes</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
       )}
-
-      {/* Document Preview Lightbox Modal */}
-      <DocumentPreviewModal
-        isOpen={Boolean(previewDoc)}
-        onClose={() => setPreviewDoc(null)}
-        documentUrl={previewDoc}
-        title="Supporting Attachment"
-      />
     </div>
   );
 }
-

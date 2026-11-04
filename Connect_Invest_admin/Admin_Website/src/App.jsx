@@ -18,6 +18,7 @@ import Queries from './pages/Queries';
 import Subscriptions from './pages/Subscriptions';
 import Settings from './pages/Settings';
 import RegistrationApprovals from './pages/RegistrationApprovals';
+import FundApprovals from './pages/FundApprovals';
 import InvestmentApprovals from './pages/InvestmentApprovals';
 
 import { adminApi } from './services/api';
@@ -56,6 +57,7 @@ function MainApp() {
           kyb: s.pendingApprovals?.kyb || 0,
           offers: s.pendingApprovals?.offers || 0,
           fundingRequests: s.pendingApprovals?.fundingRequests || 0,
+          investorRequests: s.pendingApprovals?.investorRequests || 0,
           releases: s.pendingApprovals?.releases || 0,
           overdue: s.overdueRepaymentsCount || 0,
           readyPayouts: s.upcomingPayoutsCount || 0
@@ -94,7 +96,8 @@ function MainApp() {
   const titles = {
     dashboard: { title: 'Dashboard', subtitle: "Welcome back! Here's your platform overview." },
     approvals: { title: 'Registration Approvals', subtitle: 'Compliance review, document inspection, and activation for newly registered users' },
-    investment_approvals: { title: 'Investment Approvals', subtitle: 'Underwriting evaluation, compliance review, and decision workflow for company capital raising proposals' },
+    fund_approvals: { title: 'Fund Approvals', subtitle: 'Underwriting evaluation, compliance review, and decision workflow for company capital raising proposals' },
+    investment_approvals: { title: 'Investment Approvals', subtitle: 'Review, approve, reject, or request resubmission on investor investment applications' },
     worklist: { title: 'KYC Management', subtitle: 'Centralized queue of all pending investor verifications and approvals' },
     investors: { title: 'Investor Management', subtitle: 'Identity checks, NSDL PAN verification, and investor profiles' },
     companies: { title: 'Company Management', subtitle: 'Corporate onboarding, 7-day invite links, and cooling-off timers' },
@@ -136,6 +139,7 @@ function MainApp() {
         <main style={{ flex: 1, overflowY: 'auto' }}>
           {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}
           {activeTab === 'approvals' && <RegistrationApprovals />}
+          {activeTab === 'fund_approvals' && <FundApprovals />}
           {activeTab === 'investment_approvals' && <InvestmentApprovals />}
           {activeTab === 'worklist' && <WorkList setActiveTab={setActiveTab} />}
           {activeTab === 'investors' && <Investors />}

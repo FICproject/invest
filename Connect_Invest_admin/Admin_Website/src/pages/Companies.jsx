@@ -8,8 +8,7 @@ import {
   Search,
   ExternalLink,
   Layers,
-  Trash2,
-  PieChart,
+    PieChart,
   Eye,
   Download,
   FileText,
@@ -355,21 +354,6 @@ export default function Companies() {
                           >
                             <ShieldAlert size={12} />
                             Suspend/Revoke
-                          </button>
-                          <button
-                            onClick={() => handleDeleteCompany(c)}
-                            className="btn-danger"
-                            style={{
-                              padding: '5px 8px',
-                              fontSize: '0.75rem',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                            title="Delete company"
-                          >
-                            <Trash2 size={12} />
-                            Delete
                           </button>
                         </div>
                       </td>

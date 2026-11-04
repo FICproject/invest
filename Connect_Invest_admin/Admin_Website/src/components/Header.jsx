@@ -26,7 +26,7 @@ export default function Header({
       gap: '12px'
     }}>
       {/* Left: Sidebar Toggle & Tab Title */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
         {onToggleSidebar && (
           <button
             onClick={onToggleSidebar}
@@ -51,39 +51,21 @@ export default function Header({
           </button>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Portal
-            </span>
-            <ChevronRight size={13} color="#CBD5E1" style={{ flexShrink: 0 }} />
-            <h1 style={{
-              margin: 0,
-              fontSize: '1.05rem',
-              fontWeight: 800,
-              color: '#0F172A',
-              letterSpacing: '-0.02em',
-              lineHeight: 1.2,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}>
-              {currentMeta?.title || 'Dashboard'}
-            </h1>
-          </div>
-          {currentMeta?.subtitle && (
-            <p style={{
-              margin: '2px 0 0',
-              fontSize: '0.75rem',
-              color: '#64748B',
-              lineHeight: 1,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}>
-              {currentMeta.subtitle}
-            </p>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#94A3B8', whiteSpace: 'nowrap' }}>
+            Portal
+          </span>
+          <ChevronRight size={14} color="#CBD5E1" style={{ flexShrink: 0 }} />
+          <span style={{
+            fontSize: '0.92rem',
+            fontWeight: 700,
+            color: '#0F172A',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>
+            {currentMeta?.title || 'Dashboard'}
+          </span>
         </div>
       </div>
 

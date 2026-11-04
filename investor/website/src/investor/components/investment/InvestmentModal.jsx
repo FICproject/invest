@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, AlertCircle, CheckCircle2, ArrowRight, Lock, CreditCard } from 'lucide-react';
+import { ShieldCheck, AlertCircle, CheckCircle2, ArrowRight, Lock, CreditCard, Send, Sliders } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { Input } from '../common/Input';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { paymentService } from '../../services/paymentService';
+import { investorService } from '../../services/investorService';
 import { useAuth } from '../../context/AuthContext';
 
 export const InvestmentModal = ({ isOpen, onClose, offer, onInvestmentSuccess }) => {
@@ -17,6 +18,8 @@ export const InvestmentModal = ({ isOpen, onClose, offer, onInvestmentSuccess })
 
   const [amount, setAmount] = useState(min);
   const [paymentMethod, setPaymentMethod] = useState('Net Banking');
+  const [submissionMode, setSubmissionMode] = useState('request'); // 'request' | 'instant'
+  const [investorNote, setInvestorNote] = useState('');
   const [step, setStep] = useState('input'); // 'input' | 'processing' | 'success' | 'kyc_blocked'
   const [error, setError] = useState('');
   const [successData, setSuccessData] = useState(null);
@@ -45,6 +48,36 @@ export const InvestmentModal = ({ isOpen, onClose, offer, onInvestmentSuccess })
 
     setIsSubmitting(true);
     setStep('processing');
+
+    if (submissionMode === 'request') {
+      try {
+        const reqRes = await investorService.requestInvestment({
+          offerId: offer._id,
+          amount: numAmount,
+          investorNote: investorNote.trim()
+        });
+
+        if (reqRes.data?.success || reqRes.success) {
+          const invData = reqRes.data?.data || reqRes.data || reqRes;
+          setSuccessData({
+            ...invData,
+            amountInvested: numAmount,
+            status: 'Pending Review'
+          });
+          setStep('success');
+          if (onInvestmentSuccess) onInvestmentSuccess(invData);
+        } else {
+          setError(reqRes.data?.error || reqRes.error || 'Failed to submit investment request.');
+          setStep('input');
+        }
+      } catch (err) {
+        setError(err.response?.data?.error || err.message || 'Failed to submit investment request.');
+        setStep('input');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
 
     try {
       // 1. Create Order
@@ -178,6 +211,58 @@ export const InvestmentModal = ({ isOpen, onClose, offer, onInvestmentSuccess })
             </div>
           </div>
 
+          {/* Submission Mode Selector */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '8px' }}>
+              Investment Submission Type
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div
+                onClick={() => setSubmissionMode('request')}
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: '10px',
+                  border: submissionMode === 'request' ? '2px solid var(--color-primary)' : '1px solid var(--border-color)',
+                  backgroundColor: submissionMode === 'request' ? 'var(--color-primary-subtle)' : 'var(--bg-surface)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <Send size={16} color={submissionMode === 'request' ? 'var(--color-primary)' : 'var(--text-muted)'} />
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: submissionMode === 'request' ? 'var(--color-primary)' : 'var(--text-main)' }}>
+                    Request Approval
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Admin reviews & allocates</div>
+                </div>
+              </div>
+
+              <div
+                onClick={() => setSubmissionMode('instant')}
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: '10px',
+                  border: submissionMode === 'instant' ? '2px solid var(--color-primary)' : '1px solid var(--border-color)',
+                  backgroundColor: submissionMode === 'instant' ? 'var(--color-primary-subtle)' : 'var(--bg-surface)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <CreditCard size={16} color={submissionMode === 'instant' ? 'var(--color-primary)' : 'var(--text-muted)'} />
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: submissionMode === 'instant' ? 'var(--color-primary)' : 'var(--text-main)' }}>
+                    Instant Checkout
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Direct gateway payment</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Investment Amount Input */}
           <div style={{ marginBottom: '20px' }}>
             <Input
@@ -193,36 +278,64 @@ export const InvestmentModal = ({ isOpen, onClose, offer, onInvestmentSuccess })
             />
           </div>
 
-          {/* Payment Method Selector */}
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '8px' }}>
-              Select Payment Method
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              {['Net Banking', 'UPI', 'Bank Transfer', 'Debit/Credit Card'].map((method) => (
-                <div
-                  key={method}
-                  onClick={() => setPaymentMethod(method)}
-                  style={{
-                    padding: '10px 14px',
-                    borderRadius: '8px',
-                    border: paymentMethod === method ? '2px solid var(--color-primary)' : '1px solid var(--border-color)',
-                    backgroundColor: paymentMethod === method ? 'var(--color-primary-subtle)' : 'var(--bg-surface)',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    color: paymentMethod === method ? 'var(--color-primary)' : 'var(--text-main)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}
-                >
-                  <CreditCard size={16} />
-                  <span>{method}</span>
-                </div>
-              ))}
+          {/* Note Input for Request Approval Mode */}
+          {submissionMode === 'request' && (
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '8px' }}>
+                Investor Application Note (Optional)
+              </label>
+              <textarea
+                rows={2}
+                value={investorNote}
+                onChange={(e) => setInvestorNote(e.target.value)}
+                placeholder="Optional notes or portfolio allocation preferences for the platform administrator..."
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)',
+                  backgroundColor: 'var(--bg-surface)',
+                  color: 'var(--text-main)',
+                  fontSize: '13px',
+                  outline: 'none',
+                  resize: 'vertical'
+                }}
+              />
             </div>
-          </div>
+          )}
+
+          {/* Payment Method Selector for Instant Checkout */}
+          {submissionMode === 'instant' && (
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '8px' }}>
+                Select Payment Method
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                {['Net Banking', 'UPI', 'Bank Transfer', 'Debit/Credit Card'].map((method) => (
+                  <div
+                    key={method}
+                    onClick={() => setPaymentMethod(method)}
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: '8px',
+                      border: paymentMethod === method ? '2px solid var(--color-primary)' : '1px solid var(--border-color)',
+                      backgroundColor: paymentMethod === method ? 'var(--color-primary-subtle)' : 'var(--bg-surface)',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      color: paymentMethod === method ? 'var(--color-primary)' : 'var(--text-main)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <CreditCard size={16} />
+                    <span>{method}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Action CTAs */}
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
@@ -234,9 +347,11 @@ export const InvestmentModal = ({ isOpen, onClose, offer, onInvestmentSuccess })
               size="md"
               type="submit"
               disabled={!isKycApproved}
-              icon={Lock}
+              icon={submissionMode === 'request' ? Send : Lock}
             >
-              Confirm & Pay {formatCurrency(amount)}
+              {submissionMode === 'request'
+                ? `Submit Investment Request (${formatCurrency(amount)})`
+                : `Confirm & Pay ${formatCurrency(amount)}`}
             </Button>
           </div>
         </form>
@@ -273,23 +388,25 @@ export const InvestmentModal = ({ isOpen, onClose, offer, onInvestmentSuccess })
               width: '56px',
               height: '56px',
               borderRadius: '50%',
-              backgroundColor: '#ECFDF5',
-              color: '#10B981',
+              backgroundColor: successData.status === 'Pending Review' ? '#EFF6FF' : '#ECFDF5',
+              color: successData.status === 'Pending Review' ? '#0047BA' : '#10B981',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               margin: '0 auto 16px'
             }}
           >
-            <CheckCircle2 size={32} />
+            {successData.status === 'Pending Review' ? <Send size={28} /> : <CheckCircle2 size={32} />}
           </div>
 
           <h4 style={{ fontSize: '19px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '8px' }}>
-            Investment Allotted Successfully!
+            {successData.status === 'Pending Review' ? 'Investment Request Submitted!' : 'Investment Allotted Successfully!'}
           </h4>
 
           <p style={{ fontSize: '13.5px', color: 'var(--text-muted)', marginBottom: '24px' }}>
-            Your investment of <strong>{formatCurrency(successData.amountInvested)}</strong> has been confirmed and recorded on the platform ledger.
+            {successData.status === 'Pending Review'
+              ? `Your application to invest ${formatCurrency(successData.amountInvested)} has been submitted to platform administrators for review and underwriting approval.`
+              : `Your investment of ${formatCurrency(successData.amountInvested)} has been confirmed and recorded on the platform ledger.`}
           </p>
 
           <div
@@ -303,18 +420,37 @@ export const InvestmentModal = ({ isOpen, onClose, offer, onInvestmentSuccess })
               border: '1px solid var(--border-color)'
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Certificate No:</span>
-              <strong style={{ color: 'var(--color-primary)' }}>{successData.certificateNumber}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Transaction Reference:</span>
-              <strong>{successData.transactionRef}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Maturity Expected:</span>
-              <strong style={{ color: '#10B981' }}>{formatCurrency(successData.expectedReturns)}</strong>
-            </div>
+            {successData.status === 'Pending Review' ? (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Status:</span>
+                  <strong style={{ color: '#0047BA' }}>Pending Admin Review</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Target Opportunity:</span>
+                  <strong style={{ color: 'var(--color-primary)' }}>{offer ? offer.companyName || offer.title : 'Selected Offer'}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Requested Amount:</span>
+                  <strong style={{ color: '#0047BA' }}>{formatCurrency(successData.amountInvested)}</strong>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Certificate No:</span>
+                  <strong style={{ color: 'var(--color-primary)' }}>{successData.certificateNumber}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Transaction Reference:</span>
+                  <strong>{successData.transactionRef}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Maturity Expected:</span>
+                  <strong style={{ color: '#10B981' }}>{formatCurrency(successData.expectedReturns)}</strong>
+                </div>
+              </>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: '12px' }}>
@@ -341,3 +477,4 @@ export const InvestmentModal = ({ isOpen, onClose, offer, onInvestmentSuccess })
     </Modal>
   );
 };
+

@@ -21,7 +21,8 @@ import {
   Query,
   Subscription,
   Dividend,
-  KYC
+  KYC,
+  Transaction
 } from '../../models/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -115,9 +116,10 @@ export async function getDashboardStats(req, res, next) {
     const pendingReleasesCount = await Release.countDocuments({ status: Statuses.RELEASE_AND_REFUND.PREPARED });
     const pendingBatchesCount = await Batch.countDocuments({ status: 'Prepared' });
     const pendingFundingRequestsCount = await InvestmentRequest.countDocuments({ status: { $in: ['Submitted', 'Under Review'] } });
+    const pendingInvestorRequestsCount = await Investment.countDocuments({ status: { $in: ['Pending Review', 'Submitted', 'Pending payment', 'Under Review'] } });
 
     const totalPendingApprovals =
-      pendingKycCount + pendingKybCount + pendingOffersCount + pendingReleasesCount + pendingBatchesCount + pendingFundingRequestsCount;
+      pendingKycCount + pendingKybCount + pendingOffersCount + pendingReleasesCount + pendingBatchesCount + pendingFundingRequestsCount + pendingInvestorRequestsCount;
 
     // Failed payments
     const failedPayoutsCount = await Payout.countDocuments({ status: Statuses.PAYOUT.FAILED });
@@ -246,6 +248,7 @@ export async function getDashboardStats(req, res, next) {
           kyb: pendingKybCount,
           offers: pendingOffersCount,
           fundingRequests: pendingFundingRequestsCount,
+          investorRequests: pendingInvestorRequestsCount,
           releases: pendingReleasesCount,
           batches: pendingBatchesCount
         },
@@ -4335,3 +4338,424 @@ export async function decideFundingRequest(req, res, next) {
 }
 
 
+
+
+// ==========================================
+// INVESTOR INVESTMENT REQUESTS / APPROVALS
+// ==========================================
+
+export async function getInvestorRequests(req, res, next) {
+  try {
+    const {
+      status = 'all',
+      search = '',
+      kind = 'all'
+    } = req.query;
+
+    let query = {};
+
+    // Filter by status
+    if (status && status !== 'all') {
+      const sLower = status.toLowerCase();
+      if (sLower === 'pending' || sLower === 'pending review' || sLower === 'pending approval') {
+        query.status = { $in: ['Pending Review', 'Submitted', 'Pending payment', 'Under Review'] };
+      } else if (sLower === 'changes requested' || sLower === 'resubmission') {
+        query.status = { $in: ['Changes Requested', 'Resubmission Required'] };
+      } else if (sLower === 'approved' || sLower === 'confirmed' || sLower === 'active') {
+        query.status = { $in: ['Approved', 'Confirmed', 'Active', 'Completed'] };
+      } else if (sLower === 'rejected') {
+        query.status = 'Rejected';
+      } else {
+        query.status = status;
+      }
+    }
+
+    let requests = await Investment.find(query)
+      .populate({
+        path: 'investorId',
+        select: 'name email mobile status role createdAt'
+      })
+      .populate({
+        path: 'offerId',
+        select: 'title companyName category returnRate tenureMonths targetAmount raisedAmount kind minInvestment maxInvestment status rateBps tenures targetPaise raisedPaise'
+      })
+      .populate('reviewedBy', 'name email role')
+      .sort({ createdAt: -1 });
+
+    // Populate investor KYC details for each request
+    const investorIds = requests.map(r => r.investorId?._id).filter(Boolean);
+    const kycProfiles = await InvestorProfile.find({ userId: { $in: investorIds } }).select('userId kycStatus panNumber');
+    const kycMap = {};
+    kycProfiles.forEach(p => {
+      if (p.userId) {
+        kycMap[p.userId.toString()] = {
+          kycStatus: p.kycStatus,
+          panNumber: p.panNumber
+        };
+      }
+    });
+
+    let transformed = requests.map(r => {
+      const obj = r.toObject();
+      const kycInfo = r.investorId?._id ? kycMap[r.investorId._id.toString()] : null;
+      return {
+        ...obj,
+        investorKycStatus: kycInfo?.kycStatus || 'Pending',
+        investorPan: kycInfo?.panNumber || '—'
+      };
+    });
+
+    // Filter by kind if specified
+    if (kind && kind !== 'all') {
+      transformed = transformed.filter(r => r.offerId?.kind === kind);
+    }
+
+    // Filter by search string if specified
+    if (search && search.trim()) {
+      const s = search.trim().toLowerCase();
+      transformed = transformed.filter(r =>
+        r.investorId?.name?.toLowerCase().includes(s) ||
+        r.investorId?.email?.toLowerCase().includes(s) ||
+        r.investorId?.mobile?.toLowerCase().includes(s) ||
+        r.offerId?.title?.toLowerCase().includes(s) ||
+        r.offerId?.companyName?.toLowerCase().includes(s) ||
+        r.investorPan?.toLowerCase().includes(s) ||
+        r.certificateNumber?.toLowerCase().includes(s)
+      );
+    }
+
+    // Calculate global stats across all investments
+    const allInvs = await Investment.find({});
+    const totalPending = allInvs.filter(i => ['Pending Review', 'Submitted', 'Pending payment', 'Under Review'].includes(i.status)).length;
+    const changesRequested = allInvs.filter(i => ['Changes Requested', 'Resubmission Required'].includes(i.status)).length;
+    const totalApproved = allInvs.filter(i => ['Approved', 'Confirmed', 'Active', 'Completed'].includes(i.status)).length;
+    const totalRejected = allInvs.filter(i => i.status === 'Rejected').length;
+    const pendingCapitalPaise = allInvs
+      .filter(i => ['Pending Review', 'Submitted', 'Pending payment', 'Under Review'].includes(i.status))
+      .reduce((sum, i) => sum + (Number(i.amountInvested || i.amount || 0) * 100), 0);
+
+    return res.json({
+      success: true,
+      count: transformed.length,
+      stats: {
+        total: allInvs.length,
+        totalPending,
+        changesRequested,
+        totalApproved,
+        totalRejected,
+        pendingCapitalPaise
+      },
+      requests: transformed
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getInvestorRequestById(req, res, next) {
+  try {
+    const investment = await Investment.findById(req.params.id)
+      .populate('investorId', 'name email mobile status role createdAt')
+      .populate('offerId')
+      .populate('reviewedBy', 'name email role');
+
+    if (!investment) {
+      return res.status(404).json({ success: false, error: 'Investor request not found' });
+    }
+
+    const profile = await InvestorProfile.findOne({ userId: investment.investorId?._id });
+
+    return res.json({
+      success: true,
+      request: {
+        ...investment.toObject(),
+        investorProfile: profile || null
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function decideInvestorRequest(req, res, next) {
+  try {
+    const { id } = req.params;
+    const {
+      decision, // 'Approved' | 'Rejected' | 'Changes Requested'
+      feedback,
+      proposedAmount, // counter-amount if admin is revising the requested sum
+      rejectionReason
+    } = req.body;
+
+    const investment = await Investment.findById(id)
+      .populate('investorId')
+      .populate('offerId');
+
+    if (!investment) {
+      return res.status(404).json({ success: false, error: 'Investor request not found' });
+    }
+
+    const trimmedFeedback = (feedback || '').trim();
+    const investor = investment.investorId;
+    const offer = investment.offerId;
+
+    if (decision === 'Approved') {
+      const finalAmount = proposedAmount ? Number(proposedAmount) : (investment.amountInvested || investment.amount || 0);
+      investment.amountInvested = finalAmount;
+      investment.amount = finalAmount;
+      investment.amountPaise = Math.round(finalAmount * 100);
+      investment.status = 'Approved';
+      investment.adminFeedback = trimmedFeedback || 'Investment application approved by platform administration.';
+      investment.reviewedBy = req.user._id;
+      investment.reviewedAt = new Date();
+
+      // Recalculate returns based on approved amount
+      const annualRate = investment.returnRate || (offer ? offer.returnRate || (offer.rateBps ? offer.rateBps / 100 : 12) : 12);
+      const tenureMonths = investment.tenureMonths || (offer ? offer.tenureMonths || (offer.tenures ? offer.tenures[0] : 12) : 12);
+      const totalInterest = Math.round((finalAmount * annualRate * (tenureMonths / 12)) / 100);
+      const totalMaturity = finalAmount + totalInterest;
+
+      investment.returnRate = annualRate;
+      investment.tenureMonths = tenureMonths;
+      investment.expectedReturns = totalMaturity;
+
+      if (!investment.startDate) investment.startDate = new Date();
+      if (!investment.maturityDate) {
+        const mat = new Date(investment.startDate);
+        mat.setMonth(mat.getMonth() + tenureMonths);
+        investment.maturityDate = mat;
+      }
+
+      await investment.save();
+
+      // Update offer raised amount if associated offer exists
+      if (offer) {
+        offer.raisedAmount = (offer.raisedAmount || 0) + finalAmount;
+        offer.raisedPaise = (offer.raisedPaise || 0) + Math.round(finalAmount * 100);
+        if (offer.targetAmount && offer.raisedAmount >= offer.targetAmount) {
+          offer.status = 'Fully Funded';
+        }
+        await offer.save();
+      }
+
+      // Record transaction
+      const txnRef = 'TXN_' + Math.floor(100000000 + Math.random() * 900000000);
+      try {
+        await Transaction.create({
+          investorId: investor?._id,
+          investmentId: investment._id,
+          title: `Investment in ${offer?.companyName || offer?.title || 'Opportunity'}`,
+          type: 'Investment',
+          amount: finalAmount,
+          amountPaise: Math.round(finalAmount * 100),
+          status: 'Confirmed',
+          referenceId: txnRef,
+          paymentMethod: 'Bank Transfer / Platform Balance',
+          description: `Approved investment into ${offer?.title || 'Corporate Debt'} (${annualRate}% p.a. for ${tenureMonths} Months)`
+        });
+      } catch (txErr) {
+        console.warn('Transaction creation notice:', txErr.message);
+      }
+
+      // Generate payouts schedule if not yet present
+      const existingPayouts = await Payout.find({ investmentId: investment._id });
+      if (existingPayouts.length === 0 && tenureMonths > 0) {
+        const monthlyReturnAmount = Math.round(totalInterest / tenureMonths);
+        for (let m = 1; m <= tenureMonths; m++) {
+          const payoutDate = new Date(investment.startDate);
+          payoutDate.setMonth(payoutDate.getMonth() + m);
+
+          await Payout.create({
+            investorId: investor?._id,
+            investmentId: investment._id,
+            offerTitle: offer?.companyName || offer?.title || 'Investment Offer',
+            amount: m === tenureMonths ? monthlyReturnAmount + finalAmount : monthlyReturnAmount,
+            amountPaise: Math.round((m === tenureMonths ? monthlyReturnAmount + finalAmount : monthlyReturnAmount) * 100),
+            payoutType: m === tenureMonths ? 'Maturity Payout' : 'Monthly Interest',
+            scheduledDate: payoutDate,
+            status: Statuses.PAYOUT.SCHEDULED || 'Scheduled'
+          });
+        }
+      }
+
+      // Log action in audit log
+      await logAction({
+        actorId: req.user._id,
+        role: req.user.role,
+        action: 'INVESTOR_REQUEST_APPROVED',
+        targetEntity: 'Investment',
+        targetId: investment._id,
+        reason: investment.adminFeedback,
+        ipAddress: req.ip
+      });
+
+      broadcastSyncEvent('INVESTMENT_DECISION', 'APPROVED', {
+        investmentId: investment._id,
+        status: investment.status,
+        investorId: investor?._id,
+        amount: finalAmount
+      });
+
+      return res.json({
+        success: true,
+        message: `Investment request for ₹${finalAmount.toLocaleString('en-IN')} approved successfully!`,
+        investment
+      });
+    } else if (decision === 'Rejected') {
+      const reason = (rejectionReason || trimmedFeedback || 'Investment application rejected based on allocation guidelines.').trim();
+      investment.status = 'Rejected';
+      investment.rejectionReason = reason;
+      investment.adminFeedback = trimmedFeedback || reason;
+      investment.reviewedBy = req.user._id;
+      investment.reviewedAt = new Date();
+      await investment.save();
+
+      await logAction({
+        actorId: req.user._id,
+        role: req.user.role,
+        action: 'INVESTOR_REQUEST_REJECTED',
+        targetEntity: 'Investment',
+        targetId: investment._id,
+        reason,
+        ipAddress: req.ip
+      });
+
+      broadcastSyncEvent('INVESTMENT_DECISION', 'REJECTED', {
+        investmentId: investment._id,
+        status: investment.status,
+        investorId: investor?._id,
+        reason
+      });
+
+      return res.json({
+        success: true,
+        message: 'Investment application rejected.',
+        investment
+      });
+    } else if (decision === 'Changes Requested' || decision === 'Resubmission Required') {
+      const pAmount = (proposedAmount !== undefined && proposedAmount !== null && proposedAmount !== '')
+        ? Number(proposedAmount)
+        : null;
+
+      investment.status = 'Changes Requested';
+      investment.proposedAmount = pAmount;
+      investment.proposedAmountPaise = pAmount ? Math.round(pAmount * 100) : null;
+      investment.adminSuggestions = trimmedFeedback || `Admin proposed revised investment amount of ₹${pAmount ? pAmount.toLocaleString('en-IN') : 'N/A'}`;
+      investment.adminFeedback = trimmedFeedback;
+      investment.reviewedBy = req.user._id;
+      investment.reviewedAt = new Date();
+
+      investment.revisionHistory = investment.revisionHistory || [];
+      investment.revisionHistory.push({
+        amount: investment.amountInvested || investment.amount,
+        proposedAmount: pAmount,
+        feedback: trimmedFeedback,
+        decision: 'Changes Requested',
+        date: new Date(),
+        changedBy: req.user.name || 'Admin'
+      });
+
+      await investment.save();
+
+      await logAction({
+        actorId: req.user._id,
+        role: req.user.role,
+        action: 'INVESTOR_REQUEST_CHANGES_REQUESTED',
+        targetEntity: 'Investment',
+        targetId: investment._id,
+        reason: trimmedFeedback,
+        details: { proposedAmount: pAmount },
+        ipAddress: req.ip
+      });
+
+      broadcastSyncEvent('INVESTMENT_DECISION', 'CHANGES_REQUESTED', {
+        investmentId: investment._id,
+        status: investment.status,
+        investorId: investor?._id,
+        proposedAmount: pAmount
+      });
+
+      return res.json({
+        success: true,
+        message: `Changes requested. Proposed counter amount of ₹${pAmount ? pAmount.toLocaleString('en-IN') : 'N/A'} sent to investor.`,
+        investment
+      });
+    } else {
+      return res.status(400).json({ success: false, error: 'Invalid decision specified' });
+    }
+  } catch (error) {
+    next(error);
+  }
+}
+
+
+// ==========================================
+// OFFER INVESTORS LIST
+// ==========================================
+
+export async function getOfferInvestments(req, res, next) {
+  try {
+    const { id } = req.params;
+    let offer = await Offer.findById(id).populate('companyId', 'name legalName regNo');
+    
+    // If not found in Offer, it could be an InvestmentRequest ID
+    let requestProposal = null;
+    if (!offer) {
+      requestProposal = await InvestmentRequest.findById(id).populate('companyId', 'name legalName regNo');
+    }
+
+    // Find investments matching this offer or matching by title/company
+    let query = { offerId: id };
+    if (!offer && requestProposal) {
+      const matchingOffer = await Offer.findOne({ companyId: requestProposal.companyId?._id, title: requestProposal.title });
+      if (matchingOffer) {
+        query = { offerId: matchingOffer._id };
+        offer = matchingOffer;
+      } else {
+        query = { offerId: requestProposal._id };
+      }
+    }
+
+    const investments = await Investment.find(query)
+      .populate('investorId', 'name email mobile status role')
+      .sort({ createdAt: -1 });
+
+    const totalInvestedPaise = investments
+      .filter(i => i.status !== 'Rejected' && i.status !== 'Cancelled')
+      .reduce((sum, i) => sum + (i.amountPaise || (Number(i.amountInvested || i.amount || 0) * 100)), 0);
+
+    const targetOfferInfo = offer || requestProposal;
+
+    return res.json({
+      success: true,
+      offer: {
+        id: targetOfferInfo?._id,
+        title: targetOfferInfo?.title || 'Investment Opportunity',
+        companyName: targetOfferInfo?.companyId?.name || targetOfferInfo?.companyId?.legalName || 'Registered Enterprise',
+        targetPaise: targetOfferInfo?.targetPaise || (Number(targetOfferInfo?.fundingTarget || 0) * 100),
+        raisedPaise: targetOfferInfo?.raisedPaise || totalInvestedPaise,
+        status: targetOfferInfo?.status || 'Open',
+        returnRate: targetOfferInfo?.returnRate || (targetOfferInfo?.rateBps ? targetOfferInfo.rateBps / 100 : (targetOfferInfo?.expectedReturnRate || 12)),
+        tenureMonths: targetOfferInfo?.tenures ? targetOfferInfo.tenures[0] : (targetOfferInfo?.durationMonths || 12)
+      },
+      count: investments.length,
+      totalInvestedPaise,
+      investors: investments.map(inv => ({
+        id: inv._id,
+        investorName: inv.investorId?.name || 'Verified Investor',
+        investorEmail: inv.investorId?.email || '—',
+        investorMobile: inv.investorId?.mobile || '—',
+        amount: inv.amountInvested || inv.amount || (inv.amountPaise ? inv.amountPaise / 100 : 0),
+        amountPaise: inv.amountPaise || Math.round((Number(inv.amountInvested || inv.amount || 0)) * 100),
+        status: inv.status || 'Confirmed',
+        date: inv.createdAt,
+        certificateNumber: inv.certificateNumber || '—',
+        returnRate: inv.returnRate,
+        tenureMonths: inv.tenureMonths,
+        expectedReturns: inv.expectedReturns
+      }))
+    });
+  } catch (error) {
+    next(error);
+  }
+}

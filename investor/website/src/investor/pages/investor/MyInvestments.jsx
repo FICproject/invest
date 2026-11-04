@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Briefcase, Search, Calendar, TrendingUp, Award, Layers } from 'lucide-react';
+import { Briefcase, Search, Calendar, TrendingUp, Award, Layers, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { Button } from '../../components/common/Button';
 import { Loader } from '../../components/common/Loader';
@@ -41,6 +41,25 @@ export const MyInvestments = () => {
     return () => { isMounted = false; };
   }, [statusFilter, search]);
 
+  const handleAcceptCounter = async (investmentId) => {
+    try {
+      setLoading(true);
+      await investorService.respondToCounter(investmentId, { action: 'accept' });
+      const params = {
+        status: statusFilter !== 'All' ? statusFilter : undefined,
+        search: search.trim() || undefined
+      };
+      const res = await investorService.getMyInvestments(params);
+      if (res.success && res.data) {
+        setInvestments(res.data);
+      }
+    } catch (err) {
+      console.error('[MyInvestments] Error accepting counter terms:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -76,7 +95,7 @@ export const MyInvestments = () => {
         >
           {/* Tabs */}
           <div style={{ display: 'flex', gap: '8px' }}>
-            {['All', 'Confirmed', 'Pending', 'Completed'].map((tab) => (
+            {['All', 'Pending Review', 'Changes Requested', 'Confirmed', 'Completed'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setStatusFilter(tab)}
@@ -201,6 +220,82 @@ export const MyInvestments = () => {
                       </div>
                     </div>
                   </div>
+
+                  {/* Changes Requested Banner */}
+                  {inv.status === 'Changes Requested' && (
+                    <div
+                      style={{
+                        width: '100%',
+                        padding: '14px 18px',
+                        borderRadius: '10px',
+                        backgroundColor: '#FFFBEB',
+                        border: '1px solid #FDE68A',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: '12px'
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '700', color: '#92400E' }}>
+                          <AlertTriangle size={15} color="#D97706" />
+                          <span>Admin Counter-Proposal: <strong>{formatCurrency(inv.proposedAmount)}</strong></span>
+                          <span style={{ fontSize: '11px', color: '#B45309' }}>(Original: {formatCurrency(inv.amountInvested)})</span>
+                        </div>
+                        <div style={{ fontSize: '12.5px', color: '#78350F', marginTop: '3px' }}>
+                          <em>"{inv.adminSuggestions || inv.adminFeedback || 'Admin proposed revised investment terms.'}"</em>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => handleAcceptCounter(inv._id)}
+                        >
+                          Accept Proposed Amount ({formatCurrency(inv.proposedAmount)})
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pending Review Banner */}
+                  {inv.status === 'Pending Review' && (
+                    <div
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: '8px',
+                        backgroundColor: '#EFF6FF',
+                        border: '1px solid #BFDBFE',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        fontSize: '12.5px',
+                        color: '#1E40AF'
+                      }}
+                    >
+                      <Clock size={14} color="#2563EB" />
+                      <span>Investment application is currently awaiting underwriting approval from the platform administrator.</span>
+                    </div>
+                  )}
+
+                  {/* Rejection Banner */}
+                  {inv.status === 'Rejected' && (
+                    <div
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: '8px',
+                        backgroundColor: '#FEF2F2',
+                        border: '1px solid #FECACA',
+                        fontSize: '12.5px',
+                        color: '#991B1B'
+                      }}
+                    >
+                      <strong>Application Not Approved:</strong> {inv.rejectionReason || inv.adminFeedback || 'Underwriting criteria not satisfied.'}
+                    </div>
+                  )}
 
                   {/* Right Action */}
                   <div>

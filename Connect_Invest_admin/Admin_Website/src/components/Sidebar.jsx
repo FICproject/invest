@@ -30,7 +30,8 @@ export default function Sidebar({
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
     { id: 'approvals', label: 'Registration Approvals', icon: ShieldCheck, badgeCount: (pendingCounts?.kyc || 0) + (pendingCounts?.kyb || 0) || pendingCounts?.total || 0 },
-    { id: 'investment_approvals', label: 'Investment Approvals', icon: CheckSquare, badgeCount: pendingCounts?.fundingRequests || 0 },
+    { id: 'fund_approvals', label: 'Fund Approvals', icon: CheckSquare, badgeCount: pendingCounts?.fundingRequests || 0 },
+    { id: 'investment_approvals', label: 'Investment Approvals', icon: TrendingUp, badgeCount: pendingCounts?.investorRequests || 0 },
     { id: 'investors', label: 'Investor Management', icon: Users },
     { id: 'companies', label: 'Company Management', icon: Building2 },
     { id: 'offers', label: 'Investment Management', icon: Briefcase, badgeCount: pendingCounts?.offers || 0 },

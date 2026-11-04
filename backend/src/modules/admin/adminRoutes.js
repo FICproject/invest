@@ -16,6 +16,7 @@ import {
   decideKyb,
   deleteCompany,
   getOffers,
+  getOfferInvestments,
   createOffer,
   setOfferTerms,
   publishOffer,
@@ -58,7 +59,10 @@ import {
   downloadDocument,
   getFundingRequests,
   getFundingRequestById,
-  decideFundingRequest
+  decideFundingRequest,
+  getInvestorRequests,
+  getInvestorRequestById,
+  decideInvestorRequest
 } from './adminController.js';
 import { authenticate, requireAdmin } from '../../middleware/auth.js';
 
@@ -99,6 +103,7 @@ router.delete('/companies/:id', deleteCompany);
 // Offers & Term Sheets
 router.get('/offers', getOffers);
 router.post('/offers', createOffer);
+router.get('/offers/:id/investments', getOfferInvestments);
 router.put('/offers/:id/terms', setOfferTerms);
 router.post('/offers/:id/publish', publishOffer);
 router.post('/offers/:id/activate', activateOffer);
@@ -109,6 +114,11 @@ router.delete('/offers/:id', deleteOffer);
 router.get('/funding-requests', getFundingRequests);
 router.get('/funding-requests/:id', getFundingRequestById);
 router.post('/funding-requests/:id/decision', decideFundingRequest);
+
+// Investor Investment Requests (Investor side applications)
+router.get('/investor-requests', getInvestorRequests);
+router.get('/investor-requests/:id', getInvestorRequestById);
+router.post('/investor-requests/:id/decision', decideInvestorRequest);
 
 // Equity Dividends
 router.get('/dividends', getDividends);

@@ -52,6 +52,10 @@ export const Statuses = {
     CLOSED: 'Closed'
   },
   INVESTMENT: {
+    PENDING_REVIEW: 'Pending Review',
+    CHANGES_REQUESTED: 'Changes Requested',
+    APPROVED: 'Approved',
+    REJECTED: 'Rejected',
     PENDING_PAYMENT: 'Pending payment',
     CONFIRMED: 'Confirmed',
     ACTIVE: 'Active',
