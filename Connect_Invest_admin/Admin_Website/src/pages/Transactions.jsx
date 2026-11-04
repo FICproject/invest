@@ -256,11 +256,10 @@ export default function Transactions() {
                         </div>
                       </td>
                       <td>
-                        <span className={`badge ${
-                          tx.status === 'Completed' || tx.status === 'Paid' ? 'badge-emerald' :
+                        <span className={`badge ${tx.status === 'Completed' || tx.status === 'Paid' ? 'badge-emerald' :
                           tx.status === 'Verified Ready' || tx.status === 'Ready' ? 'badge-cyan' :
-                          tx.status === 'Due' ? 'badge-amber' : 'badge-slate'
-                        }`}>
+                            tx.status === 'Due' ? 'badge-amber' : 'badge-slate'
+                          }`}>
                           {tx.status}
                         </span>
                       </td>

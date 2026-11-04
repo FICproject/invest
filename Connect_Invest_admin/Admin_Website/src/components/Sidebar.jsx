@@ -13,7 +13,8 @@ import {
   Settings as SettingsIcon,
   LogOut,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  CheckSquare
 } from 'lucide-react';
 import { ForgeIndiaBrandHeader } from '../assets/ForgeIndiaLogo';
 import { useAuth } from '../context/AuthContext';
@@ -29,9 +30,10 @@ export default function Sidebar({
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
     { id: 'approvals', label: 'Registration Approvals', icon: ShieldCheck, badgeCount: (pendingCounts?.kyc || 0) + (pendingCounts?.kyb || 0) || pendingCounts?.total || 0 },
+    { id: 'investment_approvals', label: 'Investment Approvals', icon: CheckSquare, badgeCount: pendingCounts?.fundingRequests || 0 },
     { id: 'investors', label: 'Investor Management', icon: Users },
     { id: 'companies', label: 'Company Management', icon: Building2 },
-    { id: 'offers', label: 'Investment Management', icon: Briefcase, badgeCount: (pendingCounts?.fundingRequests || 0) + (pendingCounts?.offers || 0) },
+    { id: 'offers', label: 'Investment Management', icon: Briefcase, badgeCount: pendingCounts?.offers || 0 },
     { id: 'kyc', label: 'KYC Management', icon: ShieldCheck },
     { id: 'investments_portfolio', label: 'Investments', icon: TrendingUp },
     { id: 'transactions', label: 'Transactions', icon: CreditCard },

@@ -60,6 +60,9 @@ export const RequestList: React.FC = () => {
         return 'success';
       case 'Submitted':
       case 'Under Review':
+      case 'Resubmission Required':
+      case 'Changes Requested':
+      case 'Additional Information Required':
         return 'warning';
       case 'Draft':
         return 'slate';

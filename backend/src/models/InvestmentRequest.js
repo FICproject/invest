@@ -80,6 +80,8 @@ const investmentRequestSchema = new mongoose.Schema(
         'Rejected',
         'Funded',
         'Additional Information Required',
+        'Resubmission Required',
+        'Changes Requested',
         'Open for Investment',
         'Funding Completed',
         'Cancelled'
@@ -89,7 +91,36 @@ const investmentRequestSchema = new mongoose.Schema(
     },
     reviewerFeedback: { type: String, default: '' },
     reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    reviewedAt: { type: Date }
+    reviewedAt: { type: Date },
+
+    // Counter-proposal / Resubmission changes requested by Admin
+    proposedFundingTarget: { type: Number, default: null },
+    proposedReturnRate: { type: Number, default: null },
+    proposedDurationMonths: { type: Number, default: null },
+    proposedMinInvestment: { type: Number, default: null },
+    adminSuggestions: {
+      fundingTarget: { type: Number },
+      returnRate: { type: Number },
+      durationMonths: { type: Number },
+      minInvestment: { type: Number },
+      notes: { type: String },
+      suggestedAt: { type: Date },
+      suggestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+    },
+    revisionHistory: [
+      {
+        suggestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        suggestedAt: { type: Date, default: Date.now },
+        decision: { type: String },
+        feedback: { type: String },
+        proposedFundingTarget: { type: Number },
+        proposedReturnRate: { type: Number },
+        proposedDurationMonths: { type: Number },
+        proposedMinInvestment: { type: Number },
+        originalFundingTarget: { type: Number },
+        originalReturnRate: { type: Number }
+      }
+    ]
   },
   { timestamps: true }
 );

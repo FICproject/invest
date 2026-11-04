@@ -382,12 +382,11 @@ export default function Payouts() {
                         </td>
                         <td>
                           <span
-                            className={`badge ${
-                              isPaid ? 'badge-emerald' :
+                            className={`badge ${isPaid ? 'badge-emerald' :
                               isReady ? 'badge-cyan' :
-                              isInBatch ? 'badge-indigo' :
-                              p.status === 'Failed' ? 'badge-rose' : 'badge-amber'
-                            }`}
+                                isInBatch ? 'badge-indigo' :
+                                  p.status === 'Failed' ? 'badge-rose' : 'badge-amber'
+                              }`}
                           >
                             {isPending ? 'Pending Verification' : isReady ? 'Verified (Ready)' : p.status}
                           </span>

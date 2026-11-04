@@ -57,9 +57,10 @@ export default function SidebarDrawer({
   // Exact tabs matching frontend/src/components/Sidebar.jsx
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
+    { id: 'approvals', label: 'Registration Approvals', icon: ShieldCheck, badge: pendingKycCount },
+    { id: 'investment_approvals', label: 'Investment Approvals', icon: ShieldCheck },
     { id: 'investors', label: 'Investor Management', icon: Users },
     { id: 'companies', label: 'Company Management', icon: Building2 },
-    { id: 'approvals', label: 'Registration Approvals', icon: ShieldCheck, badge: pendingKycCount },
     { id: 'offers', label: 'Investment Management', icon: Briefcase },
     { id: 'kyc', label: 'KYC Management', icon: ShieldCheck, badge: pendingKycCount },
     { id: 'investments_portfolio', label: 'Investments', icon: TrendingUp },

@@ -11,6 +11,7 @@ import { Notification } from '../models/Notification.js';
 import { AuditLog } from '../models/AuditLog.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { broadcastSyncEvent } from '../services/sse.js';
 
 // 1. Company Profile Management
 export const getCompanyProfile = asyncHandler(async (req, res) => {
@@ -303,6 +304,8 @@ export const updateRequest = asyncHandler(async (req, res) => {
   const { isDraft, ...updates } = req.body;
   if (isDraft !== undefined) {
     request.status = (isDraft === true || isDraft === 'true') ? 'Draft' : 'Submitted';
+  } else if (['Resubmission Required', 'Changes Requested', 'Additional Information Required'].includes(request.status)) {
+    request.status = 'Submitted';
   }
 
   if (updates.fundingTarget) updates.fundingTarget = Number(updates.fundingTarget);
@@ -320,9 +323,24 @@ export const updateRequest = asyncHandler(async (req, res) => {
   Object.assign(request, updates);
   await request.save();
 
+  if (request.status === 'Submitted') {
+    broadcastSyncEvent('INVESTMENT_APPROVAL', 'RESUBMITTED', {
+      requestId: request._id,
+      companyId: req.company._id,
+      title: request.title
+    });
+    broadcastSyncEvent('FUNDING_REQUEST_DECISION', 'RESUBMITTED', {
+      requestId: request._id,
+      companyId: req.company._id,
+      title: request.title
+    });
+  }
+
   res.status(200).json({
     success: true,
-    message: 'Investment request updated successfully',
+    message: request.status === 'Submitted'
+      ? 'Investment request resubmitted for admin approval'
+      : 'Investment request updated successfully',
     request
   });
 });

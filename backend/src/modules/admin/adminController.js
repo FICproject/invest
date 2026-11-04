@@ -3965,13 +3965,42 @@ export async function downloadDocument(req, res, next) {
 // ==========================================
 export async function getFundingRequests(req, res, next) {
   try {
-    const { status = 'all', search = '' } = req.query;
+    const {
+      status = 'all',
+      search = '',
+      investmentModel = 'all',
+      investmentPurpose = 'all'
+    } = req.query;
+
     let query = {};
+
+    // Intelligent status mapping
     if (status && status !== 'all') {
-      query.status = status;
+      const sLower = status.toLowerCase();
+      if (sLower === 'pending' || sLower === 'pending review' || sLower === 'pending approval') {
+        query.status = { $in: ['Submitted', 'Under Review'] };
+      } else if (sLower === 'approved' || sLower === 'live') {
+        query.status = { $in: ['Approved', 'Open for Investment', 'Funded', 'Funding Completed'] };
+      } else if (sLower === 'resubmission' || sLower === 'resubmission required' || sLower === 'changes requested') {
+        query.status = { $in: ['Resubmission Required', 'Changes Requested', 'Additional Information Required'] };
+      } else if (sLower === 'rejected') {
+        query.status = 'Rejected';
+      } else {
+        query.status = status;
+      }
     }
+
+    if (investmentModel && investmentModel !== 'all') {
+      query.investmentModel = investmentModel;
+    }
+
+    if (investmentPurpose && investmentPurpose !== 'all') {
+      query.investmentPurpose = investmentPurpose;
+    }
+
     let requests = await InvestmentRequest.find(query)
       .populate('companyId')
+      .populate('reviewedBy', 'name email role')
       .sort({ createdAt: -1 });
 
     if (search && search.trim()) {
@@ -3981,13 +4010,33 @@ export async function getFundingRequests(req, res, next) {
         r.companyId?.name?.toLowerCase().includes(s) ||
         r.companyId?.legalName?.toLowerCase().includes(s) ||
         r.category?.toLowerCase().includes(s) ||
-        r.entityOrProjectName?.toLowerCase().includes(s)
+        r.entityOrProjectName?.toLowerCase().includes(s) ||
+        r.investmentPurpose?.toLowerCase().includes(s) ||
+        r.investmentModel?.toLowerCase().includes(s)
       );
     }
+
+    // Global counts across all requests for accurate dashboard counters
+    const allRequests = await InvestmentRequest.find({});
+    const totalPending = allRequests.filter(r => ['Submitted', 'Under Review'].includes(r.status)).length;
+    const totalApproved = allRequests.filter(r => ['Approved', 'Open for Investment', 'Funded', 'Funding Completed'].includes(r.status)).length;
+    const resubmissionsNeeded = allRequests.filter(r => ['Resubmission Required', 'Changes Requested', 'Additional Information Required'].includes(r.status)).length;
+    const totalRejected = allRequests.filter(r => r.status === 'Rejected').length;
+    const pendingCapitalPaise = allRequests
+      .filter(r => ['Submitted', 'Under Review'].includes(r.status))
+      .reduce((sum, r) => sum + (Number(r.fundingTarget) || 0) * 100, 0);
 
     return res.json({
       success: true,
       count: requests.length,
+      stats: {
+        total: allRequests.length,
+        totalPending,
+        totalApproved,
+        resubmissionsNeeded,
+        totalRejected,
+        pendingCapitalPaise
+      },
       requests
     });
   } catch (error) {
@@ -3997,7 +4046,9 @@ export async function getFundingRequests(req, res, next) {
 
 export async function getFundingRequestById(req, res, next) {
   try {
-    const request = await InvestmentRequest.findById(req.params.id).populate('companyId');
+    const request = await InvestmentRequest.findById(req.params.id)
+      .populate('companyId')
+      .populate('reviewedBy', 'name email role');
     if (!request) {
       return res.status(404).json({ success: false, error: 'Funding request not found' });
     }
@@ -4010,7 +4061,16 @@ export async function getFundingRequestById(req, res, next) {
 export async function decideFundingRequest(req, res, next) {
   try {
     const { id } = req.params;
-    const { decision, feedback, publishToMarketplace = true } = req.body;
+    const {
+      decision,
+      feedback,
+      publishToMarketplace = true,
+      // Counter proposal parameters
+      proposedFundingTarget,
+      proposedReturnRate,
+      proposedDurationMonths,
+      proposedMinInvestment
+    } = req.body;
 
     const request = await InvestmentRequest.findById(id).populate('companyId');
     if (!request) {
@@ -4025,9 +4085,27 @@ export async function decideFundingRequest(req, res, next) {
     const trimmedFeedback = feedback?.trim() || '';
 
     if (decision === 'Approved') {
+      // If admin modified the parameters on approval, apply them
+      if (proposedFundingTarget) {
+        request.fundingTarget = Number(proposedFundingTarget);
+      }
+      if (proposedReturnRate) {
+        request.expectedReturnRate = Number(proposedReturnRate);
+        request.agreedReturnRate = Number(proposedReturnRate);
+      }
+      if (proposedDurationMonths) {
+        request.durationMonths = Number(proposedDurationMonths);
+        request.investmentPeriodYears = Math.round(Number(proposedDurationMonths) / 12) || 1;
+      }
+      if (proposedMinInvestment) {
+        request.minInvestment = Number(proposedMinInvestment);
+      }
+
       const finalStatus = publishToMarketplace ? 'Open for Investment' : 'Approved';
       request.status = finalStatus;
       request.reviewerFeedback = trimmedFeedback || 'Funding request approved by platform administration.';
+      request.reviewedBy = req.user._id;
+      request.reviewedAt = new Date();
       await request.save();
 
       // Check if an offer already exists for this request
@@ -4109,6 +4187,12 @@ export async function decideFundingRequest(req, res, next) {
         title: request.title
       });
 
+      broadcastSyncEvent('INVESTMENT_APPROVAL', 'APPROVED', {
+        requestId: request._id,
+        status: request.status,
+        companyId: company._id
+      });
+
       return res.json({
         success: true,
         message: publishToMarketplace
@@ -4120,6 +4204,8 @@ export async function decideFundingRequest(req, res, next) {
     } else if (decision === 'Rejected') {
       request.status = 'Rejected';
       request.reviewerFeedback = trimmedFeedback || 'Request rejected based on underwriting criteria.';
+      request.reviewedBy = req.user._id;
+      request.reviewedAt = new Date();
       await request.save();
 
       await logAction({
@@ -4140,27 +4226,104 @@ export async function decideFundingRequest(req, res, next) {
         title: request.title
       });
 
+      broadcastSyncEvent('INVESTMENT_APPROVAL', 'REJECTED', {
+        requestId: request._id,
+        status: request.status,
+        companyId: company._id
+      });
+
       return res.json({
         success: true,
         message: 'Funding request has been rejected.',
         request
       });
-    } else if (decision === 'Additional Information Required') {
-      request.status = 'Additional Information Required';
-      request.reviewerFeedback = trimmedFeedback || 'Please provide updated documentation or clarifications.';
+    } else if (
+      decision === 'Resubmission Required' ||
+      decision === 'Changes Requested' ||
+      decision === 'Additional Information Required'
+    ) {
+      const pTarget = (proposedFundingTarget !== undefined && proposedFundingTarget !== null && proposedFundingTarget !== '')
+        ? Number(proposedFundingTarget)
+        : null;
+      const pRate = (proposedReturnRate !== undefined && proposedReturnRate !== null && proposedReturnRate !== '')
+        ? Number(proposedReturnRate)
+        : null;
+      const pMonths = (proposedDurationMonths !== undefined && proposedDurationMonths !== null && proposedDurationMonths !== '')
+        ? Number(proposedDurationMonths)
+        : null;
+      const pMin = (proposedMinInvestment !== undefined && proposedMinInvestment !== null && proposedMinInvestment !== '')
+        ? Number(proposedMinInvestment)
+        : null;
+
+      request.status = 'Resubmission Required';
+      request.proposedFundingTarget = pTarget;
+      request.proposedReturnRate = pRate;
+      request.proposedDurationMonths = pMonths;
+      request.proposedMinInvestment = pMin;
+      request.reviewerFeedback = trimmedFeedback || 'Please update the requested parameters (fund amount, interest rate, tenure, etc.) and resubmit.';
+      request.reviewedBy = req.user._id;
+      request.reviewedAt = new Date();
+
+      request.adminSuggestions = {
+        fundingTarget: pTarget,
+        returnRate: pRate,
+        durationMonths: pMonths,
+        minInvestment: pMin,
+        notes: trimmedFeedback,
+        suggestedAt: new Date(),
+        suggestedBy: req.user._id
+      };
+
+      request.revisionHistory = request.revisionHistory || [];
+      request.revisionHistory.push({
+        suggestedBy: req.user._id,
+        suggestedAt: new Date(),
+        decision: 'Resubmission Required',
+        feedback: trimmedFeedback,
+        proposedFundingTarget: pTarget,
+        proposedReturnRate: pRate,
+        proposedDurationMonths: pMonths,
+        proposedMinInvestment: pMin,
+        originalFundingTarget: request.fundingTarget,
+        originalReturnRate: request.expectedReturnRate || request.agreedReturnRate
+      });
+
       await request.save();
+
+      await logAction({
+        actorId: req.user._id,
+        role: req.user.role,
+        action: 'FUNDING_REQUEST_CHANGES_REQUESTED',
+        targetEntity: 'InvestmentRequest',
+        targetId: request._id,
+        reason: request.reviewerFeedback,
+        details: {
+          proposedFundingTarget: pTarget,
+          proposedReturnRate: pRate,
+          proposedDurationMonths: pMonths
+        },
+        ipAddress: req.ip
+      });
 
       broadcastSyncEvent('FUNDING_REQUEST_DECISION', 'DECIDED', {
         requestId: request._id,
-        decision: 'Additional Information Required',
+        decision: 'Resubmission Required',
         status: request.status,
         companyId: company._id,
-        title: request.title
+        title: request.title,
+        proposedFundingTarget: pTarget,
+        proposedReturnRate: pRate
+      });
+
+      broadcastSyncEvent('INVESTMENT_APPROVAL', 'CHANGES_REQUESTED', {
+        requestId: request._id,
+        status: request.status,
+        companyId: company._id
       });
 
       return res.json({
         success: true,
-        message: 'Feedback sent to company requesting additional information.',
+        message: 'Resubmission request sent to company with proposed changes.',
         request
       });
     } else {

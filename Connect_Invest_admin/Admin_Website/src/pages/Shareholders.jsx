@@ -379,9 +379,8 @@ export default function Shareholders() {
 
                       {/* Allotment & Certificate */}
                       <td style={{ textAlign: 'center' }}>
-                        <span className={`badge ${
-                          sh.allotmentStatus === 'Allotted' ? 'badge-emerald' : 'badge-amber'
-                        }`} style={{ padding: '3px 8px', fontSize: '0.72rem' }}>
+                        <span className={`badge ${sh.allotmentStatus === 'Allotted' ? 'badge-emerald' : 'badge-amber'
+                          }`} style={{ padding: '3px 8px', fontSize: '0.72rem' }}>
                           {sh.allotmentStatus}
                         </span>
                         <div style={{ fontSize: '0.7rem', color: '#64748B', marginTop: '4px', fontFamily: 'monospace' }}>

@@ -92,6 +92,9 @@ export const RequestDetails: React.FC = () => {
         return 'success';
       case 'Submitted':
       case 'Under Review':
+      case 'Resubmission Required':
+      case 'Changes Requested':
+      case 'Additional Information Required':
         return 'warning';
       case 'Draft':
         return 'slate';
@@ -103,7 +106,21 @@ export const RequestDetails: React.FC = () => {
     }
   };
 
-  const canEdit = ['Draft', 'Submitted', 'Under Review'].includes(request.status);
+  const isResubmissionNeeded = ['Resubmission Required', 'Changes Requested', 'Additional Information Required'].includes(request.status);
+  const canEdit = ['Draft', 'Submitted', 'Under Review', 'Resubmission Required', 'Changes Requested', 'Additional Information Required'].includes(request.status);
+
+  const applyProposedChanges = () => {
+    setEditForm(prev => ({
+      ...prev,
+      fundingTarget: request.proposedFundingTarget || request.adminSuggestions?.fundingTarget || prev.fundingTarget,
+      expectedReturnRate: request.proposedReturnRate || request.adminSuggestions?.returnRate || prev.expectedReturnRate,
+      investmentPeriodYears: request.proposedDurationMonths
+        ? Math.max(1, Math.round(request.proposedDurationMonths / 12))
+        : (request.adminSuggestions?.durationMonths ? Math.max(1, Math.round(request.adminSuggestions.durationMonths / 12)) : prev.investmentPeriodYears),
+      minInvestment: request.proposedMinInvestment || request.adminSuggestions?.minInvestment || prev.minInvestment
+    }));
+    setIsEditing(true);
+  };
 
   const handleSaveEdit = async () => {
     if (!id) return;
@@ -169,14 +186,69 @@ export const RequestDetails: React.FC = () => {
         )}
       </div>
 
-      {/* Admin / Reviewer Feedback Banner */}
-      {request.reviewerFeedback && (
-        <Card className="p-4 bg-amber-50 border-amber-200 flex items-start gap-3">
-          <MessageSquare className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <span className="font-bold text-xs text-amber-900 block">Admin Feedback / Review Notes:</span>
-            <p className="text-xs text-amber-800 mt-1 leading-relaxed">{request.reviewerFeedback}</p>
+      {/* Admin / Reviewer Feedback & Counter-Proposal Banner */}
+      {(request.reviewerFeedback || isResubmissionNeeded) && (
+        <Card className={`p-5 ${isResubmissionNeeded ? 'bg-amber-50/80 border-amber-300' : 'bg-slate-50 border-slate-200'} space-y-3`}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <MessageSquare className={`w-5 h-5 ${isResubmissionNeeded ? 'text-amber-600' : 'text-slate-600'} flex-shrink-0 mt-0.5`} />
+              <div>
+                <span className={`font-bold text-sm ${isResubmissionNeeded ? 'text-amber-900' : 'text-slate-900'} block`}>
+                  {isResubmissionNeeded ? 'Admin Change Request — Resubmission Required' : 'Admin Feedback / Review Notes'}
+                </span>
+                {request.reviewerFeedback && (
+                  <p className={`text-xs ${isResubmissionNeeded ? 'text-amber-800' : 'text-slate-700'} mt-1 leading-relaxed`}>
+                    {request.reviewerFeedback}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {isResubmissionNeeded && !isEditing && (
+              <Button
+                size="sm"
+                onClick={applyProposedChanges}
+                className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-sm flex-shrink-0"
+              >
+                Apply Proposed Changes
+              </Button>
+            )}
           </div>
+
+          {/* Counter-Proposed Parameters Grid */}
+          {(request.proposedFundingTarget || request.proposedReturnRate || request.proposedDurationMonths) && (
+            <div className="mt-3 pt-3 border-t border-amber-200/80 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {request.proposedFundingTarget && (
+                <div className="bg-white/80 p-2.5 rounded-xl border border-amber-200">
+                  <span className="text-[11px] font-semibold text-slate-500 block">Proposed Fund Amount</span>
+                  <div className="flex items-baseline gap-2 mt-0.5">
+                    <span className="text-sm font-bold text-amber-900">{formatINR(request.proposedFundingTarget)}</span>
+                    <span className="text-[10px] text-slate-400 line-through">{formatINR(request.fundingTarget)}</span>
+                  </div>
+                </div>
+              )}
+
+              {request.proposedReturnRate && (
+                <div className="bg-white/80 p-2.5 rounded-xl border border-amber-200">
+                  <span className="text-[11px] font-semibold text-slate-500 block">Proposed Interest Rate</span>
+                  <div className="flex items-baseline gap-2 mt-0.5">
+                    <span className="text-sm font-bold text-amber-900">{request.proposedReturnRate}% p.a.</span>
+                    <span className="text-[10px] text-slate-400 line-through">{request.expectedReturnRate || request.agreedReturnRate || 0}%</span>
+                  </div>
+                </div>
+              )}
+
+              {request.proposedDurationMonths && (
+                <div className="bg-white/80 p-2.5 rounded-xl border border-amber-200">
+                  <span className="text-[11px] font-semibold text-slate-500 block">Proposed Duration</span>
+                  <div className="flex items-baseline gap-2 mt-0.5">
+                    <span className="text-sm font-bold text-amber-900">{request.proposedDurationMonths} Months</span>
+                    <span className="text-[10px] text-slate-400 line-through">{request.durationMonths || (request.investmentPeriodYears * 12)}M</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </Card>
       )}
 
