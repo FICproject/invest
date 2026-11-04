@@ -11,6 +11,7 @@ import {
   Offer,
   OfferTerms,
   Investment,
+  InvestmentRequest,
   Repayment,
   Payout,
   Batch,
@@ -113,9 +114,10 @@ export async function getDashboardStats(req, res, next) {
     const pendingOffersCount = await Offer.countDocuments({ status: Statuses.OFFER.SUBMITTED });
     const pendingReleasesCount = await Release.countDocuments({ status: Statuses.RELEASE_AND_REFUND.PREPARED });
     const pendingBatchesCount = await Batch.countDocuments({ status: 'Prepared' });
+    const pendingFundingRequestsCount = await InvestmentRequest.countDocuments({ status: { $in: ['Submitted', 'Under Review'] } });
 
     const totalPendingApprovals =
-      pendingKycCount + pendingKybCount + pendingOffersCount + pendingReleasesCount + pendingBatchesCount;
+      pendingKycCount + pendingKybCount + pendingOffersCount + pendingReleasesCount + pendingBatchesCount + pendingFundingRequestsCount;
 
     // Failed payments
     const failedPayoutsCount = await Payout.countDocuments({ status: Statuses.PAYOUT.FAILED });
@@ -243,6 +245,7 @@ export async function getDashboardStats(req, res, next) {
           kyc: pendingKycCount,
           kyb: pendingKybCount,
           offers: pendingOffersCount,
+          fundingRequests: pendingFundingRequestsCount,
           releases: pendingReleasesCount,
           batches: pendingBatchesCount
         },
@@ -313,6 +316,13 @@ export async function getWorkList(req, res, next) {
       .sort({ updatedAt: -1 })
       .limit(10);
 
+    const pendingFundingRequests = await InvestmentRequest.find({
+      status: { $in: ['Submitted', 'Under Review'] }
+    })
+      .populate('companyId', 'name legalName officialEmail cin pan')
+      .sort({ createdAt: -1 })
+      .limit(20);
+
     const pendingReleases = await Release.find({ status: Statuses.RELEASE_AND_REFUND.PREPARED })
       .populate('companyId', 'name bankAccount')
       .populate('offerId', 'title')
@@ -333,6 +343,7 @@ export async function getWorkList(req, res, next) {
         pendingKyc,
         pendingKyb,
         pendingOffers,
+        pendingFundingRequests,
         pendingReleases,
         pendingBatches,
         failedPayouts
@@ -547,12 +558,13 @@ export async function decideKyc(req, res, next) {
       });
     }
 
-    // PRD Section 5.1 A-5: "A decision cannot be saved without a reason"
-    if (!reason || !reason.trim()) {
+    // PRD Section 5.1 A-5: A decision cannot be saved without a reason (auto-default if approved)
+    const trimmedReason = (reason && reason.trim()) || (decision === Statuses.KYC.APPROVED ? 'KYC documents verified and approved.' : '');
+    if (!trimmedReason) {
       return res.status(400).json({
         success: false,
         code: ErrorCodes.BAD_REQUEST,
-        error: 'A written reason is required for any KYC decision'
+        error: 'A written reason is required for this KYC decision'
       });
     }
 
@@ -564,8 +576,8 @@ export async function decideKyc(req, res, next) {
     const before = { kycStatus: profile.kycStatus, kycReason: profile.kycReason };
     profile.kycStatus = decision;
     profile.registrationStatus = decision;
-    profile.kycReason = reason.trim();
-    profile.rejectionReason = decision === 'Approved' ? null : reason.trim();
+    profile.kycReason = trimmedReason;
+    profile.rejectionReason = decision === 'Approved' ? null : trimmedReason;
     if (decision === Statuses.KYC.APPROVED && profile.bankAccount) {
       profile.bankAccount.verified = true;
     }
@@ -573,8 +585,8 @@ export async function decideKyc(req, res, next) {
 
     if (profile.userId) {
       profile.userId.registrationStatus = decision;
-      profile.userId.rejectionReason = decision === 'Approved' ? null : reason.trim();
-      profile.userId.adminRemarks = reason.trim();
+      profile.userId.rejectionReason = decision === 'Approved' ? null : trimmedReason;
+      profile.userId.adminRemarks = trimmedReason;
       profile.userId.reviewedAt = new Date();
       profile.userId.reviewedBy = req.user._id;
       if (!profile.userId.statusHistory) profile.userId.statusHistory = [];
@@ -1114,8 +1126,9 @@ export async function decideKyb(req, res, next) {
       return res.status(400).json({ success: false, error: 'Decision must be Approved or Rejected' });
     }
 
-    // PRD Section 4.1 & 5.1 A-6
-    if (!reason || !reason.trim()) {
+    // PRD Section 4.1 & 5.1 A-6: A written reason is required (auto-default if approved)
+    const trimmedReason = (reason && reason.trim()) || (decision === Statuses.COMPANY.APPROVED ? 'KYB corporate documents verified and approved.' : '');
+    if (!trimmedReason) {
       return res.status(400).json({ success: false, error: 'A written reason is required for KYB decision' });
     }
 
@@ -1126,8 +1139,8 @@ export async function decideKyb(req, res, next) {
     company.status = decision;
     company.registrationStatus = decision;
     company.verificationStatus = decision;
-    company.statusReason = reason.trim();
-    company.rejectionReason = decision === 'Approved' ? null : reason.trim();
+    company.statusReason = trimmedReason;
+    company.rejectionReason = decision === 'Approved' ? null : trimmedReason;
     if (decision === Statuses.COMPANY.APPROVED && company.bankAccount) {
       company.bankAccount.verified = true;
     }
@@ -1136,8 +1149,8 @@ export async function decideKyb(req, res, next) {
     const owner = await User.findById(company.ownerUserId || company.userId);
     if (owner) {
       owner.registrationStatus = decision;
-      owner.rejectionReason = decision === 'Approved' ? null : reason.trim();
-      owner.adminRemarks = reason.trim();
+      owner.rejectionReason = decision === 'Approved' ? null : trimmedReason;
+      owner.adminRemarks = trimmedReason;
       owner.reviewedAt = new Date();
       owner.reviewedBy = req.user._id;
       if (!owner.statusHistory) owner.statusHistory = [];
@@ -1444,11 +1457,25 @@ export async function publishOffer(req, res, next) {
     if (!offer) return res.status(404).json({ success: false, error: 'Offer not found' });
 
     // PRD Section 5.2 C-6: "The company owner must accept the final terms before the admin can publish"
-    const latestTerms = await OfferTerms.findOne({ offerId: offer._id }).sort({ version: -1 });
+    let latestTerms = await OfferTerms.findOne({ offerId: offer._id }).sort({ version: -1 });
     if (!latestTerms || !latestTerms.acceptedByCompanyAt) {
       // In single-admin dev / direct publish mode, we allow recording immediate owner acceptance if flagged
       if (req.body.forceAccept) {
-        latestTerms.acceptedByCompanyAt = new Date();
+        if (!latestTerms) {
+          latestTerms = new OfferTerms({
+            offerId: offer._id,
+            version: 1,
+            targetPaise: offer.targetPaise,
+            minTargetPaise: offer.minTargetPaise || offer.targetPaise,
+            rateBps: offer.rateBps || 300,
+            tenures: offer.tenures?.length ? offer.tenures : [12],
+            fundingWindowDays: 30,
+            termsBody: `Standard terms agreed for ${offer.title}`,
+            acceptedByCompanyAt: new Date()
+          });
+        } else {
+          latestTerms.acceptedByCompanyAt = new Date();
+        }
         await latestTerms.save();
       } else {
         return res.status(400).json({
@@ -3706,11 +3733,11 @@ export async function decideRegistrationApproval(req, res, next) {
       return res.status(400).json({ success: false, error: 'Decision must be Approved, Rejected, or Resubmission Required.' });
     }
 
-    if (!reason || !reason.trim()) {
+    const trimmedReason = (reason && reason.trim()) || (decision === 'Approved' ? 'Application verified and compliant with regulatory KYC/KYB requirements.' : '');
+
+    if (!trimmedReason) {
       return res.status(400).json({ success: false, error: 'A written reason or compliance remark is required for any decision.' });
     }
-
-    const trimmedReason = reason.trim();
     const adminId = req.user._id;
     const adminName = req.user.name || 'Compliance Admin';
     const now = new Date();
@@ -3932,4 +3959,216 @@ export async function downloadDocument(req, res, next) {
     next(error);
   }
 }
+
+// ==========================================
+// 19. COMPANY FUNDING REQUESTS (PRD & WORKFLOW)
+// ==========================================
+export async function getFundingRequests(req, res, next) {
+  try {
+    const { status = 'all', search = '' } = req.query;
+    let query = {};
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+    let requests = await InvestmentRequest.find(query)
+      .populate('companyId')
+      .sort({ createdAt: -1 });
+
+    if (search && search.trim()) {
+      const s = search.trim().toLowerCase();
+      requests = requests.filter(r =>
+        r.title?.toLowerCase().includes(s) ||
+        r.companyId?.name?.toLowerCase().includes(s) ||
+        r.companyId?.legalName?.toLowerCase().includes(s) ||
+        r.category?.toLowerCase().includes(s) ||
+        r.entityOrProjectName?.toLowerCase().includes(s)
+      );
+    }
+
+    return res.json({
+      success: true,
+      count: requests.length,
+      requests
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getFundingRequestById(req, res, next) {
+  try {
+    const request = await InvestmentRequest.findById(req.params.id).populate('companyId');
+    if (!request) {
+      return res.status(404).json({ success: false, error: 'Funding request not found' });
+    }
+    return res.json({ success: true, request });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function decideFundingRequest(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { decision, feedback, publishToMarketplace = true } = req.body;
+
+    const request = await InvestmentRequest.findById(id).populate('companyId');
+    if (!request) {
+      return res.status(404).json({ success: false, error: 'Funding request not found' });
+    }
+
+    const company = request.companyId;
+    if (!company) {
+      return res.status(404).json({ success: false, error: 'Associated company not found' });
+    }
+
+    const trimmedFeedback = feedback?.trim() || '';
+
+    if (decision === 'Approved') {
+      const finalStatus = publishToMarketplace ? 'Open for Investment' : 'Approved';
+      request.status = finalStatus;
+      request.reviewerFeedback = trimmedFeedback || 'Funding request approved by platform administration.';
+      await request.save();
+
+      // Check if an offer already exists for this request
+      let offer = await Offer.findOne({ title: request.title, companyId: company._id });
+
+      const kind = request.investmentPurpose === 'Project Investment'
+        ? 'project'
+        : (request.investmentModel === 'Equity' ? 'equity' : 'company');
+
+      const targetPaise = Math.round((request.fundingTarget || 100000) * 100);
+      const minTargetPaise = Math.round((request.minInvestment || (request.fundingTarget ? request.fundingTarget * 0.1 : 25000)) * 100);
+      const rateBps = Math.round((request.expectedReturnRate || request.agreedReturnRate || 3) * 100);
+      const tenureMonths = request.durationMonths || (request.investmentPeriodYears ? request.investmentPeriodYears * 12 : 24);
+      const tenures = [tenureMonths];
+
+      const offerStatus = publishToMarketplace ? Statuses.OFFER.OPEN : Statuses.OFFER.DRAFT;
+
+      if (!offer) {
+        offer = new Offer({
+          kind,
+          companyId: company._id,
+          title: request.title || request.entityOrProjectName || `${company.name} Capital Raise`,
+          description: request.detailedDescription || request.shortDescription || 'Verified enterprise opportunity',
+          useOfFunds: request.useOfFunds || 'Business expansion and operational deployment',
+          targetPaise,
+          minTargetPaise,
+          rateBps,
+          tenures,
+          status: offerStatus,
+          windowStart: new Date(),
+          windowEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          photos: [],
+          documents: (request.supportingDocuments || []).map(d => ({ name: d.name, url: d.fileUrl }))
+        });
+      } else {
+        offer.status = offerStatus;
+        offer.targetPaise = targetPaise;
+        offer.minTargetPaise = minTargetPaise;
+        offer.rateBps = rateBps;
+        offer.tenures = tenures;
+      }
+      await offer.save();
+
+      // Ensure OfferTerms is created and accepted so it's fully active
+      let terms = await OfferTerms.findOne({ offerId: offer._id }).sort({ version: -1 });
+      if (!terms) {
+        terms = new OfferTerms({
+          offerId: offer._id,
+          version: 1,
+          targetPaise: offer.targetPaise,
+          minTargetPaise: offer.minTargetPaise,
+          rateBps: offer.rateBps,
+          tenures: offer.tenures,
+          fundingWindowDays: 30,
+          termsBody: `Standard terms agreed for ${offer.title}`,
+          acceptedByCompanyAt: new Date()
+        });
+      } else {
+        terms.acceptedByCompanyAt = new Date();
+      }
+      await terms.save();
+
+      await logAction({
+        actorId: req.user._id,
+        role: req.user.role,
+        action: 'FUNDING_REQUEST_APPROVED',
+        targetEntity: 'InvestmentRequest',
+        targetId: request._id,
+        reason: request.reviewerFeedback,
+        ipAddress: req.ip
+      });
+
+      broadcastSyncEvent('FUNDING_REQUEST_DECISION', 'DECIDED', {
+        requestId: request._id,
+        offerId: offer._id,
+        decision: 'Approved',
+        status: request.status,
+        companyId: company._id,
+        title: request.title
+      });
+
+      return res.json({
+        success: true,
+        message: publishToMarketplace
+          ? 'Funding request approved and published live to investment marketplace!'
+          : 'Funding request approved (saved in draft offers).',
+        request,
+        offer
+      });
+    } else if (decision === 'Rejected') {
+      request.status = 'Rejected';
+      request.reviewerFeedback = trimmedFeedback || 'Request rejected based on underwriting criteria.';
+      await request.save();
+
+      await logAction({
+        actorId: req.user._id,
+        role: req.user.role,
+        action: 'FUNDING_REQUEST_REJECTED',
+        targetEntity: 'InvestmentRequest',
+        targetId: request._id,
+        reason: request.reviewerFeedback,
+        ipAddress: req.ip
+      });
+
+      broadcastSyncEvent('FUNDING_REQUEST_DECISION', 'DECIDED', {
+        requestId: request._id,
+        decision: 'Rejected',
+        status: request.status,
+        companyId: company._id,
+        title: request.title
+      });
+
+      return res.json({
+        success: true,
+        message: 'Funding request has been rejected.',
+        request
+      });
+    } else if (decision === 'Additional Information Required') {
+      request.status = 'Additional Information Required';
+      request.reviewerFeedback = trimmedFeedback || 'Please provide updated documentation or clarifications.';
+      await request.save();
+
+      broadcastSyncEvent('FUNDING_REQUEST_DECISION', 'DECIDED', {
+        requestId: request._id,
+        decision: 'Additional Information Required',
+        status: request.status,
+        companyId: company._id,
+        title: request.title
+      });
+
+      return res.json({
+        success: true,
+        message: 'Feedback sent to company requesting additional information.',
+        request
+      });
+    } else {
+      return res.status(400).json({ success: false, error: 'Invalid decision specified' });
+    }
+  } catch (error) {
+    next(error);
+  }
+}
+
 

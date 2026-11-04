@@ -28,10 +28,10 @@ export default function Sidebar({
   const { logout } = useAuth();
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
-    { id: 'approvals', label: 'Registration Approvals', icon: ShieldCheck, badgeCount: pendingCounts?.total || 0 },
+    { id: 'approvals', label: 'Registration Approvals', icon: ShieldCheck, badgeCount: (pendingCounts?.kyc || 0) + (pendingCounts?.kyb || 0) || pendingCounts?.total || 0 },
     { id: 'investors', label: 'Investor Management', icon: Users },
     { id: 'companies', label: 'Company Management', icon: Building2 },
-    { id: 'offers', label: 'Investment Management', icon: Briefcase },
+    { id: 'offers', label: 'Investment Management', icon: Briefcase, badgeCount: (pendingCounts?.fundingRequests || 0) + (pendingCounts?.offers || 0) },
     { id: 'kyc', label: 'KYC Management', icon: ShieldCheck },
     { id: 'investments_portfolio', label: 'Investments', icon: TrendingUp },
     { id: 'transactions', label: 'Transactions', icon: CreditCard },

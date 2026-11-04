@@ -85,6 +85,11 @@ export const adminApi = {
   toggleOfferHold: (id, data) => api.post(`/admin/offers/${id}/hold`, data),
   deleteOffer: id => api.delete(`/admin/offers/${id}`),
 
+  // Company Funding / Investment Requests (Company Submissions)
+  getFundingRequests: params => api.get('/admin/funding-requests', { params }),
+  getFundingRequestById: id => api.get(`/admin/funding-requests/${id}`),
+  decideFundingRequest: (id, data) => api.post(`/admin/funding-requests/${id}/decision`, data),
+
   // Fund Releases
   getReleases: () => api.get('/admin/releases'),
   approveRelease: (id, data) => api.post(`/admin/releases/${id}/approve`, data),

@@ -11,20 +11,35 @@ import {
   DollarSign,
   TrendingUp,
   AlertCircle,
-  Search
+  Search,
+  Building2,
+  Eye,
+  Download,
+  FileText,
+  X,
+  XCircle,
+  AlertTriangle,
+  FolderKanban
 } from 'lucide-react';
 import { adminApi, formatINR, rupeesToPaise } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import DocumentPreviewModal from '../components/DocumentPreviewModal';
 
 export default function Offers() {
   const toast = useToast();
+  const [activeSubTab, setActiveSubTab] = useState('requests'); // 'requests' | 'offers'
   const [offers, setOffers] = useState([]);
+  const [fundingRequests, setFundingRequests] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
-  // Modals
+  // Modals & Request Review
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [requestFeedback, setRequestFeedback] = useState('');
+  const [previewDoc, setPreviewDoc] = useState(null);
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newOffer, setNewOffer] = useState({
     kind: 'project',
@@ -56,29 +71,56 @@ export default function Offers() {
 
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchOffers = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const [offersRes, compRes] = await Promise.all([
+      const [offersRes, compRes, requestsRes] = await Promise.all([
         adminApi.getOffers(),
-        adminApi.getCompanies()
+        adminApi.getCompanies(),
+        adminApi.getFundingRequests()
       ]);
-      if (offersRes.data.success) {
+      if (offersRes.data?.success) {
         // Exclude equity from investment list per specification
         const nonEquityOffers = (offersRes.data.offers || []).filter(o => o.kind !== 'equity');
         setOffers(nonEquityOffers);
       }
-      if (compRes.data.success) setCompanies(compRes.data.companies);
+      if (compRes.data?.success) setCompanies(compRes.data.companies);
+      if (requestsRes.data?.success) {
+        setFundingRequests(requestsRes.data.requests || []);
+      }
     } catch (err) {
-      console.error('Failed to load offers:', err);
+      console.error('Failed to load investment management data:', err);
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchOffers = fetchData;
+
   useEffect(() => {
-    fetchOffers();
+    fetchData();
   }, []);
+
+  const handleDecideRequest = async (requestId, decision, publishToMarketplace = true) => {
+    try {
+      setSubmitting(true);
+      const res = await adminApi.decideFundingRequest(requestId, {
+        decision,
+        feedback: requestFeedback,
+        publishToMarketplace
+      });
+      if (res.data?.success) {
+        toast.success(res.data.message || `Funding request marked as ${decision}`);
+        setSelectedRequest(null);
+        setRequestFeedback('');
+        fetchData();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || `Failed to record ${decision} decision`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleCreateOffer = async e => {
     e.preventDefault();
@@ -263,6 +305,23 @@ export default function Offers() {
     }
   };
 
+  const pendingRequestsCount = fundingRequests.filter(
+    r => r.status === 'Submitted' || r.status === 'Under Review'
+  ).length;
+
+  const filteredRequests = fundingRequests.filter(r => {
+    const s = search.toLowerCase();
+    const matchesSearch =
+      !search ||
+      r.title?.toLowerCase().includes(s) ||
+      r.companyId?.name?.toLowerCase().includes(s) ||
+      r.companyId?.legalName?.toLowerCase().includes(s) ||
+      r.category?.toLowerCase().includes(s) ||
+      r.entityOrProjectName?.toLowerCase().includes(s);
+    const matchesStatus = !statusFilter || r.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
   const filteredOffers = offers.filter(o => {
     const matchesSearch = !search || o.title?.toLowerCase().includes(search.toLowerCase()) || o.companyId?.name?.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = !statusFilter || o.status === statusFilter;
@@ -276,15 +335,15 @@ export default function Offers() {
         <div>
           <h2 style={{ fontSize: '1.35rem', fontWeight: 700 }}>Investment Management</h2>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-            Review project drafts, publish offers, and activate funding cycles.
+            Review company funding requests, configure terms, and manage marketplace investment opportunities.
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ position: 'relative', width: '260px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', width: '240px' }}>
             <input
               type="text"
-              placeholder="Search title, company..."
+              placeholder={activeSubTab === 'requests' ? 'Search requests, companies...' : 'Search offers, companies...'}
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="input-field"
@@ -300,12 +359,25 @@ export default function Offers() {
             style={{ width: '160px' }}
           >
             <option value="">All Statuses</option>
-            <option value="Draft">Draft</option>
-            <option value="Submitted">Submitted</option>
-            <option value="Approved">Approved</option>
-            <option value="Open">Open</option>
-            <option value="Active">Active</option>
-            <option value="Funding closed">Funding closed</option>
+            {activeSubTab === 'requests' ? (
+              <>
+                <option value="Submitted">Submitted</option>
+                <option value="Under Review">Under Review</option>
+                <option value="Approved">Approved</option>
+                <option value="Open for Investment">Open for Investment</option>
+                <option value="Additional Information Required">More Info Required</option>
+                <option value="Rejected">Rejected</option>
+              </>
+            ) : (
+              <>
+                <option value="Draft">Draft</option>
+                <option value="Submitted">Submitted</option>
+                <option value="Approved">Approved</option>
+                <option value="Open">Open</option>
+                <option value="Active">Active</option>
+                <option value="Funding closed">Funding closed</option>
+              </>
+            )}
           </select>
 
           <button onClick={() => setShowCreateModal(true)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -315,7 +387,241 @@ export default function Offers() {
         </div>
       </div>
 
-      {/* Offers Grid */}
+      {/* Sub-navigation Tabs: Company Funding Requests vs Marketplace Offers */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid #E2E8F0', paddingBottom: '14px', marginTop: '4px' }}>
+        <button
+          onClick={() => { setActiveSubTab('requests'); setStatusFilter(''); }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 18px',
+            borderRadius: '10px',
+            border: 'none',
+            backgroundColor: activeSubTab === 'requests' ? '#0047BA' : '#F1F5F9',
+            color: activeSubTab === 'requests' ? '#FFFFFF' : '#475569',
+            fontWeight: 700,
+            fontSize: '0.86rem',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <FolderKanban size={16} />
+          <span>Company Funding Requests</span>
+          {pendingRequestsCount > 0 && (
+            <span
+              style={{
+                backgroundColor: activeSubTab === 'requests' ? '#FFFFFF' : '#EF4444',
+                color: activeSubTab === 'requests' ? '#0047BA' : '#FFFFFF',
+                padding: '1px 8px',
+                borderRadius: '9999px',
+                fontSize: '0.72rem',
+                fontWeight: 800
+              }}
+            >
+              {pendingRequestsCount} Pending Review
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => { setActiveSubTab('offers'); setStatusFilter(''); }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 18px',
+            borderRadius: '10px',
+            border: 'none',
+            backgroundColor: activeSubTab === 'offers' ? '#0047BA' : '#F1F5F9',
+            color: activeSubTab === 'offers' ? '#FFFFFF' : '#475569',
+            fontWeight: 700,
+            fontSize: '0.86rem',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <Layers size={16} />
+          <span>Marketplace Investment Offers ({offers.length})</span>
+        </button>
+      </div>
+
+      {/* Main Tab Content */}
+      {activeSubTab === 'requests' ? (
+        <div className="glass-panel" style={{ padding: '24px' }}>
+          {loading ? (
+            <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              Loading company funding requests from MongoDB...
+            </div>
+          ) : filteredRequests.length === 0 ? (
+            <div style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <CheckCircle2 size={40} color="#16A34A" style={{ margin: '0 auto 12px' }} />
+              <h4 style={{ margin: '0 0 6px', fontSize: '1.05rem', color: '#0F172A', fontWeight: 700 }}>
+                No Funding Requests Found
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.85rem' }}>
+                There are currently no company funding requests matching your filter criteria.
+              </p>
+            </div>
+          ) : (
+            <div className="data-table-container">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '45px', textAlign: 'center' }}>S.No</th>
+                    <th>Request Title & Model</th>
+                    <th>Borrowing Company</th>
+                    <th style={{ textAlign: 'right' }}>Target Amount</th>
+                    <th>Return Rate & Tenure</th>
+                    <th style={{ textAlign: 'center' }}>Documents</th>
+                    <th style={{ textAlign: 'center' }}>Status</th>
+                    <th style={{ textAlign: 'right' }}>Admin Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRequests.map((r, idx) => {
+                    const isPending = r.status === 'Submitted' || r.status === 'Under Review';
+                    const targetRupees = r.fundingTarget || 0;
+                    const returnPct = r.expectedReturnRate || r.agreedReturnRate || 0;
+                    const tenure = r.durationMonths ? `${r.durationMonths} Mo` : (r.investmentPeriodYears ? `${r.investmentPeriodYears} Yrs` : 'N/A');
+
+                    return (
+                      <tr key={r._id}>
+                        <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--text-muted)' }}>
+                          {idx + 1}
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 700, color: '#0F172A' }}>{r.title || r.entityOrProjectName}</div>
+                          <div style={{ fontSize: '0.74rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                            <span style={{ padding: '1px 6px', borderRadius: '4px', backgroundColor: '#EFF6FF', color: '#1D4ED8', fontWeight: 700 }}>
+                              {r.investmentModel || 'Fixed-Term'}
+                            </span>
+                            <span>•</span>
+                            <span>{r.investmentPurpose || r.category || 'Company Investment'}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 600, color: '#0F172A' }}>{r.companyId?.legalName || r.companyId?.name || 'Company'}</div>
+                          <div style={{ fontSize: '0.74rem', color: '#64748B' }}>
+                            CIN: {r.companyId?.cin || 'N/A'} • {r.companyId?.officialEmail || 'No email'}
+                          </div>
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 800, color: '#0F172A' }}>
+                          ₹{Number(targetRupees).toLocaleString('en-IN')}
+                          <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 400 }}>
+                            Min: ₹{Number(r.minInvestment || 0).toLocaleString('en-IN')}
+                          </div>
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 700, color: '#16A34A' }}>
+                            {returnPct ? `${returnPct}% p.a.` : 'Negotiable'}
+                          </div>
+                          <div style={{ fontSize: '0.74rem', color: '#64748B' }}>
+                            Tenure: {tenure}
+                          </div>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '6px', backgroundColor: '#F1F5F9', color: '#475569', fontSize: '0.76rem', fontWeight: 600 }}>
+                            <FileText size={12} />
+                            <span>{r.supportingDocuments?.length || 0} files</span>
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              padding: '3px 10px',
+                              borderRadius: '9999px',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              backgroundColor:
+                                r.status === 'Approved' || r.status === 'Open for Investment'
+                                  ? '#ECFDF5'
+                                  : r.status === 'Submitted' || r.status === 'Under Review'
+                                  ? '#FFFBEB'
+                                  : r.status === 'Rejected'
+                                  ? '#FEF2F2'
+                                  : '#F1F5F9',
+                              color:
+                                r.status === 'Approved' || r.status === 'Open for Investment'
+                                  ? '#059669'
+                                  : r.status === 'Submitted' || r.status === 'Under Review'
+                                  ? '#D97706'
+                                  : r.status === 'Rejected'
+                                  ? '#DC2626'
+                                  : '#475569',
+                              border:
+                                r.status === 'Approved' || r.status === 'Open for Investment'
+                                  ? '1px solid #A7F3D0'
+                                  : r.status === 'Submitted' || r.status === 'Under Review'
+                                  ? '1px solid #FDE68A'
+                                  : r.status === 'Rejected'
+                                  ? '1px solid #FECACA'
+                                  : '1px solid #E2E8F0'
+                            }}
+                          >
+                            {r.status}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                            {isPending && (
+                              <button
+                                disabled={submitting}
+                                onClick={() => handleDecideRequest(r._id, 'Approved', true)}
+                                title="Quick Approve & Publish Live to Marketplace"
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '6px 12px',
+                                  borderRadius: '8px',
+                                  border: 'none',
+                                  backgroundColor: '#16A34A',
+                                  color: '#FFFFFF',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                <CheckCircle2 size={13} />
+                                <span>Approve & Go Live</span>
+                              </button>
+                            )}
+                            <button
+                              onClick={() => {
+                                setSelectedRequest(r);
+                                setRequestFeedback(r.reviewerFeedback || '');
+                              }}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                border: '1px solid #CBD5E1',
+                                backgroundColor: '#FFFFFF',
+                                color: '#0047BA',
+                                fontSize: '0.78rem',
+                                fontWeight: 700,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <Eye size={13} />
+                              <span>Review Details</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : (
+      /* Offers Grid */
       <div className="glass-panel" style={{ padding: '24px' }}>
         {loading ? (
           <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -487,6 +793,7 @@ export default function Offers() {
           </div>
         )}
       </div>
+      )}
 
       {/* Configure Terms Sheet Modal */}
       {selectedOfferTerms && (
@@ -848,6 +1155,358 @@ export default function Offers() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Modal: Company Funding Request Review Dossier */}
+      {selectedRequest && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 9998,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={() => setSelectedRequest(null)}
+        >
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              width: '100%',
+              maxWidth: '820px',
+              maxHeight: '90vh',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '20px 24px',
+                borderBottom: '1px solid #E2E8F0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: '#F8FAFC'
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0F172A' }}>
+                    {selectedRequest.title || selectedRequest.entityOrProjectName}
+                  </h3>
+                  <span
+                    style={{
+                      padding: '2px 8px',
+                      borderRadius: '9999px',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      backgroundColor: '#EFF6FF',
+                      color: '#1D4ED8'
+                    }}
+                  >
+                    {selectedRequest.status}
+                  </span>
+                </div>
+                <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748B' }}>
+                  Submitted by {selectedRequest.companyId?.legalName || selectedRequest.companyId?.name} • CIN: {selectedRequest.companyId?.cin || 'N/A'}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedRequest(null)}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: '#E2E8F0',
+                  color: '#475569',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Financial Metrics Row */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+                  gap: '12px',
+                  backgroundColor: '#F8FAFC',
+                  padding: '16px',
+                  borderRadius: '12px',
+                  border: '1px solid #E2E8F0'
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>Funding Target</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0F172A', marginTop: '2px' }}>
+                    ₹{Number(selectedRequest.fundingTarget || 0).toLocaleString('en-IN')}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>Min Investment</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 700, color: '#334155', marginTop: '4px' }}>
+                    ₹{Number(selectedRequest.minInvestment || 0).toLocaleString('en-IN')}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>Expected Return</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#16A34A', marginTop: '4px' }}>
+                    {selectedRequest.expectedReturnRate || selectedRequest.agreedReturnRate || 0}% p.a.
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>Tenure / Duration</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 700, color: '#334155', marginTop: '4px' }}>
+                    {selectedRequest.durationMonths ? `${selectedRequest.durationMonths} Months` : `${selectedRequest.investmentPeriodYears || 2} Years`}
+                  </div>
+                </div>
+              </div>
+
+              {/* Proposal Overview */}
+              <div>
+                <h4 style={{ margin: '0 0 8px', fontSize: '0.86rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase' }}>
+                  Project Overview & Proposal
+                </h4>
+                <div style={{ fontSize: '0.86rem', color: '#334155', lineHeight: 1.6, backgroundColor: '#FFFFFF', padding: '12px 16px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+                  {selectedRequest.detailedDescription || selectedRequest.shortDescription || 'No detailed overview provided.'}
+                </div>
+              </div>
+
+              {/* Use of Funds */}
+              <div>
+                <h4 style={{ margin: '0 0 8px', fontSize: '0.86rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase' }}>
+                  Planned Use of Funds
+                </h4>
+                <div style={{ fontSize: '0.86rem', color: '#334155', lineHeight: 1.6, backgroundColor: '#FFFFFF', padding: '12px 16px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+                  {selectedRequest.useOfFunds || 'Capital will be deployed for enterprise growth and working capital.'}
+                </div>
+              </div>
+
+              {/* Supporting Documents */}
+              <div>
+                <h4 style={{ margin: '0 0 10px', fontSize: '0.86rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase' }}>
+                  Attached Documents ({selectedRequest.supportingDocuments?.length || 0})
+                </h4>
+                {(!selectedRequest.supportingDocuments || selectedRequest.supportingDocuments.length === 0) ? (
+                  <div style={{ padding: '16px', textAlign: 'center', backgroundColor: '#F8FAFC', borderRadius: '10px', color: '#64748B', fontSize: '0.84rem' }}>
+                    No supporting documents uploaded for this request.
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
+                    {selectedRequest.supportingDocuments.map((doc, dIdx) => {
+                      const docFilename = (doc.fileUrl || '').split('/').pop();
+                      const downloadUrl = `/api/v1/admin/documents/${docFilename}/download`;
+                      return (
+                        <div
+                          key={dIdx}
+                          style={{
+                            padding: '12px 14px',
+                            borderRadius: '10px',
+                            border: '1px solid #E2E8F0',
+                            backgroundColor: '#F8FAFC',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '8px'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                            <FileText size={18} color="#0047BA" style={{ flexShrink: 0 }} />
+                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.82rem', fontWeight: 600 }}>
+                              {doc.name || docFilename}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                            <button
+                              type="button"
+                              onClick={() => setPreviewDoc({ url: doc.fileUrl, title: doc.name || 'Document' })}
+                              title="Preview Document"
+                              style={{ padding: '5px 8px', borderRadius: '6px', border: '1px solid #CBD5E1', backgroundColor: '#FFFFFF', cursor: 'pointer' }}
+                            >
+                              <Eye size={12} />
+                            </button>
+                            <a
+                              href={downloadUrl}
+                              download
+                              title="Download File"
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ padding: '5px 8px', borderRadius: '6px', border: '1px solid #0047BA', backgroundColor: '#EFF6FF', color: '#0047BA', textDecoration: 'none', display: 'flex', alignItems: 'center' }}
+                            >
+                              <Download size={12} />
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Reviewer Feedback Input */}
+              <div style={{ backgroundColor: '#F8FAFC', padding: '16px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 700, color: '#1E293B', marginBottom: '8px' }}>
+                  Compliance Remarks & Reviewer Feedback:
+                </label>
+                <textarea
+                  value={requestFeedback}
+                  onChange={e => setRequestFeedback(e.target.value)}
+                  placeholder="Enter remarks or specific feedback for borrowing company (optional for approval, required for rejection/more info)..."
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    fontSize: '0.85rem',
+                    outline: 'none',
+                    backgroundColor: '#FFFFFF',
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Modal Actions Footer */}
+            <div
+              style={{
+                padding: '16px 24px',
+                borderTop: '1px solid #E2E8F0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                flexWrap: 'wrap',
+                gap: '10px',
+                backgroundColor: '#F8FAFC'
+              }}
+            >
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => setSelectedRequest(null)}
+                className="btn-secondary"
+                style={{ padding: '9px 16px', fontSize: '0.84rem' }}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => handleDecideRequest(selectedRequest._id, 'Additional Information Required', false)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '9px 16px',
+                  borderRadius: '10px',
+                  border: '1px solid #F59E0B',
+                  backgroundColor: '#FEF3C7',
+                  color: '#B45309',
+                  fontSize: '0.84rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                <AlertTriangle size={14} />
+                <span>Request More Info</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => handleDecideRequest(selectedRequest._id, 'Rejected', false)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '9px 16px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  backgroundColor: '#DC2626',
+                  color: '#FFFFFF',
+                  fontSize: '0.84rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                <XCircle size={14} />
+                <span>Reject</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => handleDecideRequest(selectedRequest._id, 'Approved', false)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '9px 18px',
+                  borderRadius: '10px',
+                  border: '1px solid #0047BA',
+                  backgroundColor: '#EFF6FF',
+                  color: '#0047BA',
+                  fontSize: '0.84rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                <span>Approve (Draft Offer)</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => handleDecideRequest(selectedRequest._id, 'Approved', true)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '9px 20px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  backgroundColor: '#16A34A',
+                  color: '#FFFFFF',
+                  fontSize: '0.84rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                <CheckCircle2 size={15} />
+                <span>Approve & Go Live</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Document Preview Modal */}
+      {previewDoc && (
+        <DocumentPreviewModal
+          isOpen={!!previewDoc}
+          onClose={() => setPreviewDoc(null)}
+          documentUrl={previewDoc.url}
+          title={previewDoc.title}
+        />
       )}
     </div>
   );

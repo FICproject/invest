@@ -118,10 +118,13 @@ export default function RegistrationApprovals() {
   }, []);
 
   // Handle Decision
-  const handleDecision = async decision => {
-    if (!selectedApp) return;
+  const handleDecision = async (decision, targetApp = null) => {
+    const app = targetApp || selectedApp;
+    if (!app) return;
 
-    if (!decisionReason || !decisionReason.trim()) {
+    const trimmedReason = decisionReason?.trim() || (decision === 'Approved' ? 'Application verified and compliant with regulatory KYC/KYB requirements.' : '');
+
+    if (!trimmedReason && decision !== 'Approved') {
       addToast({
         type: 'warning',
         title: 'Written Reason Required',
@@ -132,10 +135,10 @@ export default function RegistrationApprovals() {
 
     try {
       setSubmitting(true);
-      const res = await adminApi.decideApproval(selectedApp.id, {
-        type: selectedApp.type,
+      const res = await adminApi.decideApproval(app.id, {
+        type: app.type,
         decision,
-        reason: decisionReason.trim()
+        reason: trimmedReason
       });
 
       if (res.data?.success) {
@@ -629,37 +632,72 @@ export default function RegistrationApprovals() {
                     </td>
 
                     <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                      <button
-                        onClick={() => {
-                          setSelectedApp(app);
-                          setDecisionReason(app.adminRemarks || app.rejectionReason || '');
-                        }}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '7px 14px',
-                          borderRadius: '8px',
-                          border: '1px solid #CBD5E1',
-                          backgroundColor: '#FFFFFF',
-                          color: '#0047BA',
-                          fontWeight: 700,
-                          fontSize: '0.82rem',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease'
-                        }}
-                        onMouseEnter={e => {
-                          e.currentTarget.style.backgroundColor = '#0047BA';
-                          e.currentTarget.style.color = '#FFFFFF';
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.backgroundColor = '#FFFFFF';
-                          e.currentTarget.style.color = '#0047BA';
-                        }}
-                      >
-                        <Eye size={14} />
-                        <span>Review & Verify</span>
-                      </button>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                        {app.registrationStatus === 'Pending Approval' && (
+                          <button
+                            disabled={submitting}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDecision('Approved', app);
+                            }}
+                            title="Quick Approve Application"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '7px 12px',
+                              borderRadius: '8px',
+                              border: 'none',
+                              backgroundColor: '#16A34A',
+                              color: '#FFFFFF',
+                              fontWeight: 700,
+                              fontSize: '0.82rem',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={e => {
+                              e.currentTarget.style.backgroundColor = '#15803D';
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.backgroundColor = '#16A34A';
+                            }}
+                          >
+                            <CheckCircle2 size={13} />
+                            <span>Approve</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            setSelectedApp(app);
+                            setDecisionReason(app.adminRemarks || app.rejectionReason || '');
+                          }}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '7px 14px',
+                            borderRadius: '8px',
+                            border: '1px solid #CBD5E1',
+                            backgroundColor: '#FFFFFF',
+                            color: '#0047BA',
+                            fontWeight: 700,
+                            fontSize: '0.82rem',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.backgroundColor = '#0047BA';
+                            e.currentTarget.style.color = '#FFFFFF';
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.backgroundColor = '#FFFFFF';
+                            e.currentTarget.style.color = '#0047BA';
+                          }}
+                        >
+                          <Eye size={14} />
+                          <span>Review & Verify</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -983,12 +1021,12 @@ export default function RegistrationApprovals() {
                 }}
               >
                 <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 700, color: '#1E293B', marginBottom: '8px' }}>
-                  Mandatory Compliance Written Remarks / Reason:
+                  Compliance Remarks / Decision Reason: <span style={{ fontWeight: 400, color: '#64748B' }}>(Optional for Approval, Mandatory for Rejection or Resubmission)</span>
                 </label>
                 <textarea
                   value={decisionReason}
                   onChange={e => setDecisionReason(e.target.value)}
-                  placeholder="Enter explicit approval remarks, rejection justification, or specific instructions for required resubmission..."
+                  placeholder="Enter optional compliance remarks or specific feedback for applicant (defaults to verified and approved if left blank)..."
                   rows={3}
                   style={{
                     width: '100%',

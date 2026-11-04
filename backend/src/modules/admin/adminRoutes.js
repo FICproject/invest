@@ -55,7 +55,10 @@ import {
   getApprovalById,
   decideRegistrationApproval,
   previewDocument,
-  downloadDocument
+  downloadDocument,
+  getFundingRequests,
+  getFundingRequestById,
+  decideFundingRequest
 } from './adminController.js';
 import { authenticate, requireAdmin } from '../../middleware/auth.js';
 
@@ -101,6 +104,11 @@ router.post('/offers/:id/publish', publishOffer);
 router.post('/offers/:id/activate', activateOffer);
 router.post('/offers/:id/hold', toggleOfferHold);
 router.delete('/offers/:id', deleteOffer);
+
+// Company Funding / Investment Requests (Company side submissions)
+router.get('/funding-requests', getFundingRequests);
+router.get('/funding-requests/:id', getFundingRequestById);
+router.post('/funding-requests/:id/decision', decideFundingRequest);
 
 // Equity Dividends
 router.get('/dividends', getDividends);

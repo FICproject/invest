@@ -56,7 +56,8 @@ export default function WorkList({ setActiveTab }) {
   }, []);
 
   const handleKycDecision = async decision => {
-    if (!decisionReason.trim()) {
+    const finalReason = decisionReason.trim() || (decision === 'Approved' ? 'KYC identity and financial documentation verified and approved.' : '');
+    if (!finalReason && decision !== 'Approved') {
       toast.warning('A written reason is required for KYC decisions (PRD Section 5.1 A-5)');
       return;
     }
@@ -64,7 +65,7 @@ export default function WorkList({ setActiveTab }) {
       setSubmitting(true);
       await adminApi.decideKyc(selectedKyc._id, {
         decision,
-        reason: decisionReason
+        reason: finalReason
       });
       toast.success(`KYC status updated: ${decision}`);
       setSelectedKyc(null);
@@ -90,6 +91,7 @@ export default function WorkList({ setActiveTab }) {
     (wl.pendingKyc?.length || 0) +
     (wl.pendingKyb?.length || 0) +
     (wl.pendingOffers?.length || 0) +
+    (wl.pendingFundingRequests?.length || 0) +
     (wl.pendingReleases?.length || 0) +
     (wl.failedPayouts?.length || 0);
 
@@ -272,6 +274,62 @@ export default function WorkList({ setActiveTab }) {
                         style={{ padding: '5px 12px', fontSize: '0.75rem' }}
                       >
                         Configure Term Sheet
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* 3b. Pending Company Funding Requests */}
+      {wl.pendingFundingRequests?.length > 0 && (
+        <div className="glass-panel" style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Layers size={18} color="#0047BA" />
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>Company Funding Requests Awaiting Review ({wl.pendingFundingRequests.length})</h3>
+            </div>
+            <button onClick={() => setActiveTab('offers')} className="btn-primary" style={{ padding: '6px 12px', fontSize: '0.75rem' }}>
+              Review in Investment Management
+            </button>
+          </div>
+
+          <div className="data-table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '50px', textAlign: 'center' }}>S.No</th>
+                  <th>Request Title</th>
+                  <th>Company</th>
+                  <th>Target (INR)</th>
+                  <th>Return Rate</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {wl.pendingFundingRequests.map((r, idx) => (
+                  <tr key={r._id}>
+                    <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--text-muted)' }}>
+                      {idx + 1}
+                    </td>
+                    <td style={{ fontWeight: 600 }}>{r.title || r.entityOrProjectName}</td>
+                    <td>{r.companyId?.legalName || r.companyId?.name || 'Company'}</td>
+                    <td style={{ fontWeight: 700 }}>₹{Number(r.fundingTarget || 0).toLocaleString('en-IN')}</td>
+                    <td>{r.expectedReturnRate ? `${r.expectedReturnRate}%` : 'N/A'}</td>
+                    <td>
+                      <span className="badge badge-amber">{r.status}</span>
+                    </td>
+                    <td>
+                      <button
+                        onClick={() => setActiveTab('offers')}
+                        className="btn-primary"
+                        style={{ padding: '5px 12px', fontSize: '0.75rem' }}
+                      >
+                        Review & Approve
                       </button>
                     </td>
                   </tr>

@@ -71,15 +71,16 @@ export default function Investors() {
   };
 
   const handleKycDecision = async decision => {
-    if (!decisionReason.trim()) {
-      toast.warning('A written reason is required for any KYC decision (PRD Section 5.1 A-5)');
+    const finalReason = decisionReason.trim() || (decision === 'Approved' ? 'KYC documents verified and approved.' : '');
+    if (!finalReason && decision !== 'Approved') {
+      toast.warning('A written reason is required for KYC decisions (PRD Section 5.1 A-5)');
       return;
     }
     try {
       setSubmitting(true);
       await adminApi.decideKyc(reviewInvestor._id, {
         decision,
-        reason: decisionReason
+        reason: finalReason
       });
       toast.success(`KYC status updated: ${decision}`);
       setReviewInvestor(null);

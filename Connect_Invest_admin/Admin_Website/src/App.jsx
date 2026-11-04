@@ -54,6 +54,7 @@ function MainApp() {
           kyc: s.pendingApprovals?.kyc || 0,
           kyb: s.pendingApprovals?.kyb || 0,
           offers: s.pendingApprovals?.offers || 0,
+          fundingRequests: s.pendingApprovals?.fundingRequests || 0,
           releases: s.pendingApprovals?.releases || 0,
           overdue: s.overdueRepaymentsCount || 0,
           readyPayouts: s.upcomingPayoutsCount || 0

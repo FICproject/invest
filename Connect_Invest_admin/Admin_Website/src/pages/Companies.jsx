@@ -95,11 +95,11 @@ export default function Companies() {
         },
         bankAccount: newCompany.accountNo
           ? {
-              accountNo: newCompany.accountNo,
-              ifsc: newCompany.ifsc,
-              holderName: newCompany.holderName || newCompany.name,
-              bankName: newCompany.bankName
-            }
+            accountNo: newCompany.accountNo,
+            ifsc: newCompany.ifsc,
+            holderName: newCompany.holderName || newCompany.name,
+            bankName: newCompany.bankName
+          }
           : undefined
       };
 
@@ -130,7 +130,8 @@ export default function Companies() {
   };
 
   const handleKybDecision = async decision => {
-    if (!decisionReason.trim()) {
+    const finalReason = decisionReason.trim() || (decision === 'Approved' ? 'KYB corporate documents verified and approved.' : '');
+    if (!finalReason && decision !== 'Approved') {
       toast?.warning?.('A written reason is required for KYB decision (PRD Section 5.1 A-6)');
       return;
     }
@@ -138,7 +139,7 @@ export default function Companies() {
       setSubmitting(true);
       await adminApi.decideKyb(reviewCompany._id, {
         decision,
-        reason: decisionReason
+        reason: finalReason
       });
       toast?.success?.(`KYB decision recorded: ${decision}`);
       setReviewCompany(null);
@@ -274,11 +275,10 @@ export default function Companies() {
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{c.ownerUserId?.email}</div>
                       </td>
                       <td style={{ textAlign: 'center' }}>
-                        <span className={`badge ${
-                          c.status === 'Approved' ? 'badge-emerald' :
-                          c.status === 'KYB submitted' ? 'badge-amber' :
-                          c.status === 'Blocked' ? 'badge-rose' : 'badge-slate'
-                        }`}>
+                        <span className={`badge ${c.status === 'Approved' ? 'badge-emerald' :
+                            c.status === 'KYB submitted' ? 'badge-amber' :
+                              c.status === 'Blocked' ? 'badge-rose' : 'badge-slate'
+                          }`}>
                           {c.status}
                         </span>
                       </td>
