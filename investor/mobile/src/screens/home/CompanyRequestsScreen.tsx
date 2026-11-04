@@ -81,7 +81,7 @@ export const CompanyRequestsScreen = ({ onBack }: { onBack?: () => void }) => {
         description: description.trim() || `${title} funding campaign on Connect Invest.`,
       });
 
-      Alert.alert('Success', 'Investment request submitted successfully!');
+      Alert.alert('Success', 'Fund request submitted successfully!');
       setModalVisible(false);
       setTitle('');
       setTargetAmount('');
@@ -89,14 +89,14 @@ export const CompanyRequestsScreen = ({ onBack }: { onBack?: () => void }) => {
       setDescription('');
       loadRequests();
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to submit investment request.');
+      Alert.alert('Error', err.message || 'Failed to submit fund request.');
     } finally {
       setSubmitting(false);
     }
   };
 
   if (loading) {
-    return <Loader fullScreen message="Loading Investment Requests..." />;
+    return <Loader fullScreen message="Loading Fund Requests..." />;
   }
 
   return (
@@ -111,7 +111,7 @@ export const CompanyRequestsScreen = ({ onBack }: { onBack?: () => void }) => {
           </TouchableOpacity>
         )}
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Investment Requests</Text>
+          <Text style={styles.headerTitle}>Fund Requests</Text>
           <Text style={styles.headerSub}>Manage your fundraising rounds & offerings</Text>
         </View>
         <TouchableOpacity
@@ -140,7 +140,7 @@ export const CompanyRequestsScreen = ({ onBack }: { onBack?: () => void }) => {
         ListEmptyComponent={
           <View style={styles.emptyCard}>
             <Icon name="briefcase" size={40} color="#9CA3AF" />
-            <Text style={styles.emptyTitle}>No Investment Requests Yet</Text>
+            <Text style={styles.emptyTitle}>No Fund Requests Yet</Text>
             <Text style={styles.emptySub}>
               Create your first capital raise round to invite vetted investors from Connect Invest.
             </Text>
@@ -148,7 +148,7 @@ export const CompanyRequestsScreen = ({ onBack }: { onBack?: () => void }) => {
               style={styles.emptyBtn}
               onPress={() => setModalVisible(true)}
             >
-              <Text style={styles.emptyBtnText}>Create Investment Request</Text>
+              <Text style={styles.emptyBtnText}>Create Fund Request</Text>
             </TouchableOpacity>
           </View>
         }
