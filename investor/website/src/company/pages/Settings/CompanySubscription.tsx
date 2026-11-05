@@ -34,35 +34,38 @@ export const CompanySubscription: React.FC = () => {
     year: 'numeric'
   });
 
-  const [paymentHistory, setPaymentHistory] = useState([
-    {
-      id: 'INV-2026-10-8841',
-      month: 'October 2026',
-      amount: 500,
-      paidOn: '04 Oct 2026',
-      method: 'UPI Auto-Debit',
-      status: 'Paid',
-      receiptUrl: '#'
-    },
-    {
-      id: 'INV-2026-09-7712',
-      month: 'September 2026',
-      amount: 500,
-      paidOn: '04 Sep 2026',
-      method: 'Net Banking',
-      status: 'Paid',
-      receiptUrl: '#'
-    },
-    {
-      id: 'INV-2026-08-6629',
-      month: 'August 2026',
-      amount: 500,
-      paidOn: '04 Aug 2026',
-      method: 'Corporate Debit Card',
-      status: 'Paid',
-      receiptUrl: '#'
+  const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+
+  // Fetch real subscription status and payments from backend on load
+  const fetchSubscriptionDetails = async () => {
+    try {
+      setLoadingHistory(true);
+      const res = await api.get('/company/subscription');
+      if (res.data?.success && res.data?.data) {
+        setIsSubscribed(Boolean(res.data.data.isSubscribed));
+        const list = (res.data.data.history || []).map((s: any) => ({
+          id: s.invoiceNumber || s._id,
+          month: s.billingMonth,
+          amount: s.amount,
+          paidOn: s.paymentDate ? new Date(s.paymentDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A',
+          method: s.paymentMethod || 'Razorpay',
+          status: s.status || 'Paid',
+          receiptUrl: '#'
+        }));
+        setPaymentHistory(list);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch subscription history:', e);
+    } finally {
+      setLoadingHistory(false);
     }
-  ]);
+  };
+
+  React.useEffect(() => {
+    fetchSubscriptionDetails();
+  }, []);
 
   const handleRazorpayPayment = async () => {
     setPaying(true);
@@ -195,7 +198,11 @@ export const CompanySubscription: React.FC = () => {
                 <h3 className="text-lg font-bold text-slate-900 font-display">
                   Corporate Portal Active Plan
                 </h3>
-                <Badge variant="success">Active / In Good Standing</Badge>
+                {isSubscribed ? (
+                  <Badge variant="success">Active / In Good Standing</Badge>
+                ) : (
+                  <Badge variant="neutral">Pending Activation</Badge>
+                )}
               </div>
               <p className="text-xs text-slate-600 mt-1">
                 Company: <strong>{company?.businessName || 'Company Portal'}</strong> • CIN / Registration Verified
@@ -258,10 +265,10 @@ export const CompanySubscription: React.FC = () => {
             <div className="w-8 h-8 rounded-lg bg-[#DE8E0A]/10 text-[#DE8E0A] flex items-center justify-center">
               <ShieldCheck className="w-4 h-4" />
             </div>
-            <h4 className="text-xs font-bold text-slate-900">Escrow & Legal Compliance</h4>
+            <h4 className="text-xs font-bold text-slate-900">Direct Compliance & Trustee Reporting</h4>
           </div>
           <p className="text-[11px] text-slate-500 leading-relaxed">
-            Statutory SEBI-aligned escrow bank reconciliation, trustee reporting, and automated payout disbursement ledgers.
+            Verified corporate bank reconciliation, regulatory compliance reporting, and automated payout disbursement ledgers.
           </p>
         </Card>
 
@@ -305,28 +312,36 @@ export const CompanySubscription: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {paymentHistory.map((item) => (
-                <tr key={item.id} className="hover:bg-slate-50/70 transition">
-                  <td className="p-4 font-mono font-bold text-slate-800">{item.id}</td>
-                  <td className="p-4 font-medium text-slate-700">{item.month}</td>
-                  <td className="p-4 font-black text-slate-900 font-display">₹{item.amount}</td>
-                  <td className="p-4 text-slate-600">{item.method}</td>
-                  <td className="p-4 text-slate-500">{item.paidOn}</td>
-                  <td className="p-4">
-                    <Badge variant="success">Paid</Badge>
-                  </td>
-                  <td className="p-4 text-right">
-                    <button
-                      type="button"
-                      onClick={() => alert(`Downloading GST Invoice ${item.id} for ₹500`)}
-                      className="inline-flex items-center gap-1 text-[11px] font-bold text-[#DE8E0A] hover:underline"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      Download
-                    </button>
+              {paymentHistory.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-slate-400">
+                    {loadingHistory ? 'Loading subscription history...' : 'No subscription payments recorded yet. Click Pay Now above to activate.'}
                   </td>
                 </tr>
-              ))}
+              ) : (
+                paymentHistory.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50/70 transition">
+                    <td className="p-4 font-mono font-bold text-slate-800">{item.id}</td>
+                    <td className="p-4 font-medium text-slate-700">{item.month}</td>
+                    <td className="p-4 font-black text-slate-900 font-display">₹{item.amount}</td>
+                    <td className="p-4 text-slate-600">{item.method}</td>
+                    <td className="p-4 text-slate-500">{item.paidOn}</td>
+                    <td className="p-4">
+                      <Badge variant={item.status === 'Paid' ? 'success' : 'neutral'}>{item.status}</Badge>
+                    </td>
+                    <td className="p-4 text-right">
+                      <button
+                        type="button"
+                        onClick={() => alert(`Downloading GST Invoice ${item.id} for ₹${item.amount}`)}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-[#DE8E0A] hover:underline"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Download
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
