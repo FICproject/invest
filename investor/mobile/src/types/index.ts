@@ -107,7 +107,8 @@ export interface Investment {
   startDate: string;
   maturityDate: string;
   certificateNumber?: string;
-  status: 'Pending' | 'Confirmed' | 'Active' | 'Matured' | 'Cancelled';
+  certificateNo?: string;
+  status: 'Pending' | 'Pending Review' | 'Approved' | 'Changes Requested' | 'Confirmed' | 'Active' | 'Matured' | 'Cancelled' | 'Rejected';
   payoutFrequency: string;
   createdAt?: string;
 }

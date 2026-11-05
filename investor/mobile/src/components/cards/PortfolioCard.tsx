@@ -12,27 +12,45 @@ interface PortfolioCardProps {
   investment: Investment;
   onPress: () => void;
   onProspectus?: () => void;
+  onPay?: () => void;
 }
 
-export const PortfolioCard: React.FC<PortfolioCardProps> = ({ investment, onPress, onProspectus }) => {
+export const PortfolioCard: React.FC<PortfolioCardProps> = ({ investment, onPress, onProspectus, onPay }) => {
   const offer = investment.offerId;
-  const companyTitle = offer ? offer.companyName || offer.title : 'Nexus Diagnostics Ltd.';
-  const offerSubtitle = offer ? offer.title || 'Private Asset Round' : 'Nexus Advanced Healthcare Diagnostics';
+  const projectTitle = offer?.title || 'Investment Project';
+  const projectSubtitle = offer
+    ? `${offer.type ? offer.type + ' Investment' : 'Project Investment'}${offer.category ? ' • ' + offer.category : ''}${offer.location ? ' • ' + offer.location : ''}`
+    : 'Project Asset';
 
   const getStatusVariant = (status: string) => {
     switch (status) {
       case 'Confirmed':
       case 'Active':
         return 'success';
+      case 'Approved':
+        return 'success';
+      case 'Pending Review':
       case 'Pending':
+        return 'warning';
+      case 'Changes Requested':
         return 'warning';
       case 'Completed':
       case 'Matured':
         return 'info';
+      case 'Rejected':
+        return 'danger';
       default:
         return 'default';
     }
   };
+
+  const returnRateDisplay = investment.returnRate || offer?.returnRate || 3;
+  const tenureMonthsDisplay = investment.tenureMonths || offer?.tenureMonths || 12;
+  const expectedReturnsDisplay = investment.expectedReturns || (
+    investment.amountInvested
+      ? Math.round(investment.amountInvested + (investment.amountInvested * (returnRateDisplay / 100) * (tenureMonthsDisplay / 12)))
+      : 0
+  );
 
   return (
     <TouchableOpacity
@@ -49,7 +67,7 @@ export const PortfolioCard: React.FC<PortfolioCardProps> = ({ investment, onPres
             size="sm"
           />
           <Text style={styles.certText}>
-            Cert: <Text style={styles.certNumber}>{investment.certificateNumber || 'CI-CERT-235078'}</Text>
+            Cert: <Text style={styles.certNumber}>{investment.certificateNumber || investment.certificateNo || ('GEN-' + investment._id.slice(-6).toUpperCase())}</Text>
           </Text>
         </View>
         <TouchableOpacity
@@ -61,12 +79,12 @@ export const PortfolioCard: React.FC<PortfolioCardProps> = ({ investment, onPres
         </TouchableOpacity>
       </View>
 
-      {/* Company Name & Sector Subtitle */}
+      {/* Project Title & Sector Subtitle */}
       <Text style={styles.companyName} numberOfLines={1}>
-        {companyTitle}
+        {projectTitle}
       </Text>
       <Text style={styles.offerSubtitle} numberOfLines={1}>
-        {offerSubtitle}
+        {projectSubtitle}
       </Text>
 
       {/* Metrics Row: Invested Amount, Return Rate, Expected Returns, Maturity Date */}
@@ -74,21 +92,21 @@ export const PortfolioCard: React.FC<PortfolioCardProps> = ({ investment, onPres
         <View style={styles.metricColumn}>
           <Text style={styles.metricLabel}>Invested Amount</Text>
           <Text style={styles.metricValue}>
-            {formatCurrency(investment.amountInvested)}
+            {formatCurrency(investment.amountInvested || investment.amount)}
           </Text>
         </View>
 
         <View style={styles.metricColumn}>
           <Text style={styles.metricLabel}>Return Rate</Text>
           <Text style={styles.metricValueGold}>
-            {investment.returnRate}% p.m.
+            {returnRateDisplay}% p.a.
           </Text>
         </View>
 
         <View style={styles.metricColumn}>
           <Text style={styles.metricLabel}>Expected Returns</Text>
           <Text style={styles.metricValueSuccess}>
-            {formatCurrency(investment.expectedReturns)}
+            {formatCurrency(expectedReturnsDisplay)}
           </Text>
         </View>
 
@@ -99,6 +117,26 @@ export const PortfolioCard: React.FC<PortfolioCardProps> = ({ investment, onPres
           </Text>
         </View>
       </View>
+
+      {/* Pay Now Button if Approved */}
+      {investment.status === 'Approved' && (
+        <View style={styles.payActionContainer}>
+          <View style={styles.payNoticeRow}>
+            <Icon name="check-circle" size={14} color="#16A34A" />
+            <Text style={styles.payNoticeText}>Approved by Admin. Ready for payment.</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.payNowBtn}
+            onPress={onPay}
+            activeOpacity={0.8}
+          >
+            <Icon name="credit-card" size={15} color="#FFFFFF" />
+            <Text style={styles.payNowBtnText}>
+              Pay {formatCurrency(investment.amountInvested || investment.amount)} via Razorpay
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </TouchableOpacity>
   );
 };
@@ -193,6 +231,38 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.textPrimary,
+  },
+  payActionContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#EFEAE2',
+  },
+  payNoticeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  payNoticeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#166534',
+  },
+  payNowBtn: {
+    backgroundColor: '#16A34A',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    borderRadius: 8,
+    ...SHADOWS.sm,
+  },
+  payNowBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
 

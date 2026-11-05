@@ -16,14 +16,34 @@ import { broadcastSyncEvent } from '../services/sse.js';
 // @route   POST /api/payments/create-order
 // @desc    Initiate investment payment order
 export const createOrder = asyncHandler(async (req, res) => {
-  const { offerId, amount, paymentMethod } = req.body;
+  let { offerId, amount, paymentMethod, investmentId } = req.body;
   const investorId = req.user._id;
+
+  let existingInvestment = null;
+  if (investmentId) {
+    existingInvestment = await Investment.findById(investmentId);
+    if (existingInvestment) {
+      if (!offerId && existingInvestment.offerId) {
+        offerId = existingInvestment.offerId;
+      }
+      if (!amount && (existingInvestment.amountInvested || existingInvestment.amount)) {
+        amount = existingInvestment.amountInvested || existingInvestment.amount;
+      }
+    }
+  }
+
+  if (offerId && typeof offerId === 'object' && offerId._id) {
+    offerId = offerId._id;
+  }
 
   if (!offerId || !amount) {
     throw new ApiError(400, 'Please provide investment offer ID and investment amount.');
   }
 
-  const offer = await InvestmentOffer.findById(offerId);
+  let offer = await InvestmentOffer.findById(offerId);
+  if (!offer) {
+    offer = await Company.model('Offer').findById(offerId).catch(() => null);
+  }
   if (!offer) {
     throw new ApiError(404, 'Investment opportunity not found.');
   }
@@ -43,7 +63,8 @@ export const createOrder = asyncHandler(async (req, res) => {
 
   // Check KYC status: PRD rule: "Do not allow investment actions that require KYC approval until the required verification is complete."
   const kyc = await KYC.findOne({ investorId });
-  if (!kyc || kyc.status !== 'APPROVED') {
+  const isKycApproved = kyc && (kyc.status === 'Approved' || kyc.status === 'APPROVED');
+  if (!isKycApproved) {
     return res.status(403).json({
       success: false,
       code: 'KYC_REQUIRED',
@@ -81,7 +102,8 @@ export const createOrder = asyncHandler(async (req, res) => {
     notes: {
       investorId: investorId.toString(),
       offerId: offer._id.toString(),
-      offerTitle: offer.title
+      offerTitle: offer.title,
+      investmentId: investmentId ? investmentId.toString() : ''
     }
   });
 
@@ -90,6 +112,7 @@ export const createOrder = asyncHandler(async (req, res) => {
   const payment = await Payment.create({
     investorId,
     offerId,
+    investmentId: investmentId || null,
     orderId,
     razorpayOrderId: rzpOrder.orderId,
     amount: investAmount,
@@ -166,7 +189,7 @@ export const verifyPayment = asyncHandler(async (req, res) => {
       amount: payment.amount,
       status: 'Failed',
       referenceId: 'TXN_' + Date.now(),
-      paymentMethod: payment.paymentMethod,
+      paymentMethod: (payment.paymentMethod && ['Net Banking', 'UPI', 'Bank Transfer', 'Debit/Credit Card', 'Credit/Debit Card', 'Razorpay Gateway'].includes(payment.paymentMethod)) ? payment.paymentMethod : 'Net Banking',
       description: 'Transaction was declined or cancelled.'
     });
 
@@ -192,20 +215,53 @@ export const verifyPayment = asyncHandler(async (req, res) => {
   const maturityDate = new Date();
   maturityDate.setMonth(maturityDate.getMonth() + tenureMonths);
 
-  // 1. Create Investment record
-  const investment = await Investment.create({
-    investorId,
-    offerId: offer._id,
-    amountInvested: principal,
-    returnRate: annualRate,
-    tenureMonths,
-    expectedReturns: totalMaturity,
-    returnsReceived: 0,
-    startDate,
-    maturityDate,
-    status: 'Confirmed',
-    payoutFrequency: offer.payoutFrequency
-  });
+  // 1. Update existing Investment record or create new
+  const targetInvId = req.body.investmentId || payment.investmentId;
+  let investment = null;
+  if (targetInvId) {
+    investment = await Investment.findById(targetInvId);
+  }
+
+  if (investment) {
+    investment.status = 'Confirmed';
+    investment.paymentStatus = 'Completed';
+    investment.amountInvested = principal;
+    investment.amount = principal;
+    investment.amountPaise = Math.round(principal * 100);
+    investment.returnRate = annualRate;
+    investment.tenureMonths = tenureMonths;
+    investment.expectedReturns = totalMaturity;
+    investment.startDate = startDate;
+    investment.maturityDate = maturityDate;
+    if (!investment.certificateNumber) {
+      const year = new Date().getFullYear();
+      const rand = Math.floor(1000 + Math.random() * 9000);
+      investment.certificateNumber = `CERT-${year}-${rand}`;
+      investment.certificateNo = investment.certificateNumber;
+    }
+    await investment.save();
+  } else {
+    const year = new Date().getFullYear();
+    const rand = Math.floor(1000 + Math.random() * 9000);
+    investment = await Investment.create({
+      investorId,
+      offerId: offer._id,
+      amountInvested: principal,
+      amount: principal,
+      amountPaise: Math.round(principal * 100),
+      returnRate: annualRate,
+      tenureMonths,
+      expectedReturns: totalMaturity,
+      returnsReceived: 0,
+      startDate,
+      maturityDate,
+      status: 'Confirmed',
+      paymentStatus: 'Completed',
+      certificateNumber: `CERT-${year}-${rand}`,
+      certificateNo: `CERT-${year}-${rand}`,
+      payoutFrequency: offer.payoutFrequency || 'Monthly'
+    });
+  }
 
   // 2. Update offer raised amount
   offer.raisedAmount += principal;
@@ -221,6 +277,18 @@ export const verifyPayment = asyncHandler(async (req, res) => {
   if (effectiveSignature) payment.razorpaySignature = effectiveSignature;
   await payment.save();
 
+  const validPaymentMethods = [
+    'Net Banking',
+    'UPI',
+    'Bank Transfer',
+    'Debit/Credit Card',
+    'Credit/Debit Card',
+    'Razorpay Gateway'
+  ];
+  const finalPaymentMethod = (payment.paymentMethod && validPaymentMethods.includes(payment.paymentMethod))
+    ? payment.paymentMethod
+    : 'Net Banking';
+
   // 4. Create confirmed transaction record
   const txnRef = 'TXN_' + Math.floor(100000000 + Math.random() * 900000000);
   await Transaction.create({
@@ -231,7 +299,7 @@ export const verifyPayment = asyncHandler(async (req, res) => {
     amount: principal,
     status: 'Confirmed',
     referenceId: txnRef,
-    paymentMethod: payment.paymentMethod,
+    paymentMethod: finalPaymentMethod,
     description: `Allocated into ${offer.title} (${annualRate}% p.a. for ${tenureMonths} Months)`
   });
 

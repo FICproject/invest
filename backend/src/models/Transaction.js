@@ -47,7 +47,16 @@ const transactionSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ['Net Banking', 'UPI', 'Bank Transfer', 'Debit/Credit Card'],
+      enum: [
+        'Net Banking',
+        'UPI',
+        'Bank Transfer',
+        'Debit/Credit Card',
+        'Credit/Debit Card',
+        'Razorpay Gateway',
+        'Auto-Debit / eNACH',
+        'Bank Transfer (NEFT/RTGS)'
+      ],
       default: 'Net Banking'
     },
     description: {

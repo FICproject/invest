@@ -21,7 +21,7 @@ interface OfferCardProps {
 
 export const OfferCard: React.FC<OfferCardProps> = ({ offer, onPress }) => {
   const isCompany = offer.type === 'Company';
-  const minPeriod = isCompany ? '5 Years' : '2 Years';
+  const minPeriod = isCompany ? '5 Years' : `${offer.tenureMonths ? offer.tenureMonths + ' Months' : '2 Years'}`;
 
   return (
     <TouchableOpacity
@@ -29,18 +29,10 @@ export const OfferCard: React.FC<OfferCardProps> = ({ offer, onPress }) => {
       onPress={onPress}
       style={styles.card}
     >
-      {/* Header Image with Project / Company Badge */}
-      <View style={styles.imageContainer}>
-        <Image
-          source={{
-            uri:
-              offer.imageUrl ||
-              'https://images.unsplash.com/photo-1497440001374-f26997328c1b?auto=format&fit=crop&w=800&q=80',
-          }}
-          style={styles.image}
-          resizeMode="cover"
-        />
-        <View style={styles.badgeOverlay}>
+      {/* Card Body - Clean List without image */}
+      <View style={styles.content}>
+        {/* Top Header Badge & Type */}
+        <View style={styles.topBadgeRow}>
           <View
             style={[
               styles.typeBadge,
@@ -58,22 +50,24 @@ export const OfferCard: React.FC<OfferCardProps> = ({ offer, onPress }) => {
                 isCompany ? styles.companyBadgeText : styles.projectBadgeText,
               ]}
             >
-              {offer.type || 'Company'}
+              {offer.type || 'Project'} Investment
             </Text>
           </View>
+          {offer.category && (
+            <Text style={styles.categoryText}>
+              • {offer.category}
+            </Text>
+          )}
         </View>
-      </View>
 
-      {/* Card Body */}
-      <View style={styles.content}>
         {/* Title */}
         <Text style={styles.title} numberOfLines={1}>
-          {offer.companyName || offer.title}
+          {offer.title || offer.companyName}
         </Text>
 
-        {/* Category · Location */}
+        {/* Company Name & Location */}
         <Text style={styles.categoryLocation} numberOfLines={1}>
-          {offer.category}
+          {offer.companyName}
           {offer.location ? ` · ${offer.location}` : ''}
         </Text>
 
@@ -89,13 +83,13 @@ export const OfferCard: React.FC<OfferCardProps> = ({ offer, onPress }) => {
             <View style={styles.metricCell}>
               <Text style={styles.metricLabel}>Min. Investment</Text>
               <Text style={styles.metricValue}>
-                {formatCurrency(offer.minInvestment || 1000)}
+                {formatCurrency(offer.minInvestment || 50000)}
               </Text>
             </View>
             <View style={styles.metricCell}>
               <Text style={styles.metricLabel}>Max. Investment</Text>
               <Text style={styles.metricValue}>
-                {formatCurrency(offer.maxInvestment || 10000000)}
+                {formatCurrency(offer.maxInvestment || offer.targetAmount || 500000)}
               </Text>
             </View>
           </View>
@@ -107,11 +101,11 @@ export const OfferCard: React.FC<OfferCardProps> = ({ offer, onPress }) => {
             <View style={styles.metricCell}>
               <Text style={styles.metricLabel}>Return Rate</Text>
               <Text style={styles.metricValueGold}>
-                {offer.returnRate || 3}% / Month
+                {offer.returnRate || 3}% p.a.
               </Text>
             </View>
             <View style={styles.metricCell}>
-              <Text style={styles.metricLabel}>Min. Period</Text>
+              <Text style={styles.metricLabel}>Tenure / Min. Period</Text>
               <Text style={styles.metricValue}>
                 {minPeriod}
               </Text>
@@ -142,20 +136,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...SHADOWS.md,
   },
-  imageContainer: {
-    height: 150,
-    width: '100%',
-    position: 'relative',
-    backgroundColor: '#EAE5DE',
+  topBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
   },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-  badgeOverlay: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
+  categoryText: {
+    fontSize: 12,
+    color: COLORS.textMuted,
   },
   typeBadge: {
     flexDirection: 'row',

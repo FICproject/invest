@@ -42,12 +42,13 @@ export const InvestorSubscription = () => {
     try {
       setLoadingHistory(true);
       const res = await investorService.getSubscription();
-      if (res.data?.success && res.data?.data) {
-        setIsSubscribed(Boolean(res.data.data.isSubscribed));
-        if (res.data.data.currentPlan?.amount) {
-          setSubscriptionAmount(res.data.data.currentPlan.amount);
+      const subData = res?.data || res;
+      if (subData) {
+        setIsSubscribed(Boolean(subData.isSubscribed));
+        if (subData.currentPlan?.amount) {
+          setSubscriptionAmount(subData.currentPlan.amount);
         }
-        const list = (res.data.data.history || []).map((s) => ({
+        const list = (subData.history || []).map((s) => ({
           id: s.invoiceNumber || s._id,
           month: s.billingMonth,
           amount: s.amount,
@@ -76,7 +77,12 @@ export const InvestorSubscription = () => {
       const res = await investorService.createSubscriptionOrder({
         billingMonth: currentMonthName
       });
-      const orderData = res.data?.data || res.data;
+      // In our axios client (api.js), response interceptor already unwraps response.data directly!
+      const orderData = res?.data || res;
+
+      if (!orderData || !orderData.orderId) {
+        throw new Error('Failed to create subscription order. Please try again.');
+      }
 
       // 2. If Razorpay SDK is available on window and not simulated
       if (typeof window !== 'undefined' && window.Razorpay && !orderData.simulated) {
@@ -104,7 +110,7 @@ export const InvestorSubscription = () => {
                 paymentMethod: selectedMethod === 'upi' ? 'UPI' : selectedMethod === 'card' ? 'Credit/Debit Card' : 'Net Banking'
               });
 
-              if (verifyRes.data?.success) {
+              if (verifyRes?.success || verifyRes?.data?.success) {
                 setPaymentSuccess(true);
                 setIsSubscribed(true);
                 fetchSubscriptionDetails();
@@ -136,7 +142,7 @@ export const InvestorSubscription = () => {
           paymentMethod: selectedMethod === 'upi' ? 'UPI' : selectedMethod === 'card' ? 'Credit/Debit Card' : 'Net Banking'
         });
 
-        if (verifyRes.data?.success) {
+        if (verifyRes?.success || verifyRes?.data?.success) {
           setPaymentSuccess(true);
           setIsSubscribed(true);
           fetchSubscriptionDetails();

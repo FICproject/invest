@@ -13,6 +13,7 @@ import {
   OfferTerms,
   Investment,
   InvestmentRequest,
+  InvestmentOffer,
   Repayment,
   Payout,
   Batch,
@@ -4483,21 +4484,64 @@ export async function decideFundingRequest(req, res, next) {
       }
       await offer.save();
 
+      // Mirror into InvestmentOffer so verified investors see it on Marketplace and Investor Dashboard
+      try {
+        let invOffer = await InvestmentOffer.findOne({
+          $or: [
+            { title: request.title },
+            { companyId: company._id, targetAmount: request.fundingTarget }
+          ]
+        });
+
+        const invCategory = company.industry || 'Technology';
+        const allowedCategories = ['Renewable Energy', 'Real Estate', 'Food & Agriculture', 'Technology', 'Healthcare', 'Others'];
+        const matchedCategory = allowedCategories.includes(invCategory) ? invCategory : 'Technology';
+
+        const invOfferData = {
+          title: request.title || request.entityOrProjectName || `${company.name} Investment`,
+          companyName: company.legalName || company.name || 'Enterprise',
+          companyId: company._id,
+          type: request.investmentPurpose === 'Project Investment' ? 'Project' : 'Company',
+          category: matchedCategory,
+          description: request.detailedDescription || request.shortDescription || 'Verified enterprise opportunity',
+          targetAmount: request.fundingTarget || 100000,
+          raisedAmount: 0,
+          minInvestment: request.minInvestment || 25000,
+          maxInvestment: request.maxInvestment || request.fundingTarget || 50000000,
+          returnRate: request.expectedReturnRate || request.agreedReturnRate || 3,
+          tenureMonths: request.durationMonths || (request.investmentPeriodYears ? request.investmentPeriodYears * 12 : 24),
+          payoutFrequency: 'Monthly',
+          riskLevel: 'Moderate',
+          status: publishToMarketplace ? 'Active' : 'Closed',
+          isFeatured: true,
+          imageUrl: (request.supportingDocuments && request.supportingDocuments[0]?.fileUrl) || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=80',
+          location: company.registeredAddress?.city || 'India',
+          securityType: 'Secured Debenture / Corporate Bond',
+          documents: (request.supportingDocuments || []).map(d => ({ name: d.name, fileUrl: d.fileUrl, fileType: 'pdf' }))
+        };
+
+        if (!invOffer) {
+          invOffer = await InvestmentOffer.create(invOfferData);
+        } else {
+          Object.assign(invOffer, invOfferData);
+          await invOffer.save();
+        }
+      } catch (errSync) {
+        console.error('Failed to sync approved request to InvestmentOffer:', errSync);
+      }
+
       // Ensure OfferTerms is created and accepted so it's fully active
       let terms = await OfferTerms.findOne({ offerId: offer._id }).sort({ version: -1 });
       if (!terms) {
         terms = new OfferTerms({
           offerId: offer._id,
           version: 1,
-          targetPaise: offer.targetPaise,
-          minTargetPaise: offer.minTargetPaise,
-          rateBps: offer.rateBps,
-          tenures: offer.tenures,
-          fundingWindowDays: 30,
-          termsBody: `Standard terms agreed for ${offer.title}`,
+          body: `Standard terms agreed for ${offer.title}`,
+          repaymentScheduleSummary: `Monthly yield returns over ${offer.tenures?.[0] || 12} months`,
           acceptedByCompanyAt: new Date()
         });
       } else {
+        if (!terms.body) terms.body = `Standard terms agreed for ${offer.title}`;
         terms.acceptedByCompanyAt = new Date();
       }
       await terms.save();
@@ -4856,6 +4900,12 @@ export async function decideInvestorRequest(req, res, next) {
       investment.tenureMonths = tenureMonths;
       investment.expectedReturns = totalMaturity;
 
+      if (!investment.certificateNumber) {
+        const year = new Date().getFullYear();
+        const rand = Math.floor(1000 + Math.random() * 9000);
+        investment.certificateNumber = `CERT-${year}-${rand}`;
+        investment.certificateNo = investment.certificateNumber;
+      }
       if (!investment.startDate) investment.startDate = new Date();
       if (!investment.maturityDate) {
         const mat = new Date(investment.startDate);

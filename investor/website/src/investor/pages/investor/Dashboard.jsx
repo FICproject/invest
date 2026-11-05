@@ -17,7 +17,7 @@ import {
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { Button } from '../../components/common/Button';
 import { Loader } from '../../components/common/Loader';
-import { InvestmentCard } from '../../components/investment/InvestmentCard';
+import { InvestmentListItem } from '../../components/investment/InvestmentListItem';
 import {
   PortfolioDonutChart,
   MonthlyReturnsLineChart,
@@ -390,13 +390,13 @@ export const Dashboard = () => {
 
           <div
             style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-              gap: '20px'
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
             }}
           >
-            {featuredOffers.slice(0, 4).map((offer) => (
-              <InvestmentCard key={offer._id} offer={offer} />
+            {featuredOffers.slice(0, 5).map((offer) => (
+              <InvestmentListItem key={offer._id} offer={offer} />
             ))}
           </div>
         </div>

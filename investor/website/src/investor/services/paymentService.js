@@ -1,11 +1,12 @@
 import api from './api';
 
 export const paymentService = {
-  async createOrder(offerId, amount, paymentMethod) {
+  async createOrder(offerId, amount, paymentMethod, extra = {}) {
     return await api.post('/payments/create-order', {
       offerId,
       amount,
-      paymentMethod
+      paymentMethod,
+      ...extra
     });
   },
 

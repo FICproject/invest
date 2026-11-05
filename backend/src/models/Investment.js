@@ -25,6 +25,30 @@ const investmentSchema = new mongoose.Schema(
       type: Number,
       default: null
     },
+    returnRate: {
+      type: Number,
+      default: 0
+    },
+    expectedReturns: {
+      type: Number,
+      default: 0
+    },
+    returnsReceived: {
+      type: Number,
+      default: 0
+    },
+    certificateNumber: {
+      type: String,
+      default: null
+    },
+    startDate: {
+      type: Date,
+      default: null
+    },
+    payoutFrequency: {
+      type: String,
+      default: 'Monthly'
+    },
     amountPaise: {
       type: Number
     },

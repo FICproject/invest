@@ -395,7 +395,7 @@ export const CreateRequest: React.FC = () => {
               <span className="absolute right-3.5 top-2.5 text-xs text-slate-400 font-bold">% p.a.</span>
             </div>
             <span className="text-[11px] text-slate-500 mt-1 block">
-              Agreed annual yield rate offered to investors.
+              Agreed annual yield rate offered to investors (Minimum 3.0% p.a.).
             </span>
           </div>
 

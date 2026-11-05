@@ -40,6 +40,7 @@ import { Notifications as InvestorNotifications } from './investor/pages/investo
 import { Statements } from './investor/pages/investor/Statements';
 import { Support } from './investor/pages/investor/Support';
 import { InvestorSubscription } from './investor/pages/investor/InvestorSubscription';
+import { InvestmentOffers } from './investor/pages/investor/InvestmentOffers';
 
 // Company Pages & Layout
 import { DashboardLayout as CompanyDashboardLayout } from './company/components/layout/DashboardLayout';
@@ -106,6 +107,14 @@ export default function App() {
               element={
                 <InvestorProtectedRoute>
                   <InvestorDashboard />
+                </InvestorProtectedRoute>
+              }
+            />
+            <Route
+              path="/investor/offers"
+              element={
+                <InvestorProtectedRoute>
+                  <InvestmentOffers />
                 </InvestorProtectedRoute>
               }
             />
@@ -178,6 +187,14 @@ export default function App() {
               element={
                 <InvestorProtectedRoute>
                   <Support />
+                </InvestorProtectedRoute>
+              }
+            />
+            <Route
+              path="/investor/subscription"
+              element={
+                <InvestorProtectedRoute>
+                  <InvestorSubscription />
                 </InvestorProtectedRoute>
               }
             />

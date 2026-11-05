@@ -125,6 +125,10 @@ export const RequestDetails: React.FC = () => {
 
   const handleSaveEdit = async () => {
     if (!id) return;
+    if (Number(editForm.expectedReturnRate) < 3) {
+      alert('Expected return rate cannot be less than 3% p.a.');
+      return;
+    }
     setIsSaving(true);
     try {
       await investmentService.updateRequest(id, {
@@ -343,6 +347,7 @@ export const RequestDetails: React.FC = () => {
                   <input
                     type="number"
                     step="0.1"
+                    min="3"
                     value={editForm.expectedReturnRate}
                     onChange={(e) => setEditForm({ ...editForm, expectedReturnRate: Number(e.target.value) })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"

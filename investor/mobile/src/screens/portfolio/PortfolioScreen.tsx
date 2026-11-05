@@ -20,8 +20,10 @@ import Loader from '../../components/common/Loader';
 import EmptyState from '../../components/common/EmptyState';
 import { usePortfolioContext } from '../../context/portfolioContext';
 import { formatCurrency } from '../../utils/formatters';
+import investmentService from '../../services/investmentService';
+import { Alert } from 'react-native';
 
-const STATUS_TABS = ['All', 'Confirmed', 'Pending', 'Completed'];
+const STATUS_TABS = ['All', 'Approved', 'Confirmed', 'Pending', 'Completed'];
 
 export const PortfolioScreen = ({ navigation }: any) => {
   const {
@@ -63,6 +65,36 @@ export const PortfolioScreen = ({ navigation }: any) => {
     totalReturnsEarned: 0,
     pendingReturns: 0,
     activeInvestments: 0,
+  };
+
+  const handlePayInvestment = async (item: any) => {
+    try {
+      setLoading(true);
+      const offerId = (item.offerId && typeof item.offerId === 'object' && item.offerId._id)
+        ? item.offerId._id
+        : (item.offerId || item.offer);
+      const amount = item.amountInvested || item.amount;
+
+      const orderRes = await investmentService.createPaymentOrder(offerId, amount, 'Razorpay Gateway');
+      if (orderRes && orderRes.data) {
+        const verifyRes = await investmentService.verifyPayment(
+          orderRes.data.orderId,
+          'MOB_PAY_' + Date.now(),
+          'Success'
+        );
+        if (verifyRes.success) {
+          Alert.alert(
+            'Payment Successful',
+            `Your payment of ${formatCurrency(amount)} was successful! Investment is confirmed and active.`,
+            [{ text: 'OK', onPress: () => refreshAll() }]
+          );
+        }
+      }
+    } catch (err: any) {
+      Alert.alert('Payment Failed', err.message || 'Unable to complete transaction.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -135,6 +167,7 @@ export const PortfolioScreen = ({ navigation }: any) => {
                     navigation.navigate(ROUTES.INVESTMENT_DETAIL, { investmentId: item._id, investment: item });
                   }
                 }}
+                onPay={() => handlePayInvestment(item)}
               />
             )}
             ListEmptyComponent={

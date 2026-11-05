@@ -155,7 +155,18 @@ export const getMyInvestments = asyncHandler(async (req, res) => {
 
   let investments = await Investment.find(query)
     .populate('offerId')
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .lean();
+
+  for (let i = 0; i < investments.length; i++) {
+    const inv = investments[i];
+    if (!inv.offerId || !inv.offerId.title) {
+      const io = await InvestmentOffer.findById(inv.offerId).lean();
+      if (io) {
+        inv.offerId = io;
+      }
+    }
+  }
 
   if (search && search.trim()) {
     const s = search.toLowerCase();

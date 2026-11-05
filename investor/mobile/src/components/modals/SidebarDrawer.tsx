@@ -51,6 +51,12 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
       route: ROUTES.TAB_HOME,
     },
     {
+      id: 'offers',
+      label: 'Investment Offers',
+      icon: 'layers',
+      route: ROUTES.TAB_OFFERS,
+    },
+    {
       id: 'investments',
       label: 'My Investments',
       icon: 'briefcase',
@@ -79,7 +85,6 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
       label: 'Notifications',
       icon: 'bell',
       route: ROUTES.NOTIFICATIONS,
-      badge: 3,
     },
     {
       id: 'help',

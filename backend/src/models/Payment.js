@@ -12,6 +12,11 @@ const paymentSchema = new mongoose.Schema(
       ref: 'InvestmentOffer',
       required: true
     },
+    investmentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Investment',
+      default: null
+    },
     orderId: {
       type: String,
       required: true,

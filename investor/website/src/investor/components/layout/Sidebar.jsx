@@ -10,7 +10,8 @@ import {
   HelpCircle,
   Settings,
   LogOut,
-  X
+  X,
+  Layers
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -21,12 +22,13 @@ export const Sidebar = ({ isOpen, onClose, isCollapsedDesktop = false }) => {
 
   const menuItems = [
     { name: 'Dashboard', path: '/investor/dashboard', icon: LayoutDashboard },
+    { name: 'Investment Offers', path: '/investor/offers', icon: Layers },
     { name: 'My Investments', path: '/investor/my-investments', icon: Briefcase },
     { name: 'Portfolio & Returns', path: '/investor/returns-payouts', icon: TrendingUp },
     { name: 'Transactions & Payments', path: '/investor/transactions', icon: CreditCard },
     { name: 'Statements & Report', path: '/investor/statements', icon: FileText },
     { name: 'Subscription', path: '/investor/subscription', icon: CreditCard },
-    { name: 'Notifications', path: '/investor/notifications', icon: Bell, badgeCount: 3 },
+    { name: 'Notifications', path: '/investor/notifications', icon: Bell },
     { name: 'Help & Support', path: '/investor/support', icon: HelpCircle },
     { name: 'Profile & Settings', path: '/investor/profile', icon: Settings }
   ];
@@ -176,24 +178,7 @@ export const Sidebar = ({ isOpen, onClose, isCollapsedDesktop = false }) => {
                   </span>
                 )}
 
-                {item.badgeCount && (
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      fontWeight: '700',
-                      width: '18px',
-                      height: '18px',
-                      borderRadius: '50%',
-                      backgroundColor: '#EF4444',
-                      color: '#FFFFFF',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    {item.badgeCount}
-                  </span>
-                )}
+                
               </NavLink>
             );
           })}

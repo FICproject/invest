@@ -30,12 +30,12 @@ export default function Sidebar({
   const { logout } = useAuth();
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
-    { id: 'approvals', label: 'Registration Approvals', icon: ShieldCheck, badgeCount: (pendingCounts?.kyc || 0) + (pendingCounts?.kyb || 0) || pendingCounts?.total || 0 },
-    { id: 'fund_approvals', label: 'Fund Approvals', icon: CheckSquare, badgeCount: pendingCounts?.fundingRequests || 0 },
-    { id: 'investment_approvals', label: 'Investment Approvals', icon: TrendingUp, badgeCount: pendingCounts?.investorRequests || 0 },
+    { id: 'approvals', label: 'Registration Approvals', icon: ShieldCheck},
+    { id: 'fund_approvals', label: 'Fund Approvals', icon: CheckSquare},
+    { id: 'investment_approvals', label: 'Investment Approvals', icon: TrendingUp},
     { id: 'investors', label: 'Investor Management', icon: Users },
     { id: 'companies', label: 'Company Management', icon: Building2 },
-    { id: 'offers', label: 'Investment Management', icon: Briefcase, badgeCount: pendingCounts?.offers || 0 },
+    { id: 'offers', label: 'Investment Management', icon: Briefcase},
     { id: 'kyc', label: 'KYC Management', icon: ShieldCheck },
     { id: 'investments_portfolio', label: 'Investments', icon: TrendingUp },
     { id: 'transactions', label: 'Transactions', icon: CreditCard },
@@ -165,20 +165,7 @@ export default function Sidebar({
                     color={isActive ? '#FFFFFF' : '#64748B'}
                     strokeWidth={isActive ? 2.3 : 1.9}
                   />
-                  {isCollapsed && item.badgeCount > 0 && (
-                    <span
-                      style={{
-                        position: 'absolute',
-                        top: '-3px',
-                        right: '-4px',
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        backgroundColor: isActive ? '#FAB800' : '#0047BA',
-                        border: '1.5px solid #FFFFFF'
-                      }}
-                    />
-                  )}
+                  
                 </div>
 
                 {!isCollapsed && (
@@ -194,39 +181,9 @@ export default function Sidebar({
                 )}
               </div>
 
-              {!isCollapsed && item.badgeCount > 0 && (
-                <span
-                  style={{
-                    background: isActive ? '#FFFFFF' : '#0047BA',
-                    color: isActive ? '#0047BA' : '#FFFFFF',
-                    borderRadius: '9999px',
-                    fontSize: '0.7rem',
-                    fontWeight: 800,
-                    padding: '2px 7px',
-                    lineHeight: 1.2,
-                    marginLeft: '6px'
-                  }}
-                >
-                  {item.badgeCount}
-                </span>
-              )}
+              
 
-              {!isCollapsed && item.id === 'notifications' && (
-                <span
-                  style={{
-                    background: '#FAB800',
-                    color: '#FFFFFF',
-                    borderRadius: '9999px',
-                    fontSize: '0.7rem',
-                    fontWeight: 800,
-                    padding: '2px 7px',
-                    lineHeight: 1.2,
-                    marginLeft: '6px'
-                  }}
-                >
-                  3
-                </span>
-              )}
+              
             </button>
           );
         })}

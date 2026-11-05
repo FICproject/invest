@@ -31,7 +31,7 @@ export const InvestmentDetailScreen = ({ route, navigation }: any) => {
   }
 
   const offer = investment.offerId;
-  const companyTitle = offer ? offer.companyName || offer.title : 'Private Asset';
+  const projectTitle = offer ? offer.title || 'Investment Project' : 'Investment Project';
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -57,7 +57,7 @@ export const InvestmentDetailScreen = ({ route, navigation }: any) => {
           <Text style={styles.certNumber}>
             {investment.certificateNumber || 'CI-CERT-PENDING'}
           </Text>
-          <Text style={styles.certCompany}>{companyTitle}</Text>
+          <Text style={styles.certCompany}>{projectTitle}</Text>
         </View>
 
         {/* Financial Metrics Box */}

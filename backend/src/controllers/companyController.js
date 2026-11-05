@@ -222,6 +222,9 @@ export const createRequest = asyncHandler(async (req, res) => {
   const minInvestment = Number(payload.minInvestment) || Number(payload.minAmount) || 0;
   const maxInvestment = Number(payload.maxInvestment) || Number(payload.maxAmount) || fundingTarget;
   const expectedReturnRate = Number(payload.expectedReturnRate) || Number(payload.agreedReturnRate) || 0;
+  if (initialStatus !== 'Draft' && expectedReturnRate < 3) {
+    throw new ApiError(400, 'Expected return rate must be at least 3% p.a.');
+  }
   const investmentPeriodYears = Number(payload.investmentPeriodYears) || (payload.fundingDuration === 'Long-Term' ? 5 : 2);
   const durationMonths = Number(payload.durationMonths) || (investmentPeriodYears * 12);
 

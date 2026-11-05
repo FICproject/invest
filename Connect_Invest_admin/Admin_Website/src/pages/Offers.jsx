@@ -34,6 +34,7 @@ export default function Offers() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [kindFilter, setKindFilter] = useState('all'); // 'all' | 'project' | 'company'
 
   // Modals & Request Review
   const [selectedRequest, setSelectedRequest] = useState(null);
@@ -340,7 +341,8 @@ export default function Offers() {
   const filteredOffers = offers.filter(o => {
     const matchesSearch = !search || o.title?.toLowerCase().includes(search.toLowerCase()) || o.companyId?.name?.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = !statusFilter || o.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesKind = kindFilter === 'all' || o.kind === kindFilter;
+    return matchesSearch && matchesStatus && matchesKind;
   });
 
   const filteredOfferInvestors = offerInvestors.filter(i => {
@@ -365,8 +367,16 @@ export default function Offers() {
           </p>
         </div>
 
+        <button onClick={() => setShowCreateModal(true)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Plus size={16} />
+          <span>Create Opportunity</span>
+        </button>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', width: '240px' }}>
+          <div style={{ position: 'relative', width: '260px' }}>
             <input
               type="text"
               placeholder={activeSubTab === 'requests' ? 'Search requests, companies...' : 'Search offers, companies...'}
@@ -382,7 +392,7 @@ export default function Offers() {
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
             className="input-field"
-            style={{ width: '160px' }}
+            style={{ width: '150px' }}
           >
             <option value="">All Statuses</option>
             {activeSubTab === 'requests' ? (
@@ -402,18 +412,13 @@ export default function Offers() {
               </>
             )}
           </select>
-
-          <button onClick={() => setShowCreateModal(true)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Plus size={16} />
-            <span>Create Opportunity</span>
-          </button>
         </div>
       </div>
 
-      {/* Sub-navigation Tabs: Marketplace Offers vs Approved Company Proposals */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid #E2E8F0', paddingBottom: '14px', marginTop: '4px' }}>
+      {/* Sub-navigation Tabs: Project Investment vs Capital Investment vs Approved Proposals */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid #E2E8F0', paddingBottom: '14px', marginTop: '4px', flexWrap: 'wrap' }}>
         <button
-          onClick={() => { setActiveSubTab('offers'); setStatusFilter(''); }}
+          onClick={() => { setActiveSubTab('offers'); setKindFilter('project'); setStatusFilter(''); }}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -421,8 +426,8 @@ export default function Offers() {
             padding: '8px 18px',
             borderRadius: '10px',
             border: 'none',
-            backgroundColor: activeSubTab === 'offers' ? '#0047BA' : '#F1F5F9',
-            color: activeSubTab === 'offers' ? '#FFFFFF' : '#475569',
+            backgroundColor: activeSubTab === 'offers' && kindFilter === 'project' ? '#0047BA' : '#F1F5F9',
+            color: activeSubTab === 'offers' && kindFilter === 'project' ? '#FFFFFF' : '#475569',
             fontWeight: 700,
             fontSize: '0.86rem',
             cursor: 'pointer',
@@ -430,7 +435,48 @@ export default function Offers() {
           }}
         >
           <Layers size={16} />
-          <span>Marketplace Investment Offers ({offers.length})</span>
+          <span>Project Investment Offers ({offers.filter(o => o.kind === 'project').length})</span>
+        </button>
+
+        <button
+          onClick={() => { setActiveSubTab('offers'); setKindFilter('company'); setStatusFilter(''); }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 18px',
+            borderRadius: '10px',
+            border: 'none',
+            backgroundColor: activeSubTab === 'offers' && kindFilter === 'company' ? '#0047BA' : '#F1F5F9',
+            color: activeSubTab === 'offers' && kindFilter === 'company' ? '#FFFFFF' : '#475569',
+            fontWeight: 700,
+            fontSize: '0.86rem',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <Building2 size={16} />
+          <span>Capital Investment Offers ({offers.filter(o => o.kind === 'company').length})</span>
+        </button>
+
+        <button
+          onClick={() => { setActiveSubTab('offers'); setKindFilter('all'); setStatusFilter(''); }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 16px',
+            borderRadius: '10px',
+            border: 'none',
+            backgroundColor: activeSubTab === 'offers' && kindFilter === 'all' ? '#0047BA' : '#F1F5F9',
+            color: activeSubTab === 'offers' && kindFilter === 'all' ? '#FFFFFF' : '#475569',
+            fontWeight: 700,
+            fontSize: '0.86rem',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <span>All Offers ({offers.length})</span>
         </button>
 
         <button
@@ -658,7 +704,7 @@ export default function Offers() {
                   <th style={{ textAlign: 'right' }}>Target / Raised</th>
                   <th>Rate & Tenures</th>
                   <th style={{ textAlign: 'center' }}>Status</th>
-                  <th>Funding Progress</th>
+                  <th style={{ width: '230px' }}>Funding Progress</th>
                   <th>Admin Actions</th>
                 </tr>
               </thead>
@@ -694,7 +740,7 @@ export default function Offers() {
                           fontWeight: 600,
                           color: o.kind === 'equity' ? '#7C3AED' : o.kind === 'company' ? '#7E22CE' : '#0047BA'
                         }}>
-                          {o.kind === 'equity' ? 'Equity / Shareholder' : o.kind === 'company' ? 'Company Investment' : 'Project Investment'}
+                          {o.kind === 'equity' ? 'Equity / Shareholder' : o.kind === 'company' ? 'Capital Investment' : 'Project Investment'}
                         </div>
                       </td>
                       <td>{o.companyId?.name || 'Company'}</td>
@@ -736,13 +782,15 @@ export default function Offers() {
                           {o.status === 'Paused' ? 'HOLD' : o.status}
                         </span>
                       </td>
-                      <td style={{ minWidth: '130px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px' }}>
-                          <span>{progressPct}%</span>
-                          <span style={{ color: 'var(--text-muted)' }}>{formatINR(o.remainingRoomPaise)} left</span>
-                        </div>
-                        <div style={{ width: '100%', height: '6px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '3px', overflow: 'hidden' }}>
-                          <div style={{ width: `${progressPct}%`, height: '100%', background: '#10b981', transition: 'width 0.3s ease' }} />
+                      <td style={{ width: '230px', minWidth: '210px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 600 }}>
+                            <span style={{ color: '#0F172A' }}>{progressPct}% funded</span>
+                            <span style={{ color: '#64748B', fontSize: '0.75rem' }}>{formatINR(o.remainingRoomPaise)} left</span>
+                          </div>
+                          <div style={{ width: '100%', height: '7px', background: '#E2E8F0', borderRadius: '4px', overflow: 'hidden' }}>
+                            <div style={{ width: `${progressPct}%`, height: '100%', background: progressPct >= 100 ? '#10B981' : '#0047BA', borderRadius: '4px', transition: 'width 0.3s ease' }} />
+                          </div>
                         </div>
                       </td>
                       <td>
@@ -1028,7 +1076,7 @@ export default function Offers() {
                     className="input-field"
                   >
                     <option value="project">1. Project Investment (Fixed Tenure ≥ 12m)</option>
-                    <option value="company">2. Company Investment (Fixed Tenure ≥ 60m)</option>
+                    <option value="company">2. Capital Investment (Fixed Tenure ≥ 60m)</option>
                   </select>
                 </div>
 
@@ -1385,28 +1433,34 @@ export default function Offers() {
                 )}
               </div>
 
-              {/* Reviewer Feedback Input */}
+              {/* Reviewer Feedback Display/Input */}
               <div style={{ backgroundColor: '#F8FAFC', padding: '16px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
                 <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 700, color: '#1E293B', marginBottom: '8px' }}>
                   Compliance Remarks & Reviewer Feedback:
                 </label>
-                <textarea
-                  value={requestFeedback}
-                  onChange={e => setRequestFeedback(e.target.value)}
-                  placeholder="Enter remarks or specific feedback for borrowing company (optional for approval, required for rejection/more info)..."
-                  rows={3}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    border: '1px solid #CBD5E1',
-                    fontSize: '0.85rem',
-                    outline: 'none',
-                    backgroundColor: '#FFFFFF',
-                    fontFamily: 'inherit',
-                    boxSizing: 'border-box'
-                  }}
-                />
+                {['Approved', 'Open for Investment', 'Funded', 'Funding Completed'].includes(selectedRequest.status) ? (
+                  <div style={{ fontSize: '0.86rem', color: '#334155', backgroundColor: '#FFFFFF', padding: '10px 14px', borderRadius: '8px', border: '1px solid #CBD5E1' }}>
+                    {selectedRequest.reviewerFeedback || 'Approved for marketplace investment.'}
+                  </div>
+                ) : (
+                  <textarea
+                    value={requestFeedback}
+                    onChange={e => setRequestFeedback(e.target.value)}
+                    placeholder="Enter remarks or specific feedback for borrowing company (optional for approval, required for rejection/more info)..."
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #CBD5E1',
+                      fontSize: '0.85rem',
+                      outline: 'none',
+                      backgroundColor: '#FFFFFF',
+                      fontFamily: 'inherit',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                )}
               </div>
             </div>
 
@@ -1417,108 +1471,127 @@ export default function Offers() {
                 borderTop: '1px solid #E2E8F0',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'flex-end',
+                justifyContent: 'space-between',
                 flexWrap: 'wrap',
                 gap: '10px',
                 backgroundColor: '#F8FAFC'
               }}
             >
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => setSelectedRequest(null)}
-                className="btn-secondary"
-                style={{ padding: '9px 16px', fontSize: '0.84rem' }}
-              >
-                Cancel
-              </button>
+              {['Approved', 'Open for Investment', 'Funded', 'Funding Completed'].includes(selectedRequest.status) ? (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#15803D', fontSize: '0.86rem', fontWeight: 700 }}>
+                    <CheckCircle2 size={18} color="#16A34A" />
+                    <span>This proposal is approved and already active on the marketplace.</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRequest(null)}
+                    className="btn-primary"
+                    style={{ padding: '9px 20px', fontSize: '0.84rem' }}
+                  >
+                    Close
+                  </button>
+                </>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', width: '100%', gap: '10px' }}>
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => setSelectedRequest(null)}
+                    className="btn-secondary"
+                    style={{ padding: '9px 16px', fontSize: '0.84rem' }}
+                  >
+                    Cancel
+                  </button>
 
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => handleDecideRequest(selectedRequest._id, 'Additional Information Required', false)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '9px 16px',
-                  borderRadius: '10px',
-                  border: '1px solid #F59E0B',
-                  backgroundColor: '#FEF3C7',
-                  color: '#B45309',
-                  fontSize: '0.84rem',
-                  fontWeight: 700,
-                  cursor: 'pointer'
-                }}
-              >
-                <AlertTriangle size={14} />
-                <span>Request More Info</span>
-              </button>
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => handleDecideRequest(selectedRequest._id, 'Additional Information Required', false)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '9px 16px',
+                      borderRadius: '10px',
+                      border: '1px solid #F59E0B',
+                      backgroundColor: '#FEF3C7',
+                      color: '#B45309',
+                      fontSize: '0.84rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <AlertTriangle size={14} />
+                    <span>Request More Info</span>
+                  </button>
 
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => handleDecideRequest(selectedRequest._id, 'Rejected', false)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '9px 16px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  backgroundColor: '#DC2626',
-                  color: '#FFFFFF',
-                  fontSize: '0.84rem',
-                  fontWeight: 700,
-                  cursor: 'pointer'
-                }}
-              >
-                <XCircle size={14} />
-                <span>Reject</span>
-              </button>
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => handleDecideRequest(selectedRequest._id, 'Rejected', false)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '9px 16px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      backgroundColor: '#DC2626',
+                      color: '#FFFFFF',
+                      fontSize: '0.84rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <XCircle size={14} />
+                    <span>Reject</span>
+                  </button>
 
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => handleDecideRequest(selectedRequest._id, 'Approved', false)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '9px 18px',
-                  borderRadius: '10px',
-                  border: '1px solid #0047BA',
-                  backgroundColor: '#EFF6FF',
-                  color: '#0047BA',
-                  fontSize: '0.84rem',
-                  fontWeight: 700,
-                  cursor: 'pointer'
-                }}
-              >
-                <span>Approve (Draft Offer)</span>
-              </button>
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => handleDecideRequest(selectedRequest._id, 'Approved', false)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '9px 18px',
+                      borderRadius: '10px',
+                      border: '1px solid #0047BA',
+                      backgroundColor: '#EFF6FF',
+                      color: '#0047BA',
+                      fontSize: '0.84rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <span>Approve (Draft Offer)</span>
+                  </button>
 
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => handleDecideRequest(selectedRequest._id, 'Approved', true)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '9px 20px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  backgroundColor: '#16A34A',
-                  color: '#FFFFFF',
-                  fontSize: '0.84rem',
-                  fontWeight: 700,
-                  cursor: 'pointer'
-                }}
-              >
-                <CheckCircle2 size={15} />
-                <span>Approve & Go Live</span>
-              </button>
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => handleDecideRequest(selectedRequest._id, 'Approved', true)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '9px 20px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      backgroundColor: '#16A34A',
+                      color: '#FFFFFF',
+                      fontSize: '0.84rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <CheckCircle2 size={15} />
+                    <span>Approve & Go Live</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
