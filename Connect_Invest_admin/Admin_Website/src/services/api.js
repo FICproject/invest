@@ -1,11 +1,19 @@
 import axios from 'axios';
 
 const getApiBase = () => {
-  if (typeof window !== 'undefined' && window.location) {
-    // Use relative path so Vite proxy routes requests seamlessly across LAN/Network
-    return '/api/v1';
+  // 1. Check for configured environment variable first (Vercel / Production deployment)
+  const envApi = import.meta.env?.VITE_API_URL;
+  if (envApi) {
+    return envApi.replace(/\/+$/, '');
   }
-  return 'http://localhost:5000/api/v1';
+  if (typeof window !== 'undefined' && window.location) {
+    // If running in development with Vite proxy
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return '/api/v1';
+    }
+  }
+  // Fallback to Live Render Backend
+  return 'https://connect-invest-backend.onrender.com/api/v1';
 };
 
 const API_BASE = getApiBase();
