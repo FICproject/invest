@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { adminApi, formatINR } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { RazorpayAdminDisburseModal } from '../components/RazorpayAdminDisburseModal';
 
 export default function MaturityReleases() {
   const toast = useToast();
@@ -28,6 +29,7 @@ export default function MaturityReleases() {
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'READY' | 'RELEASED' | 'PENDING' | 'ON_HOLD'
+  const [activeRazorpayRelease, setActiveRazorpayRelease] = useState(null);
 
   // Modal for manual release confirmation
   const [selectedForRelease, setSelectedForRelease] = useState(null);
@@ -340,9 +342,13 @@ export default function MaturityReleases() {
                           {!isReleased && !isOnHold && (
                             <button
                               onClick={() => {
-                                setSelectedForRelease(item);
-                                setReleaseUtr(`REL-${Date.now().toString().slice(-8)}`);
-                                setReleaseRemarks(`Tenure completed (${item.tenureMonths} Months). Principal returned.`);
+                                setActiveRazorpayRelease({
+                                  id: item.id,
+                                  amount: Number(item.principalRupees || 0),
+                                  title: 'Maturity Capital Release (' + (item.tenureMonths || 12) + ' Months)',
+                                  recipientName: item.investor.name,
+                                  accountNumber: item.investor.bankAccount
+                                });
                               }}
                               disabled={submitting}
                               className="btn-primary"
@@ -358,7 +364,7 @@ export default function MaturityReleases() {
                               title={isReady ? 'Authorize and release completed principal to investor' : 'Early release authorization'}
                             >
                               <Send size={13} />
-                              <span>Release Principal</span>
+                              <span>Disburse via Razorpay</span>
                             </button>
                           )}
 

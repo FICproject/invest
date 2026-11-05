@@ -48,10 +48,21 @@ export const createCompanySubscriptionOrder = asyncHandler(async (req, res) => {
     $or: [{ ownerId: companyUser._id }, { officialEmail: companyUser.email }]
   });
 
+  const billingMonth = req.body.billingMonth || new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+  // 1. Prevent duplicate billing if already paid for this month
+  const query = company
+    ? { $or: [{ companyId: company._id }, { userId: companyUser._id }, { subscriberEmail: companyUser.email }], billingMonth, status: 'Paid' }
+    : { userId: companyUser._id, billingMonth, status: 'Paid' };
+
+  const existingSub = await Subscription.findOne(query);
+  if (existingSub) {
+    throw new ApiError(400, `Subscription for ${billingMonth} is already active and paid. Duplicate payment is not allowed.`);
+  }
+
   const feeConfig = await getSubscriptionFeeConfig();
   const companyFee = feeConfig.companyFee;
   const amountPaise = companyFee * 100;
-  const billingMonth = req.body.billingMonth || new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
   const rzpOrder = await createRazorpayOrder({
     amountPaise,
@@ -90,6 +101,34 @@ export const verifyCompanySubscription = asyncHandler(async (req, res) => {
     $or: [{ ownerId: companyUser._id }, { officialEmail: companyUser.email }]
   });
 
+  // 1. Idempotency check: if transactionRef / paymentId already exists, return existing
+  if (paymentId) {
+    const alreadyProcessed = await Subscription.findOne({ transactionRef: paymentId });
+    if (alreadyProcessed) {
+      return res.status(200).json({
+        success: true,
+        message: 'Subscription payment was already recorded.',
+        data: alreadyProcessed
+      });
+    }
+  }
+
+  const currentMonth = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+  // 2. Prevent duplicate active subscription for current month
+  const duplicateQuery = company
+    ? { $or: [{ companyId: company._id }, { userId: companyUser._id }, { subscriberEmail: companyUser.email }], billingMonth: currentMonth, status: 'Paid' }
+    : { userId: companyUser._id, billingMonth: currentMonth, status: 'Paid' };
+
+  const existingActive = await Subscription.findOne(duplicateQuery);
+  if (existingActive) {
+    return res.status(200).json({
+      success: true,
+      message: `Subscription for ${currentMonth} is already paid.`,
+      data: existingActive
+    });
+  }
+
   if (signature) {
     const isValid = verifyRazorpaySignature({
       orderId,
@@ -104,7 +143,6 @@ export const verifyCompanySubscription = asyncHandler(async (req, res) => {
   const feeConfig = await getSubscriptionFeeConfig();
   const companyFee = feeConfig.companyFee;
 
-  const currentMonth = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
   const nextDueDate = new Date();
   nextDueDate.setMonth(nextDueDate.getMonth() + 1);
 

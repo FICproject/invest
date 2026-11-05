@@ -6,17 +6,19 @@ import {
   CheckCircle2,
   AlertCircle,
   Building2,
-  Search
+  Search,
+  CreditCard,
+  Send
 } from 'lucide-react';
 import { adminApi, formatINR } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { RazorpayAdminDisburseModal } from '../components/RazorpayAdminDisburseModal';
 
 export default function Releases() {
   const toast = useToast();
   const [releases, setReleases] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedRelease, setSelectedRelease] = useState(null);
-  const [disbursementRef, setDisbursementRef] = useState('');
+  const [activeRazorpayDisburse, setActiveRazorpayDisburse] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -39,20 +41,35 @@ export default function Releases() {
     fetchReleases();
   }, []);
 
-  const handleApproveRelease = async () => {
-    if (!disbursementRef.trim()) {
-      toast.warning('A bank disbursement transaction reference / UTR is required');
-      return;
-    }
+  const handleOpenDisburseModal = (r) => {
+    const amt = r.amount || (r.amountPaise ? r.amountPaise / 100 : 0);
+    const companyTitle = r.companyName || r.companyId?.name || r.companyId?.legalName || 'Borrower Company';
+    const offerTitle = r.offerTitle || r.offerId?.title || r.investmentOfferId?.title || 'Investment Project';
+    const acc = r.companyId?.bankAccount?.accountNo || r.bankAccountSnapshot?.accountNo || 'N/A';
+    const ifsc = r.companyId?.bankAccount?.ifsc || r.bankAccountSnapshot?.ifsc || 'N/A';
+
+    setActiveRazorpayDisburse({
+      id: r._id,
+      amount: amt,
+      title: `Forward Capital to ${companyTitle}`,
+      recipientName: `${companyTitle} (A/C: ${acc} • ${ifsc})`,
+      companyName: companyTitle,
+      offerTitle,
+      accountNumber: acc
+    });
+  };
+
+  const handleDisburseSuccess = async (result) => {
+    if (!activeRazorpayDisburse) return;
     try {
       setSubmitting(true);
-      const res = await adminApi.approveRelease(selectedRelease._id, {
-        reference: disbursementRef.trim()
+      const res = await adminApi.approveRelease(activeRazorpayDisburse.id, {
+        reference: result.utrNumber,
+        paymentMethod: result.method || 'Razorpay Direct Disbursement'
       });
       if (res.data.success) {
-        toast.success(res.data.message || 'Fund release approved successfully');
-        setSelectedRelease(null);
-        setDisbursementRef('');
+        toast.success(res.data.message || `Funds (${formatINR(activeRazorpayDisburse.amount * 100)}) successfully disbursed to ${activeRazorpayDisburse.companyName}!`);
+        setActiveRazorpayDisburse(null);
         fetchReleases();
       }
     } catch (err) {
@@ -207,18 +224,29 @@ export default function Releases() {
                       <td>
                         {!isReleased ? (
                           <button
-                            onClick={() => {
-                              setSelectedRelease(r);
-                              setDisbursementRef(`RZP-UTR-${Date.now().toString().slice(-8)}-${Math.floor(1000 + Math.random() * 9000)}`);
-                            }}
+                            onClick={() => handleOpenDisburseModal(r)}
+                            disabled={submitting}
                             className="btn-primary"
-                            style={{ padding: '5px 12px', fontSize: '0.75rem' }}
+                            style={{
+                              padding: '6px 14px',
+                              fontSize: '0.75rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              backgroundColor: '#16A34A',
+                              borderColor: '#16A34A',
+                              color: '#FFFFFF',
+                              borderRadius: '6px',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
                           >
-                            Disburse Funds
+                            <Send size={12} />
+                            Pay Company via Razorpay
                           </button>
                         ) : (
                           <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
-                            Ref: {r.reference}
+                            Disbursed Ref: {r.reference}
                           </span>
                         )}
                       </td>
@@ -231,76 +259,13 @@ export default function Releases() {
         )}
       </div>
 
-      {/* Confirmation & Disbursement Modal */}
-      {selectedRelease && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.8)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 50,
-          padding: '20px'
-        }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: 'min(92vw, 540px)', maxHeight: '90vh', overflowY: 'auto', padding: '28px', background: 'var(--bg-modal)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>
-                Disburse Funds via Razorpay
-              </h3>
-              <span style={{ fontSize: '0.72rem', background: '#EFF6FF', color: '#0047BA', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>
-                Razorpay Payouts
-              </span>
-            </div>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-              Forward collected investor capital directly to the company verified bank account using Razorpay gateway.
-            </p>
-
-            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '16px', borderRadius: '10px', marginBottom: '18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div><strong>Project:</strong> {selectedRelease.offerTitle || selectedRelease.offerId?.title || selectedRelease.investmentOfferId?.title || 'Project Opportunity'}</div>
-              <div><strong>Beneficiary Company:</strong> {selectedRelease.companyName || selectedRelease.companyId?.name || 'Company'}</div>
-              <div><strong>Disbursement Amount:</strong> <span style={{ color: '#059669', fontWeight: 700, fontSize: '1.05rem' }}>{formatINR(selectedRelease.amountPaise)}</span></div>
-              <div><strong>Destination Bank A/C:</strong> <span style={{ fontFamily: 'var(--font-mono)' }}>{selectedRelease.companyId?.bankAccount?.accountNo || selectedRelease.bankAccountSnapshot?.accountNo || '778899001122'}</span></div>
-              <div><strong>IFSC Code:</strong> {selectedRelease.companyId?.bankAccount?.ifsc || selectedRelease.bankAccountSnapshot?.ifsc || 'KKBK0008055'}</div>
-              <div><strong>Payment Route:</strong> <span style={{ color: '#2563EB', fontWeight: 600 }}>Razorpay Payout Gateway (NEFT/RTGS/IMPS)</span></div>
-            </div>
-
-            {selectedRelease.bankCoolingOff?.inCoolingOff && (
-              <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', padding: '12px', borderRadius: '8px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <AlertCircle size={18} color="#fbbf24" />
-                <span style={{ fontSize: '0.8rem', color: '#fbbf24' }}>
-                  Warning: Bank account is currently in cooling-off period. Release will be refused by server (PRD Section 5.4 F-3).
-                </span>
-              </div>
-            )}
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>
-                Razorpay Settlement Reference / UTR:
-              </label>
-              <input
-                type="text"
-                value={disbursementRef}
-                onChange={e => setDisbursementRef(e.target.value)}
-                className="input-field"
-                placeholder="e.g. UTR-DISB-987654"
-              />
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
-              <button disabled={submitting} onClick={() => setSelectedRelease(null)} className="btn-secondary">
-                Cancel
-              </button>
-              <button disabled={submitting} onClick={handleApproveRelease} className="btn-primary">
-                Confirm & Release Funds
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Razorpay Disbursal Gateway Modal */}
+      <RazorpayAdminDisburseModal
+        isOpen={!!activeRazorpayDisburse}
+        onClose={() => setActiveRazorpayDisburse(null)}
+        disburseData={activeRazorpayDisburse}
+        onSuccess={handleDisburseSuccess}
+      />
     </div>
   );
 }

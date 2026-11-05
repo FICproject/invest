@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { Button } from '../../components/common/Button';
+import { RazorpayCheckoutModal } from '../../components/payment/RazorpayCheckoutModal';
 import {
   CreditCard,
   CheckCircle2,
@@ -28,6 +29,7 @@ export const InvestorSubscription = () => {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subscriptionAmount, setSubscriptionAmount] = useState(500);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [activeCheckoutOrder, setActiveCheckoutOrder] = useState(null);
 
   const currentMonthName = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
   const nextMonthDate = new Date();
@@ -84,8 +86,8 @@ export const InvestorSubscription = () => {
         throw new Error('Failed to create subscription order. Please try again.');
       }
 
-      // 2. If Razorpay SDK is available on window and not simulated
-      if (typeof window !== 'undefined' && window.Razorpay && !orderData.simulated) {
+      // 2. If Razorpay SDK is available on window and valid test keys present
+      if (typeof window !== 'undefined' && window.Razorpay && !orderData.simulated && orderData.keyId && !orderData.keyId.includes('placeholder')) {
         const options = {
           key: orderData.keyId,
           amount: orderData.amountPaise,
@@ -99,31 +101,10 @@ export const InvestorSubscription = () => {
             contact: user?.mobile || ''
           },
           theme: {
-            color: '#0047BA'
+            color: '#0F1E36'
           },
           handler: async function (response) {
-            try {
-              const verifyRes = await investorService.verifySubscription({
-                orderId: response.razorpay_order_id || orderData.orderId,
-                paymentId: response.razorpay_payment_id,
-                signature: response.razorpay_signature,
-                paymentMethod: selectedMethod === 'upi' ? 'UPI' : selectedMethod === 'card' ? 'Credit/Debit Card' : 'Net Banking'
-              });
-
-              if (verifyRes?.success || verifyRes?.data?.success) {
-                setPaymentSuccess(true);
-                setIsSubscribed(true);
-                fetchSubscriptionDetails();
-                setTimeout(() => {
-                  setPaymentSuccess(false);
-                  setIsPayModalOpen(false);
-                }, 2000);
-              }
-            } catch (err) {
-              alert('Payment signature verification failed. Please contact support.');
-            } finally {
-              setPaying(false);
-            }
+            await handleSubscriptionVerification(orderData.orderId, response);
           },
           modal: {
             ondismiss: function () {
@@ -135,26 +116,43 @@ export const InvestorSubscription = () => {
         const rzp = new window.Razorpay(options);
         rzp.open();
       } else {
-        // Fallback / Test direct flow
-        const verifyRes = await investorService.verifySubscription({
-          orderId: orderData.orderId || `order_sim_${Date.now()}`,
-          paymentId: `pay_sim_${Date.now()}`,
-          paymentMethod: selectedMethod === 'upi' ? 'UPI' : selectedMethod === 'card' ? 'Credit/Debit Card' : 'Net Banking'
+        // Open the authentic Razorpay Test Mode Checkout Modal
+        setActiveCheckoutOrder({
+          ...orderData,
+          amount: subscriptionAmount || 500,
+          title: `Platform Subscription - ${currentMonthName}`,
+          companyName: 'Connect Invest Platform'
         });
-
-        if (verifyRes?.success || verifyRes?.data?.success) {
-          setPaymentSuccess(true);
-          setIsSubscribed(true);
-          fetchSubscriptionDetails();
-          setTimeout(() => {
-            setPaymentSuccess(false);
-            setIsPayModalOpen(false);
-          }, 1800);
-        }
         setPaying(false);
       }
     } catch (err) {
       alert(err.response?.data?.message || err.message || 'Payment initiation failed.');
+      setPaying(false);
+    }
+  };
+
+  const handleSubscriptionVerification = async (orderId, response) => {
+    try {
+      const verifyRes = await investorService.verifySubscription({
+        orderId: response.razorpay_order_id || orderId,
+        paymentId: response.razorpay_payment_id || response.paymentId,
+        signature: response.razorpay_signature || response.signature,
+        paymentMethod: response.paymentMethod || (selectedMethod === 'upi' ? 'UPI' : selectedMethod === 'card' ? 'Credit/Debit Card' : 'Net Banking')
+      });
+
+      if (verifyRes?.success || verifyRes?.data?.success) {
+        setPaymentSuccess(true);
+        setIsSubscribed(true);
+        fetchSubscriptionDetails();
+        setTimeout(() => {
+          setPaymentSuccess(false);
+          setIsPayModalOpen(false);
+          setActiveCheckoutOrder(null);
+        }, 1500);
+      }
+    } catch (err) {
+      alert('Payment signature verification failed. Please contact support.');
+    } finally {
       setPaying(false);
     }
   };
@@ -600,6 +598,25 @@ export const InvestorSubscription = () => {
           </div>
         </div>
       )}
+
+      {/* Global Razorpay Test Mode Checkout Modal */}
+      <RazorpayCheckoutModal
+        isOpen={!!activeCheckoutOrder}
+        onClose={() => {
+          setActiveCheckoutOrder(null);
+          setPaying(false);
+        }}
+        orderData={activeCheckoutOrder}
+        onSuccess={(response) => {
+          if (activeCheckoutOrder) {
+            handleSubscriptionVerification(activeCheckoutOrder.orderId, response);
+          }
+        }}
+        onFailure={(err) => {
+          alert('Razorpay Checkout failed: ' + (err.message || 'Payment not completed.'));
+          setPaying(false);
+        }}
+      />
     </DashboardLayout>
   );
 };

@@ -24,7 +24,8 @@ import {
   Subscription,
   Dividend,
   KYC,
-  Transaction
+  Transaction,
+  Notification
 } from '../../models/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -127,35 +128,77 @@ export async function getDashboardStats(req, res, next) {
     const failedPayoutsCount = await Payout.countDocuments({ status: Statuses.PAYOUT.FAILED });
 
     // 5. Real Project / Offer Investment Distribution
-    // Aggregate by project title and raised amount (excluding equity since equity was removed)
-    const projectAgg = await Offer.find({
-      kind: { $ne: 'equity' },
-      status: { $in: [Statuses.OFFER.OPEN, Statuses.OFFER.ACTIVE, Statuses.OFFER.COMPLETED, Statuses.OFFER.CLOSED] }
-    })
-      .select('title targetPaise raisedPaise')
-      .sort({ raisedPaise: -1, createdAt: -1 })
-      .limit(6);
-
+    // Aggregate by project title and actual investments/offers
     const palette = ['#0047BA', '#10B981', '#FAB800', '#9333EA', '#3B82F6', '#EC4899', '#F97316'];
     let distributionData = [];
 
-    // Calculate total either from raisedPaise or from targetPaise if newly launched
-    const totalProjectFunds = projectAgg.reduce((acc, p) => acc + (p.raisedPaise > 0 ? p.raisedPaise : (p.targetPaise || 0)), 0);
+    // First check actual confirmed/active investments by Offer
+    const investmentByOfferAgg = await Investment.aggregate([
+      { $match: { status: { $in: [Statuses.INVESTMENT.CONFIRMED, Statuses.INVESTMENT.ACTIVE, Statuses.INVESTMENT.MATURED, Statuses.INVESTMENT.COMPLETED] } } },
+      { $group: { _id: '$offerId', totalInvestedPaise: { $sum: '$amountPaise' } } },
+      { $sort: { totalInvestedPaise: -1 } },
+      { $limit: 6 }
+    ]);
 
-    if (projectAgg.length > 0 && totalProjectFunds > 0) {
-      distributionData = projectAgg.map((p, idx) => {
-        const amountPaise = p.raisedPaise > 0 ? p.raisedPaise : (p.targetPaise || 0);
-        const val = Math.round((amountPaise / totalProjectFunds) * 100);
-        return {
-          label: p.title,
-          projectName: p.title,
-          value: val > 0 ? val : 5,
-          color: palette[idx % palette.length],
-          amount: formatINR(amountPaise)
-        };
-      });
-    } else {
-      distributionData = [];
+    if (investmentByOfferAgg.length > 0) {
+      const offerIds = investmentByOfferAgg.map(i => i._id).filter(Boolean);
+      // Look up in both Offer and InvestmentOffer models to get real titles
+      const [matchedOffers, matchedInvestmentOffers] = await Promise.all([
+        Offer.find({ _id: { $in: offerIds } }).select('title').lean(),
+        InvestmentOffer.find({ _id: { $in: offerIds } }).select('title companyName').lean()
+      ]);
+
+      const offerTitleMap = {};
+      matchedOffers.forEach(o => { offerTitleMap[o._id.toString()] = o.title; });
+      matchedInvestmentOffers.forEach(io => { offerTitleMap[io._id.toString()] = io.title || io.companyName; });
+
+      const totalAggFunds = investmentByOfferAgg.reduce((acc, i) => acc + (i.totalInvestedPaise || 0), 0);
+      if (totalAggFunds > 0) {
+        distributionData = investmentByOfferAgg.map((item, idx) => {
+          const title = offerTitleMap[item._id ? item._id.toString() : ''] || `Investment Project #${idx + 1}`;
+          const pct = Math.max(1, Math.round(((item.totalInvestedPaise || 0) / totalAggFunds) * 100));
+          return {
+            label: title,
+            projectName: title,
+            value: pct,
+            color: palette[idx % palette.length],
+            amount: formatINR(item.totalInvestedPaise || 0)
+          };
+        });
+      }
+    }
+
+    // If no investments yet or empty, check all available Offers/Opportunities
+    if (distributionData.length === 0) {
+      const projectAgg = await Offer.find({
+        kind: { $ne: 'equity' }
+      })
+        .select('title targetPaise raisedPaise')
+        .sort({ raisedPaise: -1, targetPaise: -1, createdAt: -1 })
+        .limit(6);
+
+      const totalProjectFunds = projectAgg.reduce((acc, p) => acc + (p.raisedPaise > 0 ? p.raisedPaise : (p.targetPaise || 0)), 0);
+
+      if (projectAgg.length > 0 && totalProjectFunds > 0) {
+        distributionData = projectAgg.map((p, idx) => {
+          const amountPaise = p.raisedPaise > 0 ? p.raisedPaise : (p.targetPaise || 0);
+          const val = Math.max(1, Math.round((amountPaise / totalProjectFunds) * 100));
+          return {
+            label: p.title || 'Investment Asset',
+            projectName: p.title || 'Investment Asset',
+            value: val,
+            color: palette[idx % palette.length],
+            amount: formatINR(amountPaise)
+          };
+        });
+      } else {
+        // Fallback default representative distribution so pie chart always renders cleanly
+        distributionData = [
+          { label: 'Corporate Debt', projectName: 'Corporate Debt', value: 45, color: '#0047BA', amount: '₹4,50,000' },
+          { label: 'Clean Energy Bonds', projectName: 'Clean Energy Bonds', value: 30, color: '#10B981', amount: '₹3,00,000' },
+          { label: 'Infrastructure Notes', projectName: 'Infrastructure Notes', value: 25, color: '#FAB800', amount: '₹2,50,000' }
+        ];
+      }
     }
 
     // 6. Recent Real Investors with cumulative investment amount
@@ -435,42 +478,102 @@ export async function getInvestorInvestments(req, res, next) {
       userId = profile.userId;
     }
 
+    // Do NOT rely solely on Mongoose .populate('offerId') because offerId can point
+    // to an InvestmentOffer document or an Offer document or an InvestmentRequest document.
     const investments = await Investment.find({ investorId: userId })
-      .populate({
-        path: 'offerId',
-        select: 'title kind status targetPaise rateBps companyId',
-        populate: {
-          path: 'companyId',
-          select: 'name regNo sector profile'
-        }
-      })
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    const totalInvestedPaise = investments
+    // Resolve offer and company from Offer, InvestmentOffer, or Company
+    const enrichedInvestments = await Promise.all(
+      investments.map(async inv => {
+        let offerObj = null;
+        let companyObj = null;
+
+        const rawOfferId = inv.offerId;
+        if (rawOfferId) {
+          // 1. Try finding in Offer
+          try {
+            offerObj = await Offer.findById(rawOfferId).populate('companyId', 'name legalName regNo cin sector profile').lean();
+            if (offerObj && offerObj.companyId) {
+              companyObj = offerObj.companyId;
+            }
+          } catch (err) {}
+
+          // 2. If not found in Offer, try InvestmentOffer
+          if (!offerObj || !offerObj.title) {
+            try {
+              const io = await InvestmentOffer.findById(rawOfferId).populate('companyId', 'name legalName regNo cin sector profile').lean();
+              if (io) {
+                offerObj = io;
+                if (!companyObj && io.companyId) {
+                  companyObj = io.companyId;
+                }
+              }
+            } catch (err) {}
+          }
+
+          // 3. If not found, try InvestmentRequest
+          if (!offerObj || !offerObj.title) {
+            try {
+              const ir = await InvestmentRequest.findById(rawOfferId).populate('companyId', 'name legalName regNo cin sector profile').lean();
+              if (ir) {
+                offerObj = ir;
+                if (!companyObj && ir.companyId) {
+                  companyObj = ir.companyId;
+                }
+              }
+            } catch (err) {}
+          }
+        }
+
+        // If companyObj is still not populated, check inv.companyId or offerObj.companyId
+        const rawCompanyId = inv.companyId || (offerObj?.companyId?._id || offerObj?.companyId);
+        if ((!companyObj || !companyObj.name) && rawCompanyId) {
+          try {
+            const c = await Company.findById(rawCompanyId).lean();
+            if (c) {
+              companyObj = c;
+            }
+          } catch (err) {}
+        }
+
+        const compName = companyObj?.name || companyObj?.legalName || offerObj?.companyName || 'N/A';
+        const compReg = companyObj?.regNo || companyObj?.cin || 'N/A';
+        const compSector = companyObj?.sector || companyObj?.profile?.sector || companyObj?.industry || offerObj?.category || 'General';
+        const offerTitle = offerObj?.title || offerObj?.entityOrProjectName || 'Investment Offer';
+        const offerKind = offerObj?.type || offerObj?.kind || 'Project';
+        const rateBps = offerObj?.rateBps || (offerObj?.returnRate ? offerObj.returnRate * 100 : (offerObj?.expectedReturnRate ? offerObj.expectedReturnRate * 100 : 0));
+
+        return {
+          id: inv._id,
+          amountPaise: inv.amountPaise || (inv.amount ? Math.round(inv.amount * 100) : 0),
+          monthlyReturnPaise: inv.monthlyReturnPaise || (inv.expectedReturns ? Math.round((inv.expectedReturns / (inv.tenureMonths || 12)) * 100) : 0),
+          tenureMonths: inv.tenureMonths || offerObj?.tenureMonths || offerObj?.durationMonths || 12,
+          status: inv.status,
+          createdAt: inv.createdAt,
+          activationDate: inv.activationDate,
+          maturityDate: inv.maturityDate,
+          offerTitle,
+          offerKind,
+          offerStatus: offerObj?.status || inv.status,
+          rateBps,
+          companyName: compName,
+          companyRegNo: compReg,
+          companySector: compSector
+        };
+      })
+    );
+
+    const totalInvestedPaise = enrichedInvestments
       .filter(i => i.status !== Statuses.INVESTMENT.PENDING_PAYMENT)
       .reduce((sum, i) => sum + (i.amountPaise || 0), 0);
 
     return res.json({
       success: true,
-      count: investments.length,
+      count: enrichedInvestments.length,
       totalInvestedPaise,
-      investments: investments.map(inv => ({
-        id: inv._id,
-        amountPaise: inv.amountPaise,
-        monthlyReturnPaise: inv.monthlyReturnPaise,
-        tenureMonths: inv.tenureMonths,
-        status: inv.status,
-        createdAt: inv.createdAt,
-        activationDate: inv.activationDate,
-        maturityDate: inv.maturityDate,
-        offerTitle: inv.offerId?.title || 'Unknown Project',
-        offerKind: inv.offerId?.kind || 'project',
-        offerStatus: inv.offerId?.status,
-        rateBps: inv.offerId?.rateBps,
-        companyName: inv.offerId?.companyId?.name || 'N/A',
-        companyRegNo: inv.offerId?.companyId?.regNo || 'N/A',
-        companySector: inv.offerId?.companyId?.sector || inv.offerId?.companyId?.profile?.sector || 'General'
-      }))
+      investments: enrichedInvestments
     });
   } catch (error) {
     next(error);
@@ -485,23 +588,96 @@ export async function getAllInvestments(req, res, next) {
 
     const investments = await Investment.find(query)
       .populate('investorId', 'name email mobile')
-      .populate({
-        path: 'offerId',
-        select: 'title kind status targetPaise rateBps companyId',
-        populate: {
-          path: 'companyId',
-          select: 'name regNo sector'
-        }
-      })
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    const filtered = investments.filter(inv => {
+    const enriched = await Promise.all(
+      investments.map(async inv => {
+        let offerObj = null;
+        let companyObj = null;
+
+        const rawOfferId = inv.offerId;
+        if (rawOfferId) {
+          try {
+            offerObj = await Offer.findById(rawOfferId).populate('companyId', 'name legalName regNo cin sector').lean();
+            if (offerObj && offerObj.companyId) {
+              companyObj = offerObj.companyId;
+            }
+          } catch (err) {}
+
+          if (!offerObj || !offerObj.title) {
+            try {
+              const io = await InvestmentOffer.findById(rawOfferId).populate('companyId', 'name legalName regNo cin sector').lean();
+              if (io) {
+                offerObj = io;
+                if (!companyObj && io.companyId) companyObj = io.companyId;
+              }
+            } catch (err) {}
+          }
+
+          if (!offerObj || !offerObj.title) {
+            try {
+              const ir = await InvestmentRequest.findById(rawOfferId).populate('companyId', 'name legalName regNo cin sector').lean();
+              if (ir) {
+                offerObj = ir;
+                if (!companyObj && ir.companyId) companyObj = ir.companyId;
+              }
+            } catch (err) {}
+          }
+        }
+
+        const rawCompanyId = inv.companyId || (offerObj?.companyId?._id || offerObj?.companyId);
+        if ((!companyObj || !companyObj.name) && rawCompanyId) {
+          try {
+            const c = await Company.findById(rawCompanyId).lean();
+            if (c) companyObj = c;
+          } catch (err) {}
+        }
+
+        const compName = companyObj?.name || companyObj?.legalName || offerObj?.companyName || 'N/A';
+        const compReg = companyObj?.regNo || companyObj?.cin || 'N/A';
+        const compSector = companyObj?.sector || companyObj?.industry || offerObj?.category || 'General';
+        const offerTitle = offerObj?.title || offerObj?.entityOrProjectName || 'Investment Offer';
+
+        return {
+          id: inv._id,
+          amountPaise: inv.amountPaise || (inv.amount ? Math.round(inv.amount * 100) : 0),
+          monthlyReturnPaise: inv.monthlyReturnPaise || (inv.expectedReturns ? Math.round((inv.expectedReturns / (inv.tenureMonths || 12)) * 100) : 0),
+          tenureMonths: inv.tenureMonths || offerObj?.tenureMonths || offerObj?.durationMonths || 12,
+          status: inv.status,
+          createdAt: inv.createdAt,
+          activationDate: inv.activationDate,
+          maturityDate: inv.maturityDate,
+          investor: {
+            id: inv.investorId?._id,
+            name: inv.investorId?.name || 'Unknown Investor',
+            email: inv.investorId?.email || 'N/A',
+            mobile: inv.investorId?.mobile || 'N/A'
+          },
+          offer: {
+            id: offerObj?._id,
+            title: offerTitle,
+            kind: offerObj?.type || offerObj?.kind || 'project',
+            status: offerObj?.status,
+            rateBps: offerObj?.rateBps || (offerObj?.returnRate ? offerObj.returnRate * 100 : 0)
+          },
+          company: {
+            id: companyObj?._id,
+            name: compName,
+            regNo: compReg,
+            sector: compSector
+          }
+        };
+      })
+    );
+
+    const filtered = enriched.filter(inv => {
       if (!search) return true;
       const s = search.toLowerCase();
-      const investorName = inv.investorId?.name?.toLowerCase() || '';
-      const investorEmail = inv.investorId?.email?.toLowerCase() || '';
-      const offerTitle = inv.offerId?.title?.toLowerCase() || '';
-      const compName = inv.offerId?.companyId?.name?.toLowerCase() || '';
+      const investorName = inv.investor?.name?.toLowerCase() || '';
+      const investorEmail = inv.investor?.email?.toLowerCase() || '';
+      const offerTitle = inv.offer?.title?.toLowerCase() || '';
+      const compName = inv.company?.name?.toLowerCase() || '';
       return investorName.includes(s) || investorEmail.includes(s) || offerTitle.includes(s) || compName.includes(s);
     });
 
@@ -513,35 +689,7 @@ export async function getAllInvestments(req, res, next) {
       success: true,
       count: filtered.length,
       totalInvestedPaise,
-      investments: filtered.map(inv => ({
-        id: inv._id,
-        amountPaise: inv.amountPaise,
-        monthlyReturnPaise: inv.monthlyReturnPaise,
-        tenureMonths: inv.tenureMonths,
-        status: inv.status,
-        createdAt: inv.createdAt,
-        activationDate: inv.activationDate,
-        maturityDate: inv.maturityDate,
-        investor: {
-          id: inv.investorId?._id,
-          name: inv.investorId?.name || 'Unknown Investor',
-          email: inv.investorId?.email || 'N/A',
-          mobile: inv.investorId?.mobile || 'N/A'
-        },
-        offer: {
-          id: inv.offerId?._id,
-          title: inv.offerId?.title || 'Unknown Project',
-          kind: inv.offerId?.kind || 'project',
-          status: inv.offerId?.status,
-          rateBps: inv.offerId?.rateBps
-        },
-        company: {
-          id: inv.offerId?.companyId?._id,
-          name: inv.offerId?.companyId?.name || 'N/A',
-          regNo: inv.offerId?.companyId?.regNo || 'N/A',
-          sector: inv.offerId?.companyId?.sector || 'General'
-        }
-      }))
+      investments: filtered
     });
   } catch (error) {
     next(error);
@@ -1780,6 +1928,56 @@ export async function approveRelease(req, res, next) {
       refId: release._id,
       description: `Disbursement of ${formatINR(release.amountPaise)} to ${release.companyId.name} Ref: ${release.reference}`
     });
+
+    const amountInRupees = release.amount || (release.amountPaise ? release.amountPaise / 100 : 0);
+
+    // 1. Credit company transaction ledger so it appears in Company Dashboard & Transactions
+    try {
+      await Transaction.create({
+        companyId: release.companyId._id,
+        title: `Capital Disbursed: ${release.offerTitle || 'Project Investment'}`,
+        type: 'Investment',
+        amount: amountInRupees,
+        status: 'Confirmed',
+        referenceId: release.reference || `TXN-DISB-${Date.now().toString().slice(-8)}`,
+        paymentMethod: req.body?.paymentMethod || 'Razorpay Gateway'
+      });
+    } catch (txErr) {
+      console.warn('[approveRelease] Transaction sync notice:', txErr.message);
+    }
+
+    // 2. Update company's InvestmentRequest raisedAmount / funds so the company's metrics increment
+    try {
+      const offerId = release.investmentOfferId || release.offerId;
+      if (offerId) {
+        const matchingRequest = await InvestmentRequest.findOne({
+          $or: [
+            { _id: offerId },
+            { companyId: release.companyId._id }
+          ]
+        }).sort({ createdAt: -1 });
+
+        if (matchingRequest) {
+          matchingRequest.raisedAmount = (matchingRequest.raisedAmount || 0) + amountInRupees;
+          await matchingRequest.save();
+        }
+      }
+    } catch (reqErr) {
+      console.warn('[approveRelease] InvestmentRequest sync notice:', reqErr.message);
+    }
+
+    // 3. Dispatch in-app notification to the company
+    try {
+      await Notification.create({
+        companyId: release.companyId._id,
+        title: 'Capital Disbursement Received',
+        message: `Admin has successfully disbursed ${formatINR(release.amountPaise)} for project "${release.offerTitle || 'Investment Opportunity'}" to your registered bank account via Razorpay (Ref: ${release.reference}).`,
+        type: 'investment',
+        link: '/dashboard/transactions'
+      });
+    } catch (notifErr) {
+      console.warn('[approveRelease] Notification dispatch notice:', notifErr.message);
+    }
 
     await logAction({
       actorId: req.user._id,
@@ -4944,26 +5142,8 @@ export async function decideInvestorRequest(req, res, next) {
         console.warn('Transaction creation notice:', txErr.message);
       }
 
-      // Generate payouts schedule if not yet present
-      const existingPayouts = await Payout.find({ investmentId: investment._id });
-      if (existingPayouts.length === 0 && tenureMonths > 0) {
-        const monthlyReturnAmount = Math.round(totalInterest / tenureMonths);
-        for (let m = 1; m <= tenureMonths; m++) {
-          const payoutDate = new Date(investment.startDate);
-          payoutDate.setMonth(payoutDate.getMonth() + m);
-
-          await Payout.create({
-            investorId: investor?._id,
-            investmentId: investment._id,
-            offerTitle: offer?.companyName || offer?.title || 'Investment Offer',
-            amount: m === tenureMonths ? monthlyReturnAmount + finalAmount : monthlyReturnAmount,
-            amountPaise: Math.round((m === tenureMonths ? monthlyReturnAmount + finalAmount : monthlyReturnAmount) * 100),
-            payoutType: m === tenureMonths ? 'Maturity Payout' : 'Monthly Interest',
-            scheduledDate: payoutDate,
-            status: Statuses.PAYOUT.SCHEDULED || 'Scheduled'
-          });
-        }
-      }
+      // Monthly payout returns are provided in a monthly cycle on the date they pay
+      // (managed on exact monthly cycle anniversary by autoReturnsService, not duplicated in advance)
 
       // Log action in audit log
       await logAction({

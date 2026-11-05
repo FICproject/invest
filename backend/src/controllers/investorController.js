@@ -166,6 +166,15 @@ export const getMyInvestments = asyncHandler(async (req, res) => {
         inv.offerId = io;
       }
     }
+    // Fixed 3% investor return rate
+    inv.returnRate = 3;
+    if (inv.offerId) {
+      inv.offerId.returnRate = 3;
+    }
+    const principal = inv.amountInvested || inv.amount || 0;
+    const tenureMonths = inv.tenureMonths || inv.offerId?.tenureMonths || 12;
+    const totalInterest = Math.round((principal * 3 * (tenureMonths / 12)) / 100);
+    inv.expectedReturns = principal + totalInterest;
   }
 
   if (search && search.trim()) {

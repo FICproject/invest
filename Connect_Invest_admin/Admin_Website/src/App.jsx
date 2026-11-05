@@ -105,7 +105,7 @@ function MainApp() {
     offers: { title: 'Investment Management', subtitle: 'Investment proposals, term sheets, tenure enforcement, and activation' },
     investments_portfolio: { title: 'Investments Portfolio', subtitle: 'Capital deployed, company breakdown, returns, and maturities' },
     transactions: { title: 'Transactions Ledger', subtitle: 'Comprehensive audit log of all platform financial movements' },
-    releases: { title: 'Payments & Transactions', subtitle: 'Disbursement authorization to verified company accounts' },
+    releases: { title: 'Company Fund Releases', subtitle: 'Disburse and route capital collected from investors directly to borrower company verified bank accounts' },
     repayments: { title: 'Repayments & Dues', subtitle: 'Track collections, confirm receipts, and manage defaults' },
     payouts: { title: 'Returns & Payouts', subtitle: 'Compile, preview, and dispatch return distributions' },
     maturity_releases: { title: 'Maturity Releases', subtitle: 'Disburse and return principal capital to investors upon completion of investment tenure (12+ Months)' },

@@ -768,26 +768,59 @@ export default function InvestmentApprovals() {
 
                       {/* 6. Review Action */}
                       <td style={{ padding: '16px 18px', textAlign: 'right' }}>
-                        <button
-                          onClick={() => handleOpenReview(reqItem, 'changes_requested')}
-                          style={{
-                            padding: '8px 14px',
-                            borderRadius: '10px',
-                            backgroundColor: '#0047BA',
-                            border: 'none',
-                            color: '#FFFFFF',
-                            fontSize: '0.8rem',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            transition: 'all 0.15s ease'
-                          }}
-                        >
-                          <Sliders size={13} />
-                          Review Application
-                        </button>
+                        {(() => {
+                          const s = (reqItem.status || '').toLowerCase();
+                          const isApproved = s.includes('approved') || s.includes('confirmed') || s.includes('active');
+                          const isRejected = s.includes('reject');
+
+                          if (isApproved || isRejected) {
+                            return (
+                              <button
+                                onClick={() => handleOpenReview(reqItem, 'view')}
+                                style={{
+                                  padding: '8px 14px',
+                                  borderRadius: '10px',
+                                  backgroundColor: '#F1F5F9',
+                                  border: '1px solid var(--border-light)',
+                                  color: '#334155',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                <Eye size={13} />
+                                View Details
+                              </button>
+                            );
+                          }
+
+                          return (
+                            <button
+                              onClick={() => handleOpenReview(reqItem, 'changes_requested')}
+                              style={{
+                                padding: '8px 14px',
+                                borderRadius: '10px',
+                                backgroundColor: '#0047BA',
+                                border: 'none',
+                                color: '#FFFFFF',
+                                fontSize: '0.8rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <Sliders size={13} />
+                              Review Application
+                            </button>
+                          );
+                        })()}
                       </td>
                     </tr>
                   );
@@ -983,222 +1016,274 @@ export default function InvestmentApprovals() {
                 </div>
               )}
 
-              {/* Decision Tabs */}
-              <div>
-                <label style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0F172A', display: 'block', marginBottom: '8px' }}>
-                  Select Underwriting Decision:
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setDecisionTab('changes_requested')}
-                    style={{
-                      padding: '12px',
-                      borderRadius: '10px',
-                      border: decisionTab === 'changes_requested' ? '2px solid #D97706' : '1px solid var(--border-light)',
-                      backgroundColor: decisionTab === 'changes_requested' ? '#FFFBEB' : '#FFFFFF',
-                      color: decisionTab === 'changes_requested' ? '#92400E' : '#475569',
-                      fontWeight: 700,
-                      fontSize: '0.85rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <Sliders size={15} color={decisionTab === 'changes_requested' ? '#D97706' : '#64748B'} />
-                    Request Changes
-                  </button>
+              {/* Decision Tabs (Only shown when pending review / changes requested, hidden for approved or rejected) */}
+              {(() => {
+                const s = (selectedRequest.status || '').toLowerCase();
+                const isApproved = s.includes('approved') || s.includes('confirmed') || s.includes('active');
+                const isRejected = s.includes('reject');
 
-                  <button
-                    type="button"
-                    onClick={() => setDecisionTab('approve')}
-                    style={{
-                      padding: '12px',
-                      borderRadius: '10px',
-                      border: decisionTab === 'approve' ? '2px solid #059669' : '1px solid var(--border-light)',
-                      backgroundColor: decisionTab === 'approve' ? '#ECFDF5' : '#FFFFFF',
-                      color: decisionTab === 'approve' ? '#065F46' : '#475569',
-                      fontWeight: 700,
-                      fontSize: '0.85rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <CheckCircle2 size={15} color={decisionTab === 'approve' ? '#059669' : '#64748B'} />
-                    Approve / Accept
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setDecisionTab('reject')}
-                    style={{
-                      padding: '12px',
-                      borderRadius: '10px',
-                      border: decisionTab === 'reject' ? '2px solid #DC2626' : '1px solid var(--border-light)',
-                      backgroundColor: decisionTab === 'reject' ? '#FEF2F2' : '#FFFFFF',
-                      color: decisionTab === 'reject' ? '#991B1B' : '#475569',
-                      fontWeight: 700,
-                      fontSize: '0.85rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <XCircle size={15} color={decisionTab === 'reject' ? '#DC2626' : '#64748B'} />
-                    Reject Application
-                  </button>
-                </div>
-              </div>
-
-              {/* Form Content Based on Selected Decision */}
-              {decisionTab === 'changes_requested' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '16px', borderRadius: '12px', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A' }}>
-                  <div>
-                    <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#92400E', display: 'block', marginBottom: '6px' }}>
-                      Counter-Proposed Investment Amount (₹) *
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 50000"
-                      value={proposedAmount}
-                      onChange={e => setProposedAmount(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '10px 14px',
-                        borderRadius: '10px',
-                        border: '1px solid #FCD34D',
-                        backgroundColor: '#FFFFFF',
-                        fontSize: '0.95rem',
-                        fontWeight: 700,
-                        color: '#0F172A',
-                        outline: 'none'
-                      }}
-                    />
-                    <span style={{ fontSize: '0.72rem', color: '#B45309', marginTop: '4px', display: 'block' }}>
-                      Original requested amount: ₹{getDisplayAmount(selectedRequest).toLocaleString('en-IN')}. Set a revised maximum or suitable participation sum.
-                    </span>
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#92400E', display: 'block', marginBottom: '6px' }}>
-                      Instructions / Notes for Investor *
-                    </label>
-                    <textarea
-                      rows={3}
-                      placeholder="Explain to the investor why the amount is being revised (e.g. round cap limits, allocation tiers, or diversification guidelines)..."
-                      value={feedback}
-                      onChange={e => setFeedback(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: '10px',
-                        border: '1px solid #FCD34D',
-                        backgroundColor: '#FFFFFF',
-                        fontSize: '0.84rem',
-                        color: '#0F172A',
-                        outline: 'none',
-                        resize: 'vertical'
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {decisionTab === 'approve' && (
-                <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: '#ECFDF5', border: '1px solid #A7F3D0', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                    <CheckCircle2 size={20} color="#059669" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <div>
-                      <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#065F46' }}>
-                        Ready to Allocate Investment
+                if (isApproved) {
+                  return (
+                    <div style={{ padding: '16px 20px', borderRadius: '12px', backgroundColor: '#ECFDF5', border: '1px solid #A7F3D0', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                      <CheckCircle2 size={22} color="#059669" style={{ flexShrink: 0, marginTop: '2px' }} />
+                      <div>
+                        <div style={{ fontSize: '0.94rem', fontWeight: 700, color: '#065F46' }}>
+                          Investment Request Approved & Active
+                        </div>
+                        <p style={{ fontSize: '0.82rem', color: '#047857', margin: '4px 0 0 0', lineHeight: 1.4 }}>
+                          This investment application has already been verified and approved by administration. Underwriting decisions (approve, reject, or request changes) are completed and locked.
+                        </p>
+                        {selectedRequest.adminFeedback && (
+                          <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#065F46' }}>
+                            <strong>Approval Remarks:</strong> {selectedRequest.adminFeedback}
+                          </div>
+                        )}
                       </div>
-                      <p style={{ fontSize: '0.78rem', color: '#047857', margin: '2px 0 0 0' }}>
-                        Approving will confirm the investment of <strong>₹{getDisplayAmount(selectedRequest).toLocaleString('en-IN')}</strong>, update total funds raised for <strong>{selectedRequest.offerId?.title || 'the opportunity'}</strong>, create the ledger transaction record, and initiate scheduled return payouts.
-                      </p>
                     </div>
-                  </div>
+                  );
+                }
 
-                  <div>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#065F46', display: 'block', marginBottom: '4px' }}>
-                      Approval Remarks (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Verified compliance, allocated full requested ticket size."
-                      value={feedback}
-                      onChange={e => setFeedback(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '9px 12px',
-                        borderRadius: '8px',
-                        border: '1px solid #A7F3D0',
-                        backgroundColor: '#FFFFFF',
-                        fontSize: '0.84rem',
-                        color: '#0F172A',
-                        outline: 'none'
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
+                if (isRejected) {
+                  return (
+                    <div style={{ padding: '16px 20px', borderRadius: '12px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                      <XCircle size={22} color="#DC2626" style={{ flexShrink: 0, marginTop: '2px' }} />
+                      <div>
+                        <div style={{ fontSize: '0.94rem', fontWeight: 700, color: '#991B1B' }}>
+                          Investment Request Rejected
+                        </div>
+                        <p style={{ fontSize: '0.82rem', color: '#B91C1C', margin: '4px 0 0 0', lineHeight: 1.4 }}>
+                          This application was reviewed and rejected. No further underwriting decisions can be made.
+                        </p>
+                        {selectedRequest.rejectionReason && (
+                          <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#7F1D1D' }}>
+                            <strong>Reason:</strong> {selectedRequest.rejectionReason}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
 
-              {decisionTab === 'reject' && (
-                <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div>
-                    <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#991B1B', display: 'block', marginBottom: '6px' }}>
-                      Reason for Rejection *
-                    </label>
-                    <select
-                      value={rejectionReason}
-                      onChange={e => setRejectionReason(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '9px 12px',
-                        borderRadius: '8px',
-                        border: '1px solid #FCA5A5',
-                        backgroundColor: '#FFFFFF',
-                        fontSize: '0.84rem',
-                        color: '#0F172A',
-                        outline: 'none',
-                        marginBottom: '8px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <option value="">Select a common reason...</option>
-                      <option value="Maximum capital limit reached for this offering">Maximum capital limit reached for this offering</option>
-                      <option value="Risk suitability threshold not satisfied">Risk suitability threshold not satisfied</option>
-                      <option value="Investor KYC / documentation pending verification">Investor KYC / documentation pending verification</option>
-                      <option value="Opportunity round closed to further commitments">Opportunity round closed to further commitments</option>
-                      <option value="Custom underwriting determination">Other / Custom determination</option>
-                    </select>
+                return (
+                  <>
+                    <div>
+                      <label style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0F172A', display: 'block', marginBottom: '8px' }}>
+                        Select Underwriting Decision:
+                      </label>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setDecisionTab('changes_requested')}
+                          style={{
+                            padding: '12px',
+                            borderRadius: '10px',
+                            border: decisionTab === 'changes_requested' ? '2px solid #D97706' : '1px solid var(--border-light)',
+                            backgroundColor: decisionTab === 'changes_requested' ? '#FFFBEB' : '#FFFFFF',
+                            color: decisionTab === 'changes_requested' ? '#92400E' : '#475569',
+                            fontWeight: 700,
+                            fontSize: '0.85rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <Sliders size={15} color={decisionTab === 'changes_requested' ? '#D97706' : '#64748B'} />
+                          Request Changes
+                        </button>
 
-                    <textarea
-                      rows={2}
-                      placeholder="Provide specific details or custom rejection notes sent to the investor..."
-                      value={rejectionReason}
-                      onChange={e => setRejectionReason(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '9px 12px',
-                        borderRadius: '8px',
-                        border: '1px solid #FCA5A5',
-                        backgroundColor: '#FFFFFF',
-                        fontSize: '0.84rem',
-                        color: '#0F172A',
-                        outline: 'none',
-                        resize: 'vertical'
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
+                        <button
+                          type="button"
+                          onClick={() => setDecisionTab('approve')}
+                          style={{
+                            padding: '12px',
+                            borderRadius: '10px',
+                            border: decisionTab === 'approve' ? '2px solid #059669' : '1px solid var(--border-light)',
+                            backgroundColor: decisionTab === 'approve' ? '#ECFDF5' : '#FFFFFF',
+                            color: decisionTab === 'approve' ? '#065F46' : '#475569',
+                            fontWeight: 700,
+                            fontSize: '0.85rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <CheckCircle2 size={15} color={decisionTab === 'approve' ? '#059669' : '#64748B'} />
+                          Approve / Accept
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setDecisionTab('reject')}
+                          style={{
+                            padding: '12px',
+                            borderRadius: '10px',
+                            border: decisionTab === 'reject' ? '2px solid #DC2626' : '1px solid var(--border-light)',
+                            backgroundColor: decisionTab === 'reject' ? '#FEF2F2' : '#FFFFFF',
+                            color: decisionTab === 'reject' ? '#991B1B' : '#475569',
+                            fontWeight: 700,
+                            fontSize: '0.85rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <XCircle size={15} color={decisionTab === 'reject' ? '#DC2626' : '#64748B'} />
+                          Reject Application
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Form Content Based on Selected Decision */}
+                    {decisionTab === 'changes_requested' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '16px', borderRadius: '12px', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A' }}>
+                        <div>
+                          <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#92400E', display: 'block', marginBottom: '6px' }}>
+                            Counter-Proposed Investment Amount (₹) *
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="e.g. 50000"
+                            value={proposedAmount}
+                            onChange={e => setProposedAmount(e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '10px 14px',
+                              borderRadius: '10px',
+                              border: '1px solid #FCD34D',
+                              backgroundColor: '#FFFFFF',
+                              fontSize: '0.95rem',
+                              fontWeight: 700,
+                              color: '#0F172A',
+                              outline: 'none'
+                            }}
+                          />
+                          <span style={{ fontSize: '0.72rem', color: '#B45309', marginTop: '4px', display: 'block' }}>
+                            Original requested amount: ₹{getDisplayAmount(selectedRequest).toLocaleString('en-IN')}. Set a revised maximum or suitable participation sum.
+                          </span>
+                        </div>
+
+                        <div>
+                          <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#92400E', display: 'block', marginBottom: '6px' }}>
+                            Instructions / Notes for Investor *
+                          </label>
+                          <textarea
+                            rows={3}
+                            placeholder="Explain to the investor why the amount is being revised (e.g. round cap limits, allocation tiers, or diversification guidelines)..."
+                            value={feedback}
+                            onChange={e => setFeedback(e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '10px 12px',
+                              borderRadius: '10px',
+                              border: '1px solid #FCD34D',
+                              backgroundColor: '#FFFFFF',
+                              fontSize: '0.84rem',
+                              color: '#0F172A',
+                              outline: 'none',
+                              resize: 'vertical'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {decisionTab === 'approve' && (
+                      <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: '#ECFDF5', border: '1px solid #A7F3D0', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                          <CheckCircle2 size={20} color="#059669" style={{ flexShrink: 0, marginTop: '2px' }} />
+                          <div>
+                            <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#065F46' }}>
+                              Ready to Allocate Investment
+                            </div>
+                            <p style={{ fontSize: '0.78rem', color: '#047857', margin: '2px 0 0 0' }}>
+                              Approving will confirm the investment of <strong>₹{getDisplayAmount(selectedRequest).toLocaleString('en-IN')}</strong>, update total funds raised for <strong>{selectedRequest.offerId?.title || 'the opportunity'}</strong>, create the ledger transaction record, and initiate scheduled return payouts.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#065F46', display: 'block', marginBottom: '4px' }}>
+                            Approval Remarks (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Verified compliance, allocated full requested ticket size."
+                            value={feedback}
+                            onChange={e => setFeedback(e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '9px 12px',
+                              borderRadius: '8px',
+                              border: '1px solid #A7F3D0',
+                              backgroundColor: '#FFFFFF',
+                              fontSize: '0.84rem',
+                              color: '#0F172A',
+                              outline: 'none'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {decisionTab === 'reject' && (
+                      <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div>
+                          <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#991B1B', display: 'block', marginBottom: '6px' }}>
+                            Reason for Rejection *
+                          </label>
+                          <select
+                            value={rejectionReason}
+                            onChange={e => setRejectionReason(e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '9px 12px',
+                              borderRadius: '8px',
+                              border: '1px solid #FCA5A5',
+                              backgroundColor: '#FFFFFF',
+                              fontSize: '0.84rem',
+                              color: '#0F172A',
+                              outline: 'none',
+                              marginBottom: '8px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <option value="">Select a common reason...</option>
+                            <option value="Maximum capital limit reached for this offering">Maximum capital limit reached for this offering</option>
+                            <option value="Risk suitability threshold not satisfied">Risk suitability threshold not satisfied</option>
+                            <option value="Investor KYC / documentation pending verification">Investor KYC / documentation pending verification</option>
+                            <option value="Opportunity round closed to further commitments">Opportunity round closed to further commitments</option>
+                            <option value="Custom underwriting determination">Other / Custom determination</option>
+                          </select>
+
+                          <textarea
+                            rows={2}
+                            placeholder="Provide specific details or custom rejection notes sent to the investor..."
+                            value={rejectionReason}
+                            onChange={e => setRejectionReason(e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '9px 12px',
+                              borderRadius: '8px',
+                              border: '1px solid #FCA5A5',
+                              backgroundColor: '#FFFFFF',
+                              fontSize: '0.84rem',
+                              color: '#0F172A',
+                              outline: 'none',
+                              resize: 'vertical'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
 
             {/* Modal Actions */}
@@ -1230,55 +1315,70 @@ export default function InvestmentApprovals() {
                   cursor: 'pointer'
                 }}
               >
-                Cancel
+                {(() => {
+                  const s = (selectedRequest.status || '').toLowerCase();
+                  return s.includes('approved') || s.includes('confirmed') || s.includes('active') || s.includes('reject')
+                    ? 'Close'
+                    : 'Cancel';
+                })()}
               </button>
 
-              <button
-                type="button"
-                onClick={handleSubmitDecision}
-                disabled={submitting}
-                style={{
-                  padding: '9px 20px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  backgroundColor:
-                    decisionTab === 'approve'
-                      ? '#059669'
-                      : decisionTab === 'reject'
-                      ? '#DC2626'
-                      : '#D97706',
-                  color: '#FFFFFF',
-                  fontSize: '0.84rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
-                }}
-              >
-                {submitting ? (
-                  <>
-                    <RefreshCw size={14} className="spin" />
-                    <span>Processing...</span>
-                  </>
-                ) : decisionTab === 'approve' ? (
-                  <>
-                    <Check size={16} />
-                    <span>Confirm & Approve Investment</span>
-                  </>
-                ) : decisionTab === 'reject' ? (
-                  <>
-                    <X size={16} />
-                    <span>Reject Application</span>
-                  </>
-                ) : (
-                  <>
-                    <Send size={15} />
-                    <span>Send Resubmission with Changes</span>
-                  </>
-                )}
-              </button>
+              {(() => {
+                const s = (selectedRequest.status || '').toLowerCase();
+                const isApprovedOrRejected =
+                  s.includes('approved') || s.includes('confirmed') || s.includes('active') || s.includes('reject');
+
+                if (isApprovedOrRejected) return null;
+
+                return (
+                  <button
+                    type="button"
+                    onClick={handleSubmitDecision}
+                    disabled={submitting}
+                    style={{
+                      padding: '9px 20px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      backgroundColor:
+                        decisionTab === 'approve'
+                          ? '#059669'
+                          : decisionTab === 'reject'
+                          ? '#DC2626'
+                          : '#D97706',
+                      color: '#FFFFFF',
+                      fontSize: '0.84rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+                    }}
+                  >
+                    {submitting ? (
+                      <>
+                        <RefreshCw size={14} className="spin" />
+                        <span>Processing...</span>
+                      </>
+                    ) : decisionTab === 'approve' ? (
+                      <>
+                        <Check size={16} />
+                        <span>Confirm & Approve Investment</span>
+                      </>
+                    ) : decisionTab === 'reject' ? (
+                      <>
+                        <X size={16} />
+                        <span>Reject Application</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send size={15} />
+                        <span>Send Resubmission with Changes</span>
+                      </>
+                    )}
+                  </button>
+                );
+              })()}
             </div>
           </div>
         </div>

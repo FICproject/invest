@@ -162,6 +162,19 @@ export const verifyPayment = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'Payment order not found.');
   }
 
+  // Idempotency: If this payment has already succeeded, prevent double allocation and duplicate records
+  if (payment.status === 'Success') {
+    return res.status(200).json({
+      success: true,
+      message: 'Payment was already verified and processed.',
+      data: {
+        paymentId: payment.paymentId,
+        orderId: payment.orderId,
+        status: payment.status
+      }
+    });
+  }
+
   // If Razorpay signature is passed, verify cryptographic hash
   if (effectiveSignature) {
     const isValid = verifyRazorpaySignature({
@@ -206,8 +219,9 @@ export const verifyPayment = asyncHandler(async (req, res) => {
 
   // Calculate returns
   const principal = payment.amount;
-  const annualRate = offer.returnRate;
-  const tenureMonths = offer.tenureMonths;
+  // Fixed 3% return provided for investors regardless of company charge
+  const annualRate = 3;
+  const tenureMonths = offer.tenureMonths || 12;
   const totalInterest = Math.round((principal * annualRate * (tenureMonths / 12)) / 100);
   const totalMaturity = principal + totalInterest;
 
@@ -303,22 +317,8 @@ export const verifyPayment = asyncHandler(async (req, res) => {
     description: `Allocated into ${offer.title} (${annualRate}% p.a. for ${tenureMonths} Months)`
   });
 
-  // 5. Generate monthly scheduled payout records
-  const monthlyReturnAmount = Math.round(totalInterest / tenureMonths);
-  for (let m = 1; m <= tenureMonths; m++) {
-    const payoutDate = new Date(startDate);
-    payoutDate.setMonth(payoutDate.getMonth() + m);
-
-    await Payout.create({
-      investorId,
-      investmentId: investment._id,
-      offerTitle: offer.companyName,
-      amount: m === tenureMonths ? monthlyReturnAmount + principal : monthlyReturnAmount,
-      payoutType: m === tenureMonths ? 'Maturity Payout' : 'Monthly Interest',
-      scheduledDate: payoutDate,
-      status: 'Scheduled'
-    });
-  }
+  // 5. Monthly payout returns are provided in a monthly cycle on the date they pay
+  // (managed on exact monthly cycle anniversary by autoReturnsService, not duplicated in advance)
 
   // 6. Create congratulatory notification for Investor
   await Notification.create({

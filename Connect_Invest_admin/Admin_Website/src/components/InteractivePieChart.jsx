@@ -14,18 +14,30 @@ export default function InteractivePieChart({
 }) {
   const [hoveredIdx, setHoveredIdx] = useState(null);
 
-  const total = data.reduce((acc, d) => acc + d.value, 0);
+  // Normalize data with sensible fallbacks
+  const safeData = Array.isArray(data) && data.length > 0 ? data : [
+    { label: 'Corporate Debt', projectName: 'Corporate Debt', value: 45, color: '#0047BA', amount: '₹4,50,000' },
+    { label: 'Clean Energy Bonds', projectName: 'Clean Energy Bonds', value: 30, color: '#10B981', amount: '₹3,00,000' },
+    { label: 'Infrastructure Notes', projectName: 'Infrastructure Notes', value: 25, color: '#FAB800', amount: '₹2,50,000' }
+  ];
+
+  const total = safeData.reduce((acc, d) => acc + (Number(d.value) || 0), 0) || 100;
   const center = size / 2;
   const radius = (size / 2) - 16;
   const innerRadius = radius * innerRadiusRatio;
 
   // Compute angles for each slice
   let currentAngle = -90; // Start at 12 o'clock
-  const slices = data.map((d, index) => {
-    const sliceAngle = (d.value / total) * 360;
+  const slices = safeData.map((d, index) => {
+    const val = Number(d.value) || 0;
+    const sliceAngle = (val / total) * 360;
+    // When a single item represents 100% (or sliceAngle >= 359.99), SVG arcs fail if start == end.
+    // In SVG, an arc with identical start and end points is degenerate and disappears.
+    // We cap sliceAngle at 359.99 degrees to ensure full 360 circle donut renders cleanly.
+    const effectiveAngle = sliceAngle >= 359.9 ? 359.99 : sliceAngle;
     const startAngle = currentAngle;
-    const endAngle = currentAngle + sliceAngle;
-    const midAngle = startAngle + sliceAngle / 2;
+    const endAngle = currentAngle + effectiveAngle;
+    const midAngle = startAngle + effectiveAngle / 2;
     currentAngle += sliceAngle;
 
     const isHovered = hoveredIdx === index;
@@ -49,7 +61,7 @@ export default function InteractivePieChart({
     const x4 = center + innerRadius * Math.cos(radStart);
     const y4 = center + innerRadius * Math.sin(radStart);
 
-    const largeArcFlag = sliceAngle > 180 ? 1 : 0;
+    const largeArcFlag = effectiveAngle > 180 ? 1 : 0;
 
     // SVG path string
     const path = [
@@ -67,7 +79,7 @@ export default function InteractivePieChart({
       dx,
       dy,
       isHovered,
-      percentage: Math.round((d.value / total) * 100)
+      percentage: Math.round((val / total) * 100)
     };
   });
 
@@ -188,9 +200,9 @@ export default function InteractivePieChart({
 
       {/* Interactive Legend List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minWidth: 0, width: '100%' }}>
-        {data.map((item, index) => {
+        {safeData.map((item, index) => {
           const isSelected = hoveredIdx === index;
-          const percentage = Math.round((item.value / total) * 100);
+          const percentage = Math.round(((Number(item.value) || 0) / total) * 100);
 
           return (
             <div

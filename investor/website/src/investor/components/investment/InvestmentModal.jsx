@@ -4,6 +4,7 @@ import { ShieldCheck, AlertCircle, CheckCircle2, ArrowRight, Lock, CreditCard, S
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { Input } from '../common/Input';
+import { RazorpayCheckoutModal } from '../payment/RazorpayCheckoutModal';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { paymentService } from '../../services/paymentService';
 import { investorService } from '../../services/investorService';
@@ -24,6 +25,7 @@ export const InvestmentModal = ({ isOpen, onClose, offer, onInvestmentSuccess })
   const [error, setError] = useState('');
   const [successData, setSuccessData] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeCheckoutOrder, setActiveCheckoutOrder] = useState(null);
 
   const isKycApproved = true;
 
@@ -87,8 +89,8 @@ export const InvestmentModal = ({ isOpen, onClose, offer, onInvestmentSuccess })
         const orderData = orderRes.data;
         const orderId = orderData.orderId;
 
-        // If Razorpay SDK is loaded on window and not in direct fallback
-        if (typeof window !== 'undefined' && window.Razorpay && !orderData.simulated) {
+        // If Razorpay SDK is loaded on window and valid test key is present
+        if (typeof window !== 'undefined' && window.Razorpay && !orderData.simulated && orderData.keyId && !orderData.keyId.includes('placeholder')) {
           const rzpOptions = {
             key: orderData.keyId,
             amount: orderData.amountPaise,
@@ -102,31 +104,10 @@ export const InvestmentModal = ({ isOpen, onClose, offer, onInvestmentSuccess })
               contact: user?.mobile || ''
             },
             theme: {
-              color: '#0047BA'
+              color: '#0F1E36'
             },
             handler: async function (response) {
-              try {
-                const verifyRes = await paymentService.verifyPayment(
-                  orderId,
-                  response.razorpay_payment_id,
-                  'Success',
-                  {
-                    razorpayOrderId: response.razorpay_order_id,
-                    razorpayPaymentId: response.razorpay_payment_id,
-                    razorpaySignature: response.razorpay_signature
-                  }
-                );
-                if (verifyRes.success && verifyRes.data) {
-                  setSuccessData(verifyRes.data);
-                  setStep('success');
-                  if (onInvestmentSuccess) onInvestmentSuccess(verifyRes.data);
-                }
-              } catch (verErr) {
-                setError(verErr.response?.data?.message || verErr.message || 'Payment signature verification failed.');
-                setStep('input');
-              } finally {
-                setIsSubmitting(false);
-              }
+              await verifyAndCompletePayment(orderId, response);
             },
             modal: {
               ondismiss: function () {
@@ -144,28 +125,49 @@ export const InvestmentModal = ({ isOpen, onClose, offer, onInvestmentSuccess })
           });
           rzp.open();
         } else {
-          // Development/Fallback Gateway Processing
-          setTimeout(async () => {
-            try {
-              const verifyRes = await paymentService.verifyPayment(orderId, 'PAY_' + Date.now(), 'Success');
-              if (verifyRes.success && verifyRes.data) {
-                setSuccessData(verifyRes.data);
-                setStep('success');
-                if (onInvestmentSuccess) onInvestmentSuccess(verifyRes.data);
-              }
-            } catch (err) {
-              setError(err.message || 'Payment verification failed.');
-              setStep('input');
-            } finally {
-              setIsSubmitting(false);
-            }
-          }, 1200);
+          // Open the visual Razorpay Checkout Test Mode Modal
+          setActiveCheckoutOrder({
+            ...orderData,
+            amount: numAmount,
+            offerTitle: offer.title || 'Project Investment',
+            companyName: 'Connect Invest India'
+          });
+          setIsSubmitting(false);
         }
       }
     } catch (err) {
       setError(err.message || 'Failed to initiate investment.');
       setStep('input');
       setIsSubmitting(false);
+    }
+  };
+
+  const verifyAndCompletePayment = async (orderId, response) => {
+    try {
+      setStep('processing');
+      setIsSubmitting(true);
+      const verifyRes = await paymentService.verifyPayment(
+        orderId,
+        response.razorpay_payment_id || response.paymentId,
+        'Success',
+        {
+          razorpayOrderId: response.razorpay_order_id || orderId,
+          razorpayPaymentId: response.razorpay_payment_id || response.paymentId,
+          razorpaySignature: response.razorpay_signature || response.signature,
+          paymentMethod: response.paymentMethod || 'Razorpay Gateway'
+        }
+      );
+      if (verifyRes.success && verifyRes.data) {
+        setSuccessData(verifyRes.data);
+        setStep('success');
+        if (onInvestmentSuccess) onInvestmentSuccess(verifyRes.data);
+      }
+    } catch (verErr) {
+      setError(verErr.response?.data?.message || verErr.message || 'Payment signature verification failed.');
+      setStep('input');
+    } finally {
+      setIsSubmitting(false);
+      setActiveCheckoutOrder(null);
     }
   };
 
@@ -448,6 +450,27 @@ export const InvestmentModal = ({ isOpen, onClose, offer, onInvestmentSuccess })
           </div>
         </div>
       )}
+
+      {/* Global Razorpay Test Mode Checkout Modal */}
+      <RazorpayCheckoutModal
+        isOpen={!!activeCheckoutOrder}
+        onClose={() => {
+          setActiveCheckoutOrder(null);
+          setIsSubmitting(false);
+          setStep('input');
+        }}
+        orderData={activeCheckoutOrder}
+        onSuccess={(response) => {
+          if (activeCheckoutOrder) {
+            verifyAndCompletePayment(activeCheckoutOrder.orderId, response);
+          }
+        }}
+        onFailure={(err) => {
+          setError(err.message || 'Payment not completed.');
+          setIsSubmitting(false);
+          setStep('input');
+        }}
+      />
     </Modal>
   );
 };

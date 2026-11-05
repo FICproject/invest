@@ -58,12 +58,18 @@ export const getAllOffers = asyncHandler(async (req, res) => {
     sortOption = { raisedAmount: -1 };
   }
 
-  const offers = await InvestmentOffer.find(query).sort(sortOption);
+  const offers = await InvestmentOffer.find(query).sort(sortOption).lean();
+
+  // Fixed 3% return rate for all investors
+  const investorOffers = offers.map(o => ({
+    ...o,
+    returnRate: 3
+  }));
 
   res.status(200).json({
     success: true,
-    count: offers.length,
-    data: offers
+    count: investorOffers.length,
+    data: investorOffers
   });
 });
 
@@ -83,21 +89,32 @@ export const getFeaturedOffers = asyncHandler(async (req, res) => {
     }).sort({ createdAt: 1 }).limit(4);
   }
 
+  const investorFeatured = result.map(o => {
+    const obj = typeof o.toObject === 'function' ? o.toObject() : o;
+    return {
+      ...obj,
+      returnRate: 3
+    };
+  });
+
   res.status(200).json({
     success: true,
-    count: result.length,
-    data: result
+    count: investorFeatured.length,
+    data: investorFeatured
   });
 });
 
 // @route   GET /api/investments/:id
 // @desc    Get full investment offer details by ID
 export const getOfferById = asyncHandler(async (req, res) => {
-  const offer = await InvestmentOffer.findById(req.params.id);
+  const offer = await InvestmentOffer.findById(req.params.id).lean();
 
   if (!offer) {
     throw new ApiError(404, 'Investment opportunity not found.');
   }
+
+  // Fixed 3% return rate for investors
+  offer.returnRate = 3;
 
   res.status(200).json({
     success: true,
@@ -124,8 +141,8 @@ export const calculateReturns = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Invalid investment amount.');
   }
 
-  const tenureMonths = customTenureMonths ? Number(customTenureMonths) : offer.tenureMonths;
-  const annualRate = offer.returnRate; // e.g. 10%
+  const tenureMonths = customTenureMonths ? Number(customTenureMonths) : (offer.tenureMonths || 12);
+  const annualRate = 3; // Fixed 3% return for investors
   
   // Simple Annual Interest formula: (P * R * T) / 100 where T is in years
   const totalInterest = (principal * annualRate * (tenureMonths / 12)) / 100;
@@ -136,9 +153,9 @@ export const calculateReturns = asyncHandler(async (req, res) => {
     success: true,
     data: {
       principal,
-      annualRate,
+      annualRate: 3,
       tenureMonths,
-      payoutFrequency: offer.payoutFrequency,
+      payoutFrequency: offer.payoutFrequency || 'Monthly',
       monthlyPayout: Math.round(monthlyPayout),
       totalExpectedInterest: Math.round(totalInterest),
       totalMaturityAmount: Math.round(totalMaturityAmount)

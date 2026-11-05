@@ -20,7 +20,6 @@ import logoImg from '../../assets/logo.png';
 const menuItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/dashboard/requests', label: 'Request', icon: FilePlus2 },
-  { path: '/dashboard/investments', label: 'Investments', icon: Briefcase },
   { path: '/dashboard/returns', label: 'Returns and Dividends', icon: Coins },
   { path: '/dashboard/transactions', label: 'Transactions', icon: Receipt },
   { path: '/dashboard/documents', label: 'Documents', icon: FileCheck2 },

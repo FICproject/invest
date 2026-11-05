@@ -21,6 +21,7 @@ import EmptyState from '../../components/common/EmptyState';
 import { usePortfolioContext } from '../../context/portfolioContext';
 import { formatCurrency } from '../../utils/formatters';
 import investmentService from '../../services/investmentService';
+import { RazorpayMobileCheckoutModal } from '../../components/payment/RazorpayMobileCheckoutModal';
 import { Alert } from 'react-native';
 
 const STATUS_TABS = ['All', 'Approved', 'Confirmed', 'Pending', 'Completed'];
@@ -38,6 +39,8 @@ export const PortfolioScreen = ({ navigation }: any) => {
   const [activeTab, setActiveTab] = useState<string>('All');
   const [search, setSearch] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
+  const [activeCheckoutOrder, setActiveCheckoutOrder] = useState<any>(null);
+  const [activeCheckoutItem, setActiveCheckoutItem] = useState<any>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -76,22 +79,49 @@ export const PortfolioScreen = ({ navigation }: any) => {
       const amount = item.amountInvested || item.amount;
 
       const orderRes = await investmentService.createPaymentOrder(offerId, amount, 'Razorpay Gateway');
-      if (orderRes && orderRes.data) {
-        const verifyRes = await investmentService.verifyPayment(
-          orderRes.data.orderId,
-          'MOB_PAY_' + Date.now(),
-          'Success'
-        );
-        if (verifyRes.success) {
-          Alert.alert(
-            'Payment Successful',
-            `Your payment of ${formatCurrency(amount)} was successful! Investment is confirmed and active.`,
-            [{ text: 'OK', onPress: () => refreshAll() }]
-          );
-        }
+      if (orderRes && (orderRes.data || orderRes.orderId)) {
+        const orderData = orderRes.data || orderRes;
+        setActiveCheckoutOrder({
+          ...orderData,
+          amount,
+          offerTitle: item.offerId?.title || 'Project Allocation',
+          companyName: 'Connect Invest Platform'
+        });
+        setActiveCheckoutItem(item);
       }
     } catch (err: any) {
-      Alert.alert('Payment Failed', err.message || 'Unable to complete transaction.');
+      Alert.alert('Payment Initialization Failed', err.message || 'Unable to create payment order.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMobileVerification = async (paymentResult: any) => {
+    try {
+      setLoading(true);
+      const verifyRes = await investmentService.verifyPayment(
+        paymentResult.orderId,
+        paymentResult.paymentId,
+        'Success',
+        {
+          investmentId: activeCheckoutItem?._id,
+          razorpayOrderId: paymentResult.razorpay_order_id,
+          razorpayPaymentId: paymentResult.razorpay_payment_id,
+          razorpaySignature: paymentResult.razorpay_signature,
+          paymentMethod: paymentResult.paymentMethod || 'Razorpay Gateway'
+        }
+      );
+      if (verifyRes.success || verifyRes.data?.success) {
+        setActiveCheckoutOrder(null);
+        setActiveCheckoutItem(null);
+        Alert.alert(
+          'Payment Successful',
+          `Your payment of ${formatCurrency(activeCheckoutOrder?.amount)} was successful! Investment is confirmed and active.`,
+          [{ text: 'OK', onPress: () => refreshAll() }]
+        );
+      }
+    } catch (err: any) {
+      Alert.alert('Payment Verification Failed', err.message || 'Verification could not be completed.');
     } finally {
       setLoading(false);
     }
@@ -194,6 +224,20 @@ export const PortfolioScreen = ({ navigation }: any) => {
           />
         )}
       </View>
+
+      {/* Global Razorpay Test Mode Checkout Modal */}
+      <RazorpayMobileCheckoutModal
+        visible={!!activeCheckoutOrder}
+        onClose={() => {
+          setActiveCheckoutOrder(null);
+          setActiveCheckoutItem(null);
+        }}
+        orderData={activeCheckoutOrder}
+        onSuccess={handleMobileVerification}
+        onFailure={(err) => {
+          Alert.alert('Payment Cancelled', err.message || 'Payment not completed.');
+        }}
+      />
     </SafeAreaView>
   );
 };

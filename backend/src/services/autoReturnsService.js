@@ -3,9 +3,10 @@ import { Investment } from '../models/Investment.js';
 import { Statuses } from '../constants/index.js';
 
 /**
- * Calculates and schedules monthly return records for active/confirmed investments.
- * IMPORTANT: Strictly NO automatic payments. Every return is created in 'Calculated' status
- * and requires manual Admin verification and manual execution (via batch or manual pay).
+ * Calculates monthly return records for active/confirmed investments.
+ * Returns will be provided strictly in a monthly cycle on the date they pay.
+ * A return record is only created when the current date reaches or passes the monthly anniversary due date.
+ * Exactly ONE return line is generated per monthly billing cycle.
  */
 export async function processAutoMonthlyReturns() {
   try {
@@ -20,7 +21,7 @@ export async function processAutoMonthlyReturns() {
 
     for (const inv of investments) {
       // Determine the base payment / activation date
-      const paidAt = inv.activationDate || inv.investedAt || inv.createdAt;
+      const paidAt = inv.activationDate || inv.investedAt || inv.startDate || inv.createdAt;
       if (!paidAt) continue;
 
       const baseDate = new Date(paidAt);
@@ -36,10 +37,16 @@ export async function processAutoMonthlyReturns() {
 
       if (monthlyReturnPaise <= 0) continue;
 
-      // For each elapsed month up to tenure
+      // Check each month up to tenure
       for (let m = 1; m <= tenureMonths; m++) {
         const cycleDueDate = new Date(baseDate);
         cycleDueDate.setMonth(cycleDueDate.getMonth() + m);
+
+        // Only generate return record once the monthly cycle due date has arrived (or for current month due date)
+        if (cycleDueDate > now) {
+          // Future months are not yet due; do not generate or show in advance
+          continue;
+        }
 
         // Check if a payout record already exists for this investment and cycle month
         const windowStart = new Date(cycleDueDate);
@@ -47,14 +54,13 @@ export async function processAutoMonthlyReturns() {
         const windowEnd = new Date(cycleDueDate);
         windowEnd.setDate(windowEnd.getDate() + 15);
 
-        let payout = await Payout.findOne({
+        const existingPayout = await Payout.findOne({
           investmentId: inv._id,
           scheduledDate: { $gte: windowStart, $lte: windowEnd }
         });
 
-        if (!payout) {
-          // If not existing yet, create as Calculated for Admin review & manual payment
-          payout = await Payout.create({
+        if (!existingPayout) {
+          await Payout.create({
             investmentId: inv._id,
             investorId: inv.investorId?._id || inv.investorId,
             offerId: inv.offerId?._id || inv.offerId,
@@ -62,7 +68,7 @@ export async function processAutoMonthlyReturns() {
             amountPaise: monthlyReturnPaise,
             amount: monthlyReturnPaise / 100,
             payoutType: m === tenureMonths ? 'Maturity & Final Return' : 'Monthly Return',
-            status: Statuses.PAYOUT.CALCULATED, // Always Calculated - Requires Admin manual verification & pay
+            status: Statuses.PAYOUT.READY || 'Ready',
             scheduledDate: cycleDueDate
           });
           createdCount++;
@@ -71,7 +77,7 @@ export async function processAutoMonthlyReturns() {
     }
 
     if (createdCount > 0) {
-      console.log(`[ReturnsScheduler] Calculated ${createdCount} monthly return records awaiting Admin manual verification.`);
+      console.log(`[ReturnsScheduler] Generated ${createdCount} monthly return records on due date for disbursement.`);
     }
   } catch (error) {
     console.error('[ReturnsScheduler] Error calculating monthly returns:', error);

@@ -52,10 +52,26 @@ export const createInvestorSubscriptionOrder = asyncHandler(async (req, res) => 
     $or: [{ userId: investorUser._id }, { email: investorUser.email }]
   });
 
+  const billingMonth = req.body.billingMonth || new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+  // 1. Prevent duplicate billing/payments if already subscribed for this month
+  const existingSub = await Subscription.findOne({
+    $or: [
+      { userId: investorUser._id },
+      { subscriberEmail: investorUser.email },
+      ...(investorProfile ? [{ investorId: investorProfile._id }] : [])
+    ],
+    billingMonth,
+    status: 'Paid'
+  });
+
+  if (existingSub) {
+    throw new ApiError(400, `Subscription for ${billingMonth} is already active and paid. Duplicate payment is not allowed.`);
+  }
+
   const feeConfig = await getSubscriptionFeeConfig();
   const investorFee = feeConfig.investorFee;
   const amountPaise = investorFee * 100;
-  const billingMonth = req.body.billingMonth || new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
   const rzpOrder = await createRazorpayOrder({
     amountPaise,
@@ -94,6 +110,40 @@ export const verifyInvestorSubscription = asyncHandler(async (req, res) => {
     $or: [{ userId: investorUser._id }, { email: investorUser.email }]
   });
 
+  // 1. Check idempotency: If paymentId / transactionRef or orderId already verified, return existing record
+  const effectiveRef = paymentId || `ORDER_${orderId}`;
+  if (paymentId) {
+    const alreadyProcessed = await Subscription.findOne({ transactionRef: paymentId });
+    if (alreadyProcessed) {
+      return res.status(200).json({
+        success: true,
+        message: 'Subscription payment was already recorded.',
+        data: alreadyProcessed
+      });
+    }
+  }
+
+  const currentMonth = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+  // 2. Prevent duplicate active subscription for the current billing cycle
+  const existingActive = await Subscription.findOne({
+    $or: [
+      { userId: investorUser._id },
+      { subscriberEmail: investorUser.email },
+      ...(investorProfile ? [{ investorId: investorProfile._id }] : [])
+    ],
+    billingMonth: currentMonth,
+    status: 'Paid'
+  });
+
+  if (existingActive) {
+    return res.status(200).json({
+      success: true,
+      message: `Subscription for ${currentMonth} is already paid.`,
+      data: existingActive
+    });
+  }
+
   if (signature) {
     const isValid = verifyRazorpaySignature({
       orderId,
@@ -108,7 +158,6 @@ export const verifyInvestorSubscription = asyncHandler(async (req, res) => {
   const feeConfig = await getSubscriptionFeeConfig();
   const investorFee = feeConfig.investorFee;
 
-  const currentMonth = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
   const nextDueDate = new Date();
   nextDueDate.setMonth(nextDueDate.getMonth() + 1);
 

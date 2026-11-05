@@ -15,14 +15,14 @@ import {
   Check
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import api from '../../../investor/services/api';
+import api from '../../services/api';
+import { RazorpayCheckoutModal } from '../../../investor/components/payment/RazorpayCheckoutModal';
 
 export const CompanySubscription: React.FC = () => {
   const { company } = useAuth();
-  const [isPayModalOpen, setIsPayModalOpen] = useState(false);
-  const [selectedMethod, setSelectedMethod] = useState<'upi' | 'card' | 'netbanking'>('upi');
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [activeCheckoutOrder, setActiveCheckoutOrder] = useState<any>(null);
 
   // Current month billing details (₹500 / month)
   const currentMonthName = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
@@ -44,12 +44,13 @@ export const CompanySubscription: React.FC = () => {
     try {
       setLoadingHistory(true);
       const res = await api.get('/company/subscription');
-      if (res.data?.success && res.data?.data) {
-        setIsSubscribed(Boolean(res.data.data.isSubscribed));
-        if (res.data.data.currentPlan?.amount) {
-          setSubscriptionAmount(res.data.data.currentPlan.amount);
+      const data = res.data?.data || res.data;
+      if (data) {
+        setIsSubscribed(Boolean(data.isSubscribed));
+        if (data.currentPlan?.amount) {
+          setSubscriptionAmount(data.currentPlan.amount);
         }
-        const list = (res.data.data.history || []).map((s: any) => ({
+        const list = (data.history || []).map((s: any) => ({
           id: s.invoiceNumber || s._id,
           month: s.billingMonth,
           amount: s.amount,
@@ -80,8 +81,12 @@ export const CompanySubscription: React.FC = () => {
       });
       const orderData = res.data?.data || res.data;
 
-      // 2. If Razorpay SDK is available on window and not simulation
-      if (typeof window !== 'undefined' && (window as any).Razorpay && !orderData.simulated) {
+      if (!orderData || !orderData.orderId) {
+        throw new Error('Failed to create subscription order. Please try again.');
+      }
+
+      // 2. If real Razorpay SDK is available on window and valid test keys present
+      if (typeof window !== 'undefined' && (window as any).Razorpay && !orderData.simulated && orderData.keyId && !orderData.keyId.includes('placeholder')) {
         const options = {
           key: orderData.keyId,
           amount: orderData.amountPaise,
@@ -90,40 +95,15 @@ export const CompanySubscription: React.FC = () => {
           description: `Platform Subscription - ${currentMonthName}`,
           order_id: orderData.orderId,
           prefill: {
-            name: company?.legalName || company?.name || '',
+            name: company?.legalName || company?.name || company?.businessName || '',
             email: company?.officialEmail || '',
             contact: company?.officialPhone || ''
           },
           theme: {
-            color: '#DE8E0A'
+            color: '#0F1E36'
           },
           handler: async function (response: any) {
-            try {
-              const verifyRes = await api.post('/company/subscription/verify', {
-                orderId: response.razorpay_order_id || orderData.orderId,
-                paymentId: response.razorpay_payment_id,
-                signature: response.razorpay_signature,
-                paymentMethod: selectedMethod === 'upi' ? 'UPI' : selectedMethod === 'card' ? 'Credit/Debit Card' : 'Net Banking'
-              });
-              const invoice = verifyRes.data?.data;
-              setPaymentSuccess(true);
-              setPaymentHistory([
-                {
-                  id: invoice?.invoiceNumber || `INV-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`,
-                  month: currentMonthName,
-                  amount: 500,
-                  paidOn: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-                  method: `Razorpay (${invoice?.transactionRef || 'Paid'})`,
-                  status: 'Paid',
-                  receiptUrl: '#'
-                },
-                ...paymentHistory
-              ]);
-            } catch (err: any) {
-              alert(err.response?.data?.message || 'Payment verification failed');
-            } finally {
-              setPaying(false);
-            }
+            await handleVerificationSuccess(orderData.orderId, response);
           },
           modal: {
             ondismiss: function () {
@@ -135,31 +115,41 @@ export const CompanySubscription: React.FC = () => {
         const rzp = new (window as any).Razorpay(options);
         rzp.open();
       } else {
-        // Direct simulation / verification fallback
-        const verifyRes = await api.post('/company/subscription/verify', {
-          orderId: orderData?.orderId || `order_sim_${Date.now()}`,
-          paymentId: `PAY_${Date.now()}`,
-          signature: 'simulated_valid_signature',
-          paymentMethod: selectedMethod === 'upi' ? 'UPI' : selectedMethod === 'card' ? 'Credit/Debit Card' : 'Net Banking'
+        // Open the visual Razorpay Checkout Test Mode Modal directly!
+        setActiveCheckoutOrder({
+          ...orderData,
+          amount: subscriptionAmount || 500,
+          title: `Corporate Platform Subscription - ${currentMonthName}`,
+          companyName: company?.legalName || company?.name || company?.businessName || 'Corporate Portal'
         });
-        const invoice = verifyRes.data?.data;
         setPaying(false);
-        setPaymentSuccess(true);
-        setPaymentHistory([
-          {
-            id: invoice?.invoiceNumber || `INV-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`,
-            month: currentMonthName,
-            amount: 500,
-            paidOn: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-            method: selectedMethod === 'upi' ? 'UPI (Instant QR)' : selectedMethod === 'card' ? 'Corporate Card' : 'Net Banking',
-            status: 'Paid',
-            receiptUrl: '#'
-          },
-          ...paymentHistory
-        ]);
       }
     } catch (err: any) {
-      alert(err.response?.data?.message || err.message || 'Subscription payment failed');
+      alert(err.response?.data?.message || err.message || 'Subscription payment initiation failed');
+      setPaying(false);
+    }
+  };
+
+  const handleVerificationSuccess = async (orderId: string, response: any) => {
+    try {
+      setPaying(true);
+      const verifyRes = await api.post('/company/subscription/verify', {
+        orderId: response.razorpay_order_id || orderId,
+        paymentId: response.razorpay_payment_id || response.paymentId,
+        signature: response.razorpay_signature || response.signature,
+        paymentMethod: response.paymentMethod || 'Razorpay Gateway'
+      });
+      const invoice = verifyRes.data?.data;
+      setPaymentSuccess(true);
+      setIsSubscribed(true);
+      fetchSubscriptionDetails();
+      setTimeout(() => {
+        setPaymentSuccess(false);
+        setActiveCheckoutOrder(null);
+      }, 1500);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Payment verification failed');
+    } finally {
       setPaying(false);
     }
   };
@@ -179,14 +169,12 @@ export const CompanySubscription: React.FC = () => {
 
         <Button
           variant="primary"
-          onClick={() => {
-            setPaymentSuccess(false);
-            setIsPayModalOpen(true);
-          }}
+          onClick={handleRazorpayPayment}
+          disabled={paying}
           className="text-xs font-bold shadow-md shadow-[#DE8E0A]/20"
         >
           <CreditCard className="w-3.5 h-3.5 mr-1.5" />
-          Pay Platform Fee (₹500)
+          {paying ? 'Opening Gateway...' : `Pay Platform Fee (₹${subscriptionAmount})`}
         </Button>
       </div>
 
@@ -238,13 +226,11 @@ export const CompanySubscription: React.FC = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                setPaymentSuccess(false);
-                setIsPayModalOpen(true);
-              }}
+              onClick={handleRazorpayPayment}
+              disabled={paying}
               className="text-xs font-bold"
             >
-              Pay Now
+              {paying ? 'Connecting...' : 'Pay Now'}
             </Button>
           </div>
         </div>
@@ -351,121 +337,32 @@ export const CompanySubscription: React.FC = () => {
         </div>
       </Card>
 
-      {/* Pay Platform Fee Modal */}
-      {isPayModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl border border-slate-100 relative">
-            {paymentSuccess ? (
-              <div className="text-center py-6">
-                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-4">
-                  <Check className="w-8 h-8" />
-                </div>
-                <h3 className="text-lg font-bold text-slate-900">Payment Successful!</h3>
-                <p className="text-xs text-slate-500 mt-1 mb-4">
-                  ₹500 has been paid successfully for {currentMonthName}. Your platform listing and privileges are active.
-                </p>
-                <Button
-                  variant="primary"
-                  fullWidth
-                  onClick={() => setIsPayModalOpen(false)}
-                  className="font-bold text-xs"
-                >
-                  Done
-                </Button>
-              </div>
-            ) : (
-              <div>
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900 font-display">
-                      Pay Monthly Platform Fee
-                    </h3>
-                    <p className="text-xs text-slate-500">Billing Cycle: {currentMonthName}</p>
-                  </div>
-                  <button
-                    onClick={() => setIsPayModalOpen(false)}
-                    className="text-slate-400 hover:text-slate-600 text-sm font-bold"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                {/* Amount Summary */}
-                <div className="bg-[#FFFDF7] border border-[#F2EBD9] p-4 rounded-xl flex items-center justify-between mb-4">
-                  <div>
-                    <div className="text-xs text-slate-600 font-semibold">Monthly Platform Access Fee</div>
-                    <div className="text-[11px] text-slate-400">Includes all portal tools & investor sync</div>
-                  </div>
-                  <div className="text-xl font-black text-slate-900 font-display">₹{subscriptionAmount}</div>
-                </div>
-
-                {/* Method selector */}
-                <div className="space-y-2 mb-6">
-                  <label className="text-xs font-bold text-slate-700">Choose Payment Method</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedMethod('upi')}
-                      className={`p-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1.5 transition ${
-                        selectedMethod === 'upi'
-                          ? 'border-[#DE8E0A] bg-[#FFFDF7] text-[#DE8E0A]'
-                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <QrCode className="w-5 h-5" />
-                      UPI / QR
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedMethod('card')}
-                      className={`p-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1.5 transition ${
-                        selectedMethod === 'card'
-                          ? 'border-[#DE8E0A] bg-[#FFFDF7] text-[#DE8E0A]'
-                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <CreditCard className="w-5 h-5" />
-                      Cards
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedMethod('netbanking')}
-                      className={`p-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1.5 transition ${
-                        selectedMethod === 'netbanking'
-                          ? 'border-[#DE8E0A] bg-[#FFFDF7] text-[#DE8E0A]'
-                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <Building2 className="w-5 h-5" />
-                      Net Banking
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    fullWidth
-                    onClick={() => setIsPayModalOpen(false)}
-                    className="font-bold text-xs"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="primary"
-                    fullWidth
-                    onClick={handleRazorpayPayment}
-                    disabled={paying}
-                    className="font-bold text-xs"
-                  >
-                    {paying ? 'Processing ₹500...' : 'Pay ₹500 Now'}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
+      {/* Success Notification Alert */}
+      {paymentSuccess && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3 text-emerald-800 text-sm font-semibold">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+          <span>Payment of ₹{subscriptionAmount} successful via Razorpay! Your platform subscription is active.</span>
         </div>
       )}
+
+      {/* Global Razorpay Test Mode Checkout Modal */}
+      <RazorpayCheckoutModal
+        isOpen={!!activeCheckoutOrder}
+        onClose={() => {
+          setActiveCheckoutOrder(null);
+          setPaying(false);
+        }}
+        orderData={activeCheckoutOrder}
+        onSuccess={(response) => {
+          if (activeCheckoutOrder) {
+            handleVerificationSuccess(activeCheckoutOrder.orderId, response);
+          }
+        }}
+        onFailure={(err) => {
+          alert('Razorpay Checkout failed: ' + (err.message || 'Payment not completed.'));
+          setPaying(false);
+        }}
+      />
     </div>
   );
 };

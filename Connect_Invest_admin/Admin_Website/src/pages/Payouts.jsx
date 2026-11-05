@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { adminApi, formatINR } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { RazorpayAdminDisburseModal } from '../components/RazorpayAdminDisburseModal';
 
 export default function Payouts() {
   const toast = useToast();
@@ -28,6 +29,7 @@ export default function Payouts() {
   const [submitting, setSubmitting] = useState(false);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [search, setSearch] = useState('');
+  const [activeRazorpayPayout, setActiveRazorpayPayout] = useState(null);
 
   // Tab switch within Returns & Payouts
   const [viewTab, setViewTab] = useState('verification'); // 'verification' (all returns) or 'batches'
@@ -181,28 +183,33 @@ export default function Payouts() {
   };
 
   // Trigger auto returns calculation
-  const handlePaySingleReturn = async (payout) => {
-    const amt = payout.amountPaise || Math.round((payout.amount || 0) * 100);
-    const defaultUtr = 'RZP-UTR-' + Date.now().toString().slice(-8) + '-' + Math.floor(1000 + Math.random() * 9000);
-    const refInput = window.prompt(
-      'Disburse ' + formatINR(amt) + ' via Razorpay to ' + (payout.investorId?.name || 'Investor') + ' linked bank account.\nEnter Razorpay Settlement UTR / Reference:',
-      defaultUtr
-    );
-    if (refInput === null) return;
+  const handlePaySingleReturn = (payout) => {
+    const amt = payout.amountPaise ? payout.amountPaise / 100 : (payout.amount || 0);
+    setActiveRazorpayPayout({
+      id: payout._id,
+      amount: amt,
+      title: `${payout.payoutType || 'Monthly Interest'} Return Disbursal`,
+      recipientName: payout.investorId?.name || 'Investor Beneficiary',
+      accountNumber: payout.investorId?.bankAccount || 'Bank / Linked UPI'
+    });
+  };
 
+  const handleExecutePayoutSuccess = async (result) => {
+    if (!activeRazorpayPayout) return;
     try {
       setSubmitting(true);
-      const res = await adminApi.paySingleReturn(payout._id, {
-        reference: refInput.trim() || defaultUtr,
-        paymentMethod: 'Razorpay Payouts (Direct Bank Settlement)',
-        remarks: 'Disbursed via Razorpay by Administrator'
+      const res = await adminApi.paySingleReturn(activeRazorpayPayout.id, {
+        reference: result.utrNumber,
+        paymentMethod: result.method || 'Razorpay Payouts (Direct Bank Settlement)',
+        remarks: 'Disbursed via Razorpay Payouts by Administrator'
       });
       if (res.data.success) {
-        toast.success(res.data.message || 'Return successfully marked as PAID!');
+        toast.success(res.data.message || 'Return successfully disbursed via Razorpay!');
+        setActiveRazorpayPayout(null);
         fetchData();
       }
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to process manual return payout');
+      toast.error(err.response?.data?.error || 'Failed to complete Razorpay payout');
     } finally {
       setSubmitting(false);
     }
@@ -249,99 +256,40 @@ export default function Payouts() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          {/* Subtabs Switcher */}
-          <div style={{ display: 'flex', background: '#F1F5F9', borderRadius: '10px', padding: '4px' }}>
-            <button
-              onClick={() => { setViewTab('verification'); setSearch(''); }}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: 'none',
-                background: viewTab === 'verification' ? '#0047BA' : 'transparent',
-                color: viewTab === 'verification' ? '#FFFFFF' : '#64748B',
-                fontWeight: 700,
-                fontSize: '0.82rem',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-            >
-              Verify Returns ({payouts.length})
-            </button>
-            <button
-              onClick={() => { setViewTab('batches'); setSearch(''); }}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: 'none',
-                background: viewTab === 'batches' ? '#0047BA' : 'transparent',
-                color: viewTab === 'batches' ? '#FFFFFF' : '#64748B',
-                fontWeight: 700,
-                fontSize: '0.82rem',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-            >
-              Disbursement Batches ({batches.length})
-            </button>
-          </div>
-
           {/* Quick Actions */}
-          {viewTab === 'verification' && (
-            <>
-              <button
-                onClick={handleCalculateReturns}
-                disabled={submitting}
-                className="btn-secondary"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  borderColor: '#3B82F6',
-                  color: '#1D4ED8',
-                  backgroundColor: '#EFF6FF',
-                  fontWeight: 700
-                }}
-                title="Calculate due returns for admin manual verification & payment"
-              >
-                <RefreshCw size={14} className={submitting ? 'animate-spin' : ''} />
-                <span>Calculate Due Returns</span>
-              </button>
-
-              {pendingVerification.length > 0 && (
-                <button
-                  onClick={handleVerifyAll}
-                  disabled={submitting}
-                  className="btn-secondary"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    borderColor: '#10B981',
-                    color: '#059669',
-                    fontWeight: 700
-                  }}
-                >
-                  <CheckCheck size={16} />
-                  <span>Verify All ({pendingVerification.length})</span>
-                </button>
-              )}
-            </>
+          {pendingVerification.length > 0 && (
+            <button
+              onClick={handleVerifyAll}
+              disabled={submitting}
+              className="btn-secondary"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderColor: '#10B981',
+                color: '#059669',
+                fontWeight: 700
+              }}
+            >
+              <CheckCheck size={16} />
+              <span>Verify All Due Returns ({pendingVerification.length})</span>
+            </button>
           )}
 
           <button
-            onClick={handleCreateBatch}
-            disabled={submitting || readyPayouts.length === 0}
-            className="btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            onClick={fetchData}
+            disabled={loading}
+            className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
           >
-            <Send size={15} />
-            <span>Create Batch ({readyPayouts.length} Ready • {formatINR(readyTotalPaise)})</span>
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <span>Refresh</span>
           </button>
         </div>
       </div>
 
       {/* Overview Metric Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
         <div className="glass-panel" style={{ padding: '16px', borderRadius: '12px', borderLeft: '4px solid #F59E0B' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Awaiting Verification</div>
           <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#D97706', marginTop: '4px' }}>
@@ -353,22 +301,12 @@ export default function Payouts() {
         </div>
 
         <div className="glass-panel" style={{ padding: '16px', borderRadius: '12px', borderLeft: '4px solid #10B981' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Verified & Ready for Batch</div>
+          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Verified & Ready for Disbursal</div>
           <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#059669', marginTop: '4px' }}>
             {readyPayouts.length}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
             {formatINR(readyTotalPaise)} approved funds
-          </div>
-        </div>
-
-        <div className="glass-panel" style={{ padding: '16px', borderRadius: '12px', borderLeft: '4px solid #6366F1' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>In Active Batches</div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#4F46E5', marginTop: '4px' }}>
-            {payouts.filter(p => p.status === 'In batch' || p.status === 'Approved').length}
-          </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-            Disbursement in progress
           </div>
         </div>
 
@@ -387,41 +325,34 @@ export default function Payouts() {
       <div className="glass-panel" style={{ padding: '24px' }}>
         {/* Verification Filters Row & In-Page Search */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
-          {viewTab === 'verification' ? (
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {[
-                { id: 'ALL', label: `All Returns (${payouts.length})` },
-                { id: 'PENDING', label: `Pending Verification (${pendingVerification.length})` },
-                { id: 'READY', label: `Verified Ready (${readyPayouts.length})` },
-                { id: 'IN_BATCH', label: 'In Batch' },
-                { id: 'PAID', label: 'Disbursed Paid' },
-                { id: 'HOLD', label: `On Hold (${payouts.filter(p => p.isHold || p.status === 'On Hold').length})` }
-              ].map(f => (
-                <button
-                  key={f.id}
-                  onClick={() => setStatusFilter(f.id)}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: '8px',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    border: '1px solid',
-                    borderColor: statusFilter === f.id ? '#0047BA' : '#E2E8F0',
-                    backgroundColor: statusFilter === f.id ? '#EFF6FF' : '#FFFFFF',
-                    color: statusFilter === f.id ? '#0047BA' : '#64748B',
-                    transition: 'all 0.15s'
-                  }}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0F172A' }}>
-              Disbursement Batches Queue
-            </div>
-          )}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {[
+              { id: 'ALL', label: `All Returns (${payouts.length})` },
+              { id: 'PENDING', label: `Pending Verification (${pendingVerification.length})` },
+              { id: 'READY', label: `Verified Ready (${readyPayouts.length})` },
+              { id: 'PAID', label: 'Disbursed Paid' },
+              { id: 'HOLD', label: `On Hold (${payouts.filter(p => p.isHold || p.status === 'On Hold').length})` }
+            ].map(f => (
+              <button
+                key={f.id}
+                onClick={() => setStatusFilter(f.id)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '8px',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  border: '1px solid',
+                  borderColor: statusFilter === f.id ? '#0047BA' : '#E2E8F0',
+                  backgroundColor: statusFilter === f.id ? '#EFF6FF' : '#FFFFFF',
+                  color: statusFilter === f.id ? '#0047BA' : '#64748B',
+                  transition: 'all 0.15s'
+                }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
 
           {/* In-page Search Input */}
           <div style={{ position: 'relative', width: '320px' }}>
@@ -430,7 +361,7 @@ export default function Payouts() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={viewTab === 'verification' ? "Search investor, offer, UTR..." : "Search batch ID, reference..."}
+              placeholder="Search investor, offer, UTR..."
               className="input-field"
               style={{ width: '100%', height: '38px', paddingLeft: '36px', fontSize: '0.825rem' }}
             />
@@ -441,14 +372,13 @@ export default function Payouts() {
           <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
             Loading investor returns & disbursement data...
           </div>
-        ) : viewTab === 'verification' ? (
-          filteredPayouts.length === 0 ? (
-            <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
-              {search.trim() ? `No returns match "${search}". Try adjusting your query.` : 'No returns found matching the selected filter.'}
-            </div>
-          ) : (
-            <div className="data-table-container">
-              <table className="data-table">
+        ) : filteredPayouts.length === 0 ? (
+          <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
+            {search.trim() ? `No returns match "${search}". Try adjusting your query.` : 'No returns found matching the selected filter.'}
+          </div>
+        ) : (
+          <div className="data-table-container">
+            <table className="data-table">
                 <thead>
                   <tr>
                     <th style={{ width: '45px', textAlign: 'center' }}>S.No</th>
@@ -623,68 +553,16 @@ export default function Payouts() {
                 </tbody>
               </table>
             </div>
-          )
-        ) : (
-          /* Batches History Tab */
-          filteredBatches.length === 0 ? (
-            <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
-              {search.trim() ? `No disbursement batches match "${search}".` : 'No payout batches compiled yet. Verify returns to build the first batch.'}
-            </div>
-          ) : (
-            <div className="data-table-container">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: '50px', textAlign: 'center' }}>S.No</th>
-                    <th>Batch ID</th>
-                    <th>Created By</th>
-                    <th>Verified Payouts</th>
-                    <th>Total Batch Value</th>
-                    <th>Disbursement Status</th>
-                    <th>UTR / Gateway Reference</th>
-                    <th>Admin Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredBatches.map((b, idx) => (
-                    <tr key={b._id}>
-                      <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--text-muted)' }}>
-                        {idx + 1}
-                      </td>
-                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', fontWeight: 600 }}>
-                        {b._id}
-                      </td>
-                      <td>{b.adminId?.name || 'Administrator'}</td>
-                      <td style={{ fontWeight: 600 }}>{b.payoutCount} returns</td>
-                      <td style={{ fontWeight: 800, color: '#0047BA' }}>{formatINR(b.totalPaise)}</td>
-                      <td>
-                        <span className={`badge ${b.status === 'Paid' ? 'badge-emerald' : 'badge-amber'}`}>
-                          {b.status === 'Paid' ? 'Dispatched & Settled' : b.status}
-                        </span>
-                      </td>
-                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>
-                        {b.reference || 'Awaiting Authorization'}
-                      </td>
-                      <td>
-                        {b.status !== 'Paid' && (
-                          <button
-                            onClick={() => handleApproveAndSendBatch(b._id)}
-                            disabled={submitting}
-                            className="btn-primary"
-                            style={{ padding: '6px 14px', fontSize: '0.78rem' }}
-                          >
-                            Authorize & Release
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )
-        )}
+          )}
       </div>
+
+      {/* Razorpay Disbursal Modal */}
+      <RazorpayAdminDisburseModal
+        isOpen={!!activeRazorpayPayout}
+        onClose={() => setActiveRazorpayPayout(null)}
+        disburseData={activeRazorpayPayout}
+        onSuccess={handleExecutePayoutSuccess}
+      />
     </div>
   );
 }

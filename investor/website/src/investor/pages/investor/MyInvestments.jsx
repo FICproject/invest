@@ -6,6 +6,7 @@ import { Button } from '../../components/common/Button';
 import { Loader } from '../../components/common/Loader';
 import { EmptyState } from '../../components/common/EmptyState';
 import { Modal } from '../../components/common/Modal';
+import { RazorpayCheckoutModal } from '../../components/payment/RazorpayCheckoutModal';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { formatDate } from '../../utils/formatDate';
 import { investorService } from '../../services/investorService';
@@ -20,6 +21,8 @@ export const MyInvestments = () => {
   const [paySuccessMsg, setPaySuccessMsg] = useState('');
   const [expandedId, setExpandedId] = useState(null);
   const [detailModalOffer, setDetailModalOffer] = useState(null);
+  const [activeCheckoutOrder, setActiveCheckoutOrder] = useState(null);
+  const [activeCheckoutInv, setActiveCheckoutInv] = useState(null);
 
   const navigate = useNavigate();
 
@@ -57,93 +60,85 @@ export const MyInvestments = () => {
 
       // 1. Create order through backend
       const orderRes = await paymentService.createOrder(offerId, amount, 'Razorpay Gateway', { investmentId: inv._id });
-      // In our axios client (api.js), response interceptor already returns response.data directly!
       const orderData = orderRes?.data || orderRes;
 
       if (!orderData || !orderData.orderId) {
         throw new Error('Failed to create payment order. Please try again.');
       }
 
-      // Check if Razorpay Checkout script is loaded and order is NOT simulated
-      // If Razorpay keys in .env are invalid/expired or order is simulated, use direct simulated verification flow
-      if (typeof window.Razorpay === 'function' && !orderData.simulated) {
+      // Check if real live Razorpay SDK keys are active
+      if (typeof window.Razorpay === 'function' && !orderData.simulated && orderData.keyId && !orderData.keyId.includes('placeholder')) {
         const options = {
-          key: orderData.keyId || 'rzp_test_placeholder',
+          key: orderData.keyId,
           amount: orderData.amountPaise || Math.round(amount * 100),
           currency: 'INR',
           name: 'Connect Invest',
-          description: `Investment in ${inv.offerId?.title || 'Offer'}`,
+          description: `Investment in ${inv.offerId?.title || 'Project'}`,
           order_id: orderData.razorpayOrderId || orderData.orderId,
           handler: async function (response) {
-            try {
-              const verifyRes = await paymentService.verifyPayment(
-                orderData.orderId,
-                response.razorpay_payment_id,
-                'Success',
-                {
-                  razorpayOrderId: response.razorpay_order_id,
-                  razorpaySignature: response.razorpay_signature,
-                  investmentId: inv._id
-                }
-              );
-              if (verifyRes.data?.success || verifyRes.success) {
-                setPaySuccessMsg(`Payment of ${formatCurrency(amount)} successful! Investment confirmed.`);
-                const refreshRes = await investorService.getMyInvestments({
-                  status: statusFilter !== 'All' ? statusFilter : undefined,
-                  search: search.trim() || undefined
-                });
-                if (refreshRes.success && refreshRes.data) {
-                  setInvestments(refreshRes.data);
-                }
-                setTimeout(() => setPaySuccessMsg(''), 5000);
-              }
-            } catch (vErr) {
-              alert('Payment verification failed: ' + (vErr.response?.data?.message || vErr.message));
-            } finally {
-              setPayingId(null);
-            }
+            await handleVerificationSuccess(inv, orderData, response, amount);
           },
           modal: {
             ondismiss: function () {
               setPayingId(null);
             }
           },
-          prefill: {
-            name: '',
-            email: ''
-          },
           theme: {
-            color: '#0047BA'
+            color: '#0F1E36'
           }
         };
 
         const rzp = new window.Razorpay(options);
         rzp.open();
       } else {
-        // Direct simulation fallback
-        const verifyRes = await paymentService.verifyPayment(
-          orderData.orderId,
-          'PAY_SIM_' + Date.now(),
-          'Success',
-          { investmentId: inv._id }
-        );
-        if (verifyRes.data?.success || verifyRes.success) {
-          setPaySuccessMsg(`Payment of ${formatCurrency(amount)} successful! Investment confirmed.`);
-          const refreshRes = await investorService.getMyInvestments({
-            status: statusFilter !== 'All' ? statusFilter : undefined,
-            search: search.trim() || undefined
-          });
-          if (refreshRes.success && refreshRes.data) {
-            setInvestments(refreshRes.data);
-          }
-          setTimeout(() => setPaySuccessMsg(''), 5000);
-        }
-        setPayingId(null);
+        // Automatically open the full Razorpay Test Mode checkout interface
+        setActiveCheckoutOrder({
+          ...orderData,
+          amount,
+          offerTitle: inv.offerId?.title || 'Project Investment',
+          companyName: 'Connect Invest India'
+        });
+        setActiveCheckoutInv(inv);
       }
     } catch (err) {
       console.error('[MyInvestments] Payment initiation failed:', err);
-      alert(err.response?.data?.message || err.message || 'Payment initiation failed.');
+      alert('Payment initialization failed: ' + (err.response?.data?.message || err.message));
       setPayingId(null);
+    }
+  };
+
+  const handleVerificationSuccess = async (inv, orderData, response, amount) => {
+    try {
+      const verifyRes = await paymentService.verifyPayment(
+        orderData.orderId,
+        response.razorpay_payment_id || response.paymentId,
+        'Success',
+        {
+          razorpayOrderId: response.razorpay_order_id || orderData.orderId,
+          razorpayPaymentId: response.razorpay_payment_id || response.paymentId,
+          razorpaySignature: response.razorpay_signature || response.signature,
+          paymentMethod: response.paymentMethod || 'Razorpay Gateway',
+          investmentId: inv._id
+        }
+      );
+
+      if (verifyRes.data?.success || verifyRes.success) {
+        setPaySuccessMsg(`Payment of ${formatCurrency(amount)} successful! Investment confirmed.`);
+        const refreshRes = await investorService.getMyInvestments({
+          status: statusFilter !== 'All' ? statusFilter : undefined,
+          search: search.trim() || undefined
+        });
+        if (refreshRes.success && refreshRes.data) {
+          setInvestments(refreshRes.data);
+        }
+        setTimeout(() => setPaySuccessMsg(''), 5000);
+      }
+    } catch (vErr) {
+      alert('Payment verification failed: ' + (vErr.response?.data?.message || vErr.message));
+    } finally {
+      setPayingId(null);
+      setActiveCheckoutOrder(null);
+      setActiveCheckoutInv(null);
     }
   };
 
@@ -283,370 +278,374 @@ export const MyInvestments = () => {
             onAction={() => navigate('/opportunities')}
           />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {investments.map((inv) => {
-              const offer = inv.offerId;
-              return (
-                <div
-                  key={inv._id}
-                  style={{
-                    backgroundColor: 'var(--bg-surface)',
-                    borderRadius: '14px',
-                    padding: '20px 24px',
-                    border: '1px solid var(--border-color)',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '20px'
-                  }}
-                >
-                  {/* Left: Info */}
-                  <div style={{ minWidth: '260px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                      <span className={`badge badge-${inv.status.toLowerCase()}`}>
-                        {inv.status}
-                      </span>
-                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                        Cert: <strong>{inv.certificateNumber || inv.certificateNo || ('GEN-' + inv._id.slice(-6).toUpperCase())}</strong>
-                      </span>
-                    </div>
+          <div
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              borderRadius: '14px',
+              border: '1px solid var(--border-color)',
+              overflow: 'hidden',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+            }}
+          >
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
+                <thead>
+                  <tr
+                    style={{
+                      backgroundColor: 'var(--bg-surface-subtle)',
+                      borderBottom: '1px solid var(--border-color)',
+                      textAlign: 'left',
+                      color: 'var(--text-muted)',
+                      fontSize: '12px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em'
+                    }}
+                  >
+                    <th style={{ padding: '14px 16px', width: '60px', textAlign: 'center' }}>Sl No</th>
+                    <th style={{ padding: '14px 16px' }}>Project / Opportunity</th>
+                    <th style={{ padding: '14px 16px' }}>Certificate</th>
+                    <th style={{ padding: '14px 16px' }}>Invested Amount</th>
+                    <th style={{ padding: '14px 16px' }}>Return Rate</th>
+                    <th style={{ padding: '14px 16px' }}>Expected Returns</th>
+                    <th style={{ padding: '14px 16px' }}>Maturity Date</th>
+                    <th style={{ padding: '14px 16px', textAlign: 'center' }}>Status</th>
+                    <th style={{ padding: '14px 16px', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {investments.map((inv, idx) => {
+                    const offer = inv.offerId;
+                    const certNo = inv.certificateNumber || inv.certificateNo || ('GEN-' + inv._id.slice(-6).toUpperCase());
+                    const isExpanded = expandedId === inv._id;
 
-                    <h3 style={{ fontSize: '17px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '2px' }}>
-                      {offer?.title || 'Investment Project'}
-                    </h3>
-                    <div style={{ fontSize: '13px', color: 'var(--color-gold)', fontWeight: '600' }}>
-                      {offer?.type ? `${offer.type} Investment` : 'Project Investment'}
-                      {offer?.category ? ` • ${offer.category}` : ''}
-                      {offer?.location ? ` • ${offer.location}` : ''}
-                    </div>
-                  </div>
-
-                  {/* Middle: Key Figures */}
-                  <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap' }}>
-                    <div>
-                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>Invested Amount</div>
-                      <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-main)' }}>
-                        {formatCurrency(inv.amountInvested)}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>Return Rate</div>
-                      <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--color-gold)' }}>
-                        {inv.returnRate || offer?.returnRate || 3}% p.a.
-                      </div>
-                    </div>
-
-                    <div>
-                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>Expected Returns</div>
-                      <div style={{ fontSize: '16px', fontWeight: '800', color: '#10B981' }}>
-                        {formatCurrency(inv.expectedReturns || (inv.amountInvested ? Math.round(inv.amountInvested + (inv.amountInvested * ((inv.returnRate || offer?.returnRate || 3) / 100) * ((inv.tenureMonths || offer?.tenureMonths || 12) / 12))) : 0))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>Maturity Date</div>
-                      <div style={{ fontSize: '14.5px', fontWeight: '600', color: 'var(--text-main)' }}>
-                        {formatDate(inv.maturityDate)}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Changes Requested Banner */}
-                  {inv.status === 'Changes Requested' && (
-                    <div
-                      style={{
-                        width: '100%',
-                        padding: '14px 18px',
-                        borderRadius: '10px',
-                        backgroundColor: '#FFFBEB',
-                        border: '1px solid #FDE68A',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        flexWrap: 'wrap',
-                        gap: '12px'
-                      }}
-                    >
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '700', color: '#92400E' }}>
-                          <AlertTriangle size={15} color="#D97706" />
-                          <span>Admin Counter-Proposal: <strong>{formatCurrency(inv.proposedAmount)}</strong></span>
-                          <span style={{ fontSize: '11px', color: '#B45309' }}>(Original: {formatCurrency(inv.amountInvested)})</span>
-                        </div>
-                        <div style={{ fontSize: '12.5px', color: '#78350F', marginTop: '3px' }}>
-                          <em>"{inv.adminSuggestions || inv.adminFeedback || 'Admin proposed revised investment terms.'}"</em>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={() => handleAcceptCounter(inv._id)}
+                    return (
+                      <React.Fragment key={inv._id}>
+                        <tr
+                          style={{
+                            borderBottom: '1px solid var(--border-color)',
+                            backgroundColor: isExpanded ? 'var(--bg-surface-subtle)' : 'transparent',
+                            transition: 'background-color 0.15s ease'
+                          }}
                         >
-                          Accept Proposed Amount ({formatCurrency(inv.proposedAmount)})
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+                          {/* Sl No */}
+                          <td
+                            style={{
+                              padding: '16px',
+                              textAlign: 'center',
+                              fontWeight: '600',
+                              color: 'var(--text-muted)',
+                              fontFamily: 'var(--font-mono, monospace)',
+                              fontSize: '13px'
+                            }}
+                          >
+                            {idx + 1}
+                          </td>
 
-                  {/* Pending Review Banner */}
-                  {inv.status === 'Pending Review' && (
-                    <div
-                      style={{
-                        width: '100%',
-                        padding: '10px 14px',
-                        borderRadius: '8px',
-                        backgroundColor: '#EFF6FF',
-                        border: '1px solid #BFDBFE',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        fontSize: '12.5px',
-                        color: '#1E40AF'
-                      }}
-                    >
-                      <Clock size={14} color="#2563EB" />
-                      <span>Investment application is currently awaiting underwriting approval from the platform administrator.</span>
-                    </div>
-                  )}
+                          {/* Project / Opportunity */}
+                          <td style={{ padding: '16px' }}>
+                            <div style={{ fontWeight: '700', color: 'var(--text-main)', fontSize: '14px' }}>
+                              {offer?.title || 'Investment Project'}
+                            </div>
+                            <div style={{ fontSize: '12px', color: 'var(--color-gold)', fontWeight: '600', marginTop: '2px' }}>
+                              {offer?.type ? `${offer.type} Investment` : 'Project Investment'}
+                              {offer?.category ? ` • ${offer.category}` : ''}
+                            </div>
+                          </td>
 
-                  {/* Rejection Banner */}
-                  {inv.status === 'Rejected' && (
-                    <div
-                      style={{
-                        width: '100%',
-                        padding: '10px 14px',
-                        borderRadius: '8px',
-                        backgroundColor: '#FEF2F2',
-                        border: '1px solid #FECACA',
-                        fontSize: '12.5px',
-                        color: '#991B1B'
-                      }}
-                    >
-                      <strong>Application Not Approved:</strong> {inv.rejectionReason || inv.adminFeedback || 'Underwriting criteria not satisfied.'}
-                    </div>
-                  )}
+                          {/* Certificate */}
+                          <td style={{ padding: '16px', whiteSpace: 'nowrap' }}>
+                            <span
+                              style={{
+                                fontFamily: 'var(--font-mono, monospace)',
+                                fontSize: '12.5px',
+                                fontWeight: '600',
+                                color: 'var(--text-main)',
+                                padding: '3px 8px',
+                                backgroundColor: 'var(--bg-surface-subtle)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '6px'
+                              }}
+                            >
+                              {certNo}
+                            </span>
+                          </td>
 
-                  {/* Approved Banner & Pay with Razorpay button */}
-                  {inv.status === 'Approved' && (
-                    <div
-                      style={{
-                        width: '100%',
-                        padding: '14px 18px',
-                        borderRadius: '10px',
-                        backgroundColor: '#F0FDF4',
-                        border: '1px solid #BBF7D0',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        flexWrap: 'wrap',
-                        gap: '12px'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <CheckCircle2 size={18} color="#16A34A" />
-                        <div>
-                          <div style={{ fontSize: '13.5px', fontWeight: '700', color: '#166534' }}>
-                            Investment Request Approved by Admin!
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#15803D' }}>
-                            Please complete payment of {formatCurrency(inv.amountInvested)} to activate your investment and lock in your return.
-                          </div>
-                        </div>
-                      </div>
+                          {/* Invested Amount */}
+                          <td style={{ padding: '16px', fontWeight: '800', color: 'var(--text-main)', whiteSpace: 'nowrap' }}>
+                            {formatCurrency(inv.amountInvested)}
+                          </td>
 
-                      <button
-                        type="button"
-                        onClick={() => handlePayInvestment(inv)}
-                        disabled={payingId === inv._id}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          backgroundColor: '#16A34A',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          borderRadius: '8px',
-                          padding: '10px 20px',
-                          fontSize: '13.5px',
-                          fontWeight: '700',
-                          cursor: payingId === inv._id ? 'not-allowed' : 'pointer',
-                          boxShadow: '0 2px 6px rgba(22, 163, 74, 0.3)',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        <CreditCard size={16} />
-                        <span>{payingId === inv._id ? 'Processing...' : `Pay ${formatCurrency(inv.amountInvested)} via Razorpay`}</span>
-                      </button>
-                    </div>
-                  )}
+                          {/* Return Rate */}
+                          <td style={{ padding: '16px', fontWeight: '700', color: 'var(--color-gold)', whiteSpace: 'nowrap' }}>
+                            {inv.returnRate || offer?.returnRate || 3}% p.a.
+                          </td>
 
-                  {/* Confirmed Banner */}
-                  {inv.status === 'Confirmed' && (
-                    <div
-                      style={{
-                        width: '100%',
-                        padding: '8px 14px',
-                        borderRadius: '8px',
-                        backgroundColor: '#F0FDF4',
-                        border: '1px solid #DCFCE7',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        color: '#15803D'
-                      }}
-                    >
-                      <CheckCircle2 size={14} color="#16A34A" />
-                      <span>Investment Active & Payment Completed via Razorpay</span>
-                    </div>
-                  )}
+                          {/* Expected Returns */}
+                          <td style={{ padding: '16px', fontWeight: '800', color: '#10B981', whiteSpace: 'nowrap' }}>
+                            {formatCurrency(
+                              inv.expectedReturns ||
+                                (inv.amountInvested
+                                  ? Math.round(
+                                      inv.amountInvested +
+                                        inv.amountInvested *
+                                          ((inv.returnRate || offer?.returnRate || 3) / 100) *
+                                          ((inv.tenureMonths || offer?.tenureMonths || 12) / 12)
+                                    )
+                                  : 0)
+                            )}
+                          </td>
 
-                  {/* Collapsible Project Details Section */}
-                  {expandedId === inv._id && offer && (
-                    <div
-                      style={{
-                        width: '100%',
-                        backgroundColor: 'var(--bg-surface-subtle)',
-                        borderRadius: '10px',
-                        padding: '16px 20px',
-                        border: '1px solid var(--border-color)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px',
-                        marginTop: '4px'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
-                        <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <FileText size={15} color="var(--color-primary)" />
-                          Project Details & Parameters
-                        </span>
-                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                          Tenure: <strong>{inv.tenureMonths || offer.tenureMonths || 12} Months</strong> • Payout: <strong>{offer.payoutFrequency || 'Monthly'}</strong>
-                        </span>
-                      </div>
+                          {/* Maturity Date */}
+                          <td style={{ padding: '16px', color: 'var(--text-main)', fontSize: '13px', whiteSpace: 'nowrap' }}>
+                            {formatDate(inv.maturityDate)}
+                          </td>
 
-                      {offer.description && (
-                        <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.6', margin: 0 }}>
-                          {offer.description}
-                        </p>
-                      )}
+                          {/* Status */}
+                          <td style={{ padding: '16px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            <span className={`badge badge-${inv.status.toLowerCase().replace(/\s+/g, '-')}`}>
+                              {inv.status}
+                            </span>
+                          </td>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', fontSize: '12.5px' }}>
-                        <div style={{ padding: '8px 12px', backgroundColor: 'var(--bg-surface)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                          <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>Project Target</span>
-                          <strong style={{ color: 'var(--text-main)' }}>{formatCurrency(offer.targetAmount)}</strong>
-                        </div>
-                        <div style={{ padding: '8px 12px', backgroundColor: 'var(--bg-surface)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                          <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>Total Raised</span>
-                          <strong style={{ color: '#10B981' }}>{formatCurrency(offer.raisedAmount)}</strong>
-                        </div>
-                        <div style={{ padding: '8px 12px', backgroundColor: 'var(--bg-surface)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                          <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>Risk Rating</span>
-                          <strong style={{ color: 'var(--color-gold)' }}>{offer.riskLevel || 'Moderate'}</strong>
-                        </div>
-                        <div style={{ padding: '8px 12px', backgroundColor: 'var(--bg-surface)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                          <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>Security Type</span>
-                          <strong style={{ color: 'var(--text-main)' }}>{offer.securityType || 'Asset-Backed'}</strong>
-                        </div>
-                      </div>
+                          {/* Actions */}
+                          <td style={{ padding: '16px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end' }}>
+                              {inv.status === 'Approved' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handlePayInvestment(inv)}
+                                  disabled={payingId === inv._id}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    backgroundColor: '#16A34A',
+                                    color: '#FFFFFF',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    padding: '7px 14px',
+                                    fontSize: '12.5px',
+                                    fontWeight: '700',
+                                    cursor: payingId === inv._id ? 'not-allowed' : 'pointer',
+                                    boxShadow: '0 2px 4px rgba(22, 163, 74, 0.25)',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                >
+                                  <CreditCard size={14} />
+                                  <span>{payingId === inv._id ? 'Processing...' : `Pay ${formatCurrency(inv.amountInvested)}`}</span>
+                                </button>
+                              )}
 
-                      {offer.financialHighlights && offer.financialHighlights.length > 0 && (
-                        <div style={{ marginTop: '4px' }}>
-                          <div style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase' }}>
-                            Highlights
-                          </div>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                            {offer.financialHighlights.map((hl, hIdx) => (
-                              <span
-                                key={hIdx}
-                                style={{
-                                  fontSize: '11.5px',
-                                  padding: '3px 9px',
-                                  backgroundColor: 'var(--bg-surface)',
-                                  borderRadius: '6px',
-                                  border: '1px solid var(--border-color)',
-                                  color: 'var(--text-main)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '5px'
-                                }}
-                              >
-                                <CheckCircle2 size={12} color="#10B981" />
-                                {hl}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                              {inv.status === 'Changes Requested' && (
+                                <Button
+                                  variant="primary"
+                                  size="sm"
+                                  onClick={() => handleAcceptCounter(inv._id)}
+                                >
+                                  Accept {formatCurrency(inv.proposedAmount)}
+                                </Button>
+                              )}
 
-                  {/* Right Action */}
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginLeft: 'auto' }}>
-                    {offer && (
-                      <button
-                        type="button"
-                        onClick={() => setExpandedId(expandedId === inv._id ? null : inv._id)}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '5px',
-                          backgroundColor: 'transparent',
-                          color: 'var(--color-primary)',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: '6px',
-                          padding: '7px 12px',
-                          fontSize: '12.5px',
-                          fontWeight: '600',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <span>{expandedId === inv._id ? 'Hide Details' : 'Project Details'}</span>
-                        {expandedId === inv._id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                      </button>
-                    )}
-                    {inv.status === 'Approved' && (
-                      <button
-                        type="button"
-                        onClick={() => handlePayInvestment(inv)}
-                        disabled={payingId === inv._id}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          backgroundColor: '#16A34A',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          borderRadius: '6px',
-                          padding: '7px 14px',
-                          fontSize: '12.5px',
-                          fontWeight: '700',
-                          cursor: payingId === inv._id ? 'not-allowed' : 'pointer'
-                        }}
-                      >
-                        <CreditCard size={14} />
-                        <span>{payingId === inv._id ? 'Opening Gateway...' : 'Pay Now'}</span>
-                      </button>
-                    )}
-                    {offer && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setDetailModalOffer(offer)}
-                      >
-                        Offer Prospectus
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                              {offer && (
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedId(isExpanded ? null : inv._id)}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    backgroundColor: 'transparent',
+                                    color: 'var(--color-primary)',
+                                    border: '1px solid var(--border-color)',
+                                    borderRadius: '6px',
+                                    padding: '6px 10px',
+                                    fontSize: '12px',
+                                    fontWeight: '600',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  <span>{isExpanded ? 'Hide' : 'Details'}</span>
+                                  {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                                </button>
+                              )}
+
+                              {offer && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setDetailModalOffer(offer)}
+                                >
+                                  Prospectus
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+
+                        {/* Expandable row for details & alert notices */}
+                        {(isExpanded || inv.status === 'Changes Requested' || inv.status === 'Pending Review' || inv.status === 'Rejected') && (
+                          <tr style={{ backgroundColor: 'var(--bg-surface-subtle)', borderBottom: '1px solid var(--border-color)' }}>
+                            <td colSpan={9} style={{ padding: '16px 20px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {/* Changes Requested Alert */}
+                                {inv.status === 'Changes Requested' && (
+                                  <div
+                                    style={{
+                                      padding: '12px 16px',
+                                      borderRadius: '8px',
+                                      backgroundColor: '#FFFBEB',
+                                      border: '1px solid #FDE68A',
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center',
+                                      flexWrap: 'wrap',
+                                      gap: '12px'
+                                    }}
+                                  >
+                                    <div>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '700', color: '#92400E' }}>
+                                        <AlertTriangle size={15} color="#D97706" />
+                                        <span>Admin Counter-Proposal: <strong>{formatCurrency(inv.proposedAmount)}</strong></span>
+                                        <span style={{ fontSize: '11px', color: '#B45309' }}>(Original: {formatCurrency(inv.amountInvested)})</span>
+                                      </div>
+                                      <div style={{ fontSize: '12.5px', color: '#78350F', marginTop: '3px' }}>
+                                        <em>"{inv.adminSuggestions || inv.adminFeedback || 'Admin proposed revised investment terms.'}"</em>
+                                      </div>
+                                    </div>
+                                    <Button
+                                      variant="primary"
+                                      size="sm"
+                                      onClick={() => handleAcceptCounter(inv._id)}
+                                    >
+                                      Accept Counter ({formatCurrency(inv.proposedAmount)})
+                                    </Button>
+                                  </div>
+                                )}
+
+                                {/* Pending Review Notice */}
+                                {inv.status === 'Pending Review' && (
+                                  <div
+                                    style={{
+                                      padding: '10px 14px',
+                                      borderRadius: '8px',
+                                      backgroundColor: '#EFF6FF',
+                                      border: '1px solid #BFDBFE',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      fontSize: '12.5px',
+                                      color: '#1E40AF'
+                                    }}
+                                  >
+                                    <Clock size={14} color="#2563EB" />
+                                    <span>Investment application is currently awaiting underwriting approval from the platform administrator.</span>
+                                  </div>
+                                )}
+
+                                {/* Rejected Notice */}
+                                {inv.status === 'Rejected' && (
+                                  <div
+                                    style={{
+                                      padding: '10px 14px',
+                                      borderRadius: '8px',
+                                      backgroundColor: '#FEF2F2',
+                                      border: '1px solid #FECACA',
+                                      fontSize: '12.5px',
+                                      color: '#991B1B'
+                                    }}
+                                  >
+                                    <strong>Application Not Approved:</strong> {inv.rejectionReason || inv.adminFeedback || 'Underwriting criteria not satisfied.'}
+                                  </div>
+                                )}
+
+                                {/* Collapsible Project Details */}
+                                {isExpanded && offer && (
+                                  <div
+                                    style={{
+                                      backgroundColor: 'var(--bg-surface)',
+                                      borderRadius: '10px',
+                                      padding: '16px 20px',
+                                      border: '1px solid var(--border-color)',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '12px'
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+                                      <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <FileText size={15} color="var(--color-primary)" />
+                                        Project Details & Parameters
+                                      </span>
+                                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                        Tenure: <strong>{inv.tenureMonths || offer.tenureMonths || 12} Months</strong> • Payout: <strong>{offer.payoutFrequency || 'Monthly'}</strong>
+                                      </span>
+                                    </div>
+
+                                    {offer.description && (
+                                      <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.6', margin: 0 }}>
+                                        {offer.description}
+                                      </p>
+                                    )}
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', fontSize: '12.5px' }}>
+                                      <div style={{ padding: '8px 12px', backgroundColor: 'var(--bg-surface-subtle)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>Project Target</span>
+                                        <strong style={{ color: 'var(--text-main)' }}>{formatCurrency(offer.targetAmount)}</strong>
+                                      </div>
+                                      <div style={{ padding: '8px 12px', backgroundColor: 'var(--bg-surface-subtle)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>Total Raised</span>
+                                        <strong style={{ color: '#10B981' }}>{formatCurrency(offer.raisedAmount)}</strong>
+                                      </div>
+                                      <div style={{ padding: '8px 12px', backgroundColor: 'var(--bg-surface-subtle)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>Risk Rating</span>
+                                        <strong style={{ color: 'var(--color-gold)' }}>{offer.riskLevel || 'Moderate'}</strong>
+                                      </div>
+                                      <div style={{ padding: '8px 12px', backgroundColor: 'var(--bg-surface-subtle)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>Security Type</span>
+                                        <strong style={{ color: 'var(--text-main)' }}>{offer.securityType || 'Asset-Backed'}</strong>
+                                      </div>
+                                    </div>
+
+                                    {offer.financialHighlights && offer.financialHighlights.length > 0 && (
+                                      <div style={{ marginTop: '4px' }}>
+                                        <div style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase' }}>
+                                          Highlights
+                                        </div>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                          {offer.financialHighlights.map((hl, hIdx) => (
+                                            <span
+                                              key={hIdx}
+                                              style={{
+                                                fontSize: '11.5px',
+                                                padding: '3px 9px',
+                                                backgroundColor: 'var(--bg-surface-subtle)',
+                                                borderRadius: '6px',
+                                                border: '1px solid var(--border-color)',
+                                                color: 'var(--text-main)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '5px'
+                                              }}
+                                            >
+                                              <CheckCircle2 size={12} color="#10B981" />
+                                              {hl}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -748,6 +747,31 @@ export const MyInvestments = () => {
             </div>
           </Modal>
         )}
+
+        {/* Global Razorpay Test Mode Checkout Modal */}
+        <RazorpayCheckoutModal
+          isOpen={!!activeCheckoutOrder}
+          onClose={() => {
+            setActiveCheckoutOrder(null);
+            setActiveCheckoutInv(null);
+            setPayingId(null);
+          }}
+          orderData={activeCheckoutOrder}
+          onSuccess={(response) => {
+            if (activeCheckoutInv && activeCheckoutOrder) {
+              handleVerificationSuccess(
+                activeCheckoutInv,
+                activeCheckoutOrder,
+                response,
+                activeCheckoutOrder.amount
+              );
+            }
+          }}
+          onFailure={(err) => {
+            alert('Razorpay Checkout failed: ' + (err.message || 'Payment not completed.'));
+            setPayingId(null);
+          }}
+        />
       </div>
     </DashboardLayout>
   );
