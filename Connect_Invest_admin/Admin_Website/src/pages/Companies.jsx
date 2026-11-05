@@ -527,12 +527,25 @@ export default function Companies() {
               Registration CIN: <span style={{ fontFamily: 'var(--font-mono)' }}>{reviewCompany.regNo}</span> • Status: <strong>{reviewCompany.status}</strong>
             </p>
 
-            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '8px', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div><strong>Company Email:</strong> <span style={{ color: '#0047BA', fontWeight: 600 }}>{reviewCompany.officialEmail || reviewCompany.email || reviewCompany.ownerUserId?.email}</span></div>
-              <div><strong>Authorized Representative:</strong> {reviewCompany.ownerUserId?.name} ({reviewCompany.ownerUserId?.email || 'N/A'})</div>
-              <div><strong>Sector:</strong> {reviewCompany.profile?.sector || 'General'}</div>
+            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '16px', borderRadius: '8px', marginBottom: '16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.84rem' }}>
+              <div><strong>Company Official Email:</strong> <span style={{ color: '#0047BA', fontWeight: 600 }}>{reviewCompany.officialEmail || reviewCompany.email || reviewCompany.ownerUserId?.email || 'N/A'}</span></div>
+              <div><strong>Company Official Phone:</strong> {reviewCompany.officialMobile || reviewCompany.mobile || reviewCompany.ownerUserId?.mobile || 'N/A'}</div>
+              <div><strong>Company PAN:</strong> <span style={{ fontFamily: 'monospace' }}>{reviewCompany.pan || 'N/A'}</span></div>
+              <div><strong>CIN:</strong> <span style={{ fontFamily: 'monospace' }}>{reviewCompany.cin || reviewCompany.regNo || 'N/A'}</span></div>
+              <div><strong>Authorized Representative:</strong> {reviewCompany.ownerUserId?.name || 'N/A'} ({reviewCompany.ownerUserId?.email || 'N/A'})</div>
+              <div><strong>Sector / Industry:</strong> {reviewCompany.profile?.sector || reviewCompany.sector || reviewCompany.industry || 'General'}</div>
               <div><strong>Bank Account:</strong> {reviewCompany.bankAccount?.accountNo || 'None'} ({reviewCompany.bankAccount?.ifsc || 'N/A'})</div>
               <div><strong>Cooling-Off:</strong> {reviewCompany.bankCoolingOff?.inCoolingOff ? `ACTIVE (${reviewCompany.bankCoolingOff.hoursRemaining} hours left)` : 'Completed / Ready'}</div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <strong>Registered Office Address:</strong>{' '}
+                {(() => {
+                  const addr = reviewCompany.registeredAddress || reviewCompany.address;
+                  if (!addr) return 'N/A';
+                  if (typeof addr === 'string') return addr;
+                  const parts = [addr.street, addr.city, addr.state, addr.pincode ? `- ${addr.pincode}` : '', addr.country].filter(Boolean);
+                  return parts.length > 0 ? parts.join(', ') : 'N/A';
+                })()}
+              </div>
             </div>
 
             {/* Corporate Compliance Documents */}

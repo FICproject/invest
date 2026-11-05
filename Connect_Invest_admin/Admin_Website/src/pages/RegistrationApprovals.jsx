@@ -798,7 +798,7 @@ export default function RegistrationApprovals() {
                   </h2>
                 </div>
                 <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#64748B' }}>
-                  ID: {selectedApp.id} • Registered Contact: {selectedApp.email} ({selectedApp.mobile})
+                  ID: {selectedApp.id} • Registered Type: {selectedApp.type === 'company' ? 'Corporate Legal Entity' : 'Individual Investor'}
                 </p>
               </div>
 
@@ -854,7 +854,7 @@ export default function RegistrationApprovals() {
               {/* Section 1: Business / Personal Details */}
               <div style={{ marginBottom: '24px' }}>
                 <h4 style={{ margin: '0 0 12px 0', fontSize: '0.88rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  1. Identification & Personal Details
+                  {selectedApp.type === 'company' ? '1. Corporate Identification & Contact Details' : '1. Investor Identification & Contact Details'}
                 </h4>
                 <div
                   style={{
@@ -868,34 +868,56 @@ export default function RegistrationApprovals() {
                     fontSize: '0.84rem'
                   }}
                 >
-                  <div><strong>Legal PAN:</strong> <span style={{ fontFamily: 'monospace' }}>{selectedApp.details?.pan}</span></div>
                   {selectedApp.type === 'company' ? (
                     <>
-                      <div><strong>Company Email:</strong> <span style={{ color: '#0047BA', fontWeight: 700 }}>{selectedApp.email}</span></div>
-                      <div><strong>CIN / Reg No:</strong> <span style={{ fontFamily: 'monospace' }}>{selectedApp.details?.cin}</span></div>
+                      <div><strong>Company Official Email:</strong> <span style={{ color: '#0047BA', fontWeight: 700 }}>{selectedApp.email || selectedApp.details?.officialEmail || 'N/A'}</span></div>
+                      <div><strong>Company Official Phone:</strong> <span style={{ color: '#1E293B', fontWeight: 600 }}>{selectedApp.mobile || selectedApp.details?.officialMobile || 'N/A'}</span></div>
+                      <div><strong>Company PAN:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{selectedApp.details?.pan || 'N/A'}</span></div>
+                      <div><strong>CIN / Reg No:</strong> <span style={{ fontFamily: 'monospace' }}>{selectedApp.details?.cin || 'N/A'}</span></div>
                       <div><strong>GSTIN:</strong> <span style={{ fontFamily: 'monospace' }}>{selectedApp.details?.gstin || 'N/A'}</span></div>
-                      <div><strong>Entity Type:</strong> {selectedApp.details?.companyType}</div>
-                      <div><strong>Industry / Sector:</strong> {selectedApp.details?.industry} • {selectedApp.details?.sector}</div>
-                      <div><strong>Official Website:</strong> <a href={selectedApp.details?.website} target="_blank" rel="noreferrer" style={{ color: '#0047BA' }}>{selectedApp.details?.website || 'N/A'}</a></div>
+                      <div><strong>Entity Type:</strong> {selectedApp.details?.companyType || 'Private Limited'}</div>
+                      <div><strong>Industry / Sector:</strong> {selectedApp.details?.industry || 'General'} • {selectedApp.details?.sector || 'General'}</div>
+                      <div><strong>Official Website:</strong> {selectedApp.details?.website ? <a href={selectedApp.details.website} target="_blank" rel="noreferrer" style={{ color: '#0047BA' }}>{selectedApp.details.website}</a> : 'N/A'}</div>
+                      {selectedApp.details?.repName && (
+                        <div><strong>Authorized Signatory / Rep:</strong> {selectedApp.details.repName} ({selectedApp.details.repEmail || selectedApp.details.repMobile || 'N/A'})</div>
+                      )}
+                      {selectedApp.details?.description && (
+                        <div style={{ gridColumn: 'span 2' }}><strong>Business Summary:</strong> {selectedApp.details.description}</div>
+                      )}
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <strong>Registered Office Address:</strong>{' '}
+                        {(() => {
+                          const addr = selectedApp.details?.registeredAddress || selectedApp.details?.address;
+                          if (!addr) return 'N/A';
+                          if (typeof addr === 'string') return addr;
+                          const parts = [addr.street, addr.city, addr.state, addr.pincode ? `- ${addr.pincode}` : '', addr.country].filter(Boolean);
+                          return parts.length > 0 ? parts.join(', ') : 'N/A';
+                        })()}
+                      </div>
                     </>
                   ) : (
                     <>
-                      <div><strong>Aadhaar No:</strong> <span style={{ fontFamily: 'monospace' }}>{selectedApp.details?.aadhaar}</span></div>
+                      <div><strong>Email Address:</strong> <span style={{ color: '#0047BA', fontWeight: 700 }}>{selectedApp.email || 'N/A'}</span></div>
+                      <div><strong>Mobile Number:</strong> <span style={{ color: '#1E293B', fontWeight: 600 }}>{selectedApp.mobile || 'N/A'}</span></div>
+                      <div><strong>Legal PAN:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{selectedApp.details?.pan || 'N/A'}</span></div>
+                      <div><strong>Aadhaar No:</strong> <span style={{ fontFamily: 'monospace' }}>{selectedApp.details?.aadhaar || 'N/A'}</span></div>
                       <div><strong>Date of Birth:</strong> {selectedApp.details?.dob ? new Date(selectedApp.details.dob).toLocaleDateString() : 'N/A'}</div>
-                      <div><strong>Nationality:</strong> {selectedApp.details?.nationality}</div>
+                      <div><strong>Nationality:</strong> {selectedApp.details?.nationality || 'Indian'}</div>
                       <div><strong>Occupation:</strong> {selectedApp.details?.occupation || 'N/A'}</div>
                       <div><strong>Annual Income:</strong> {selectedApp.details?.annualIncomeRange || 'N/A'}</div>
                       <div><strong>Source of Funds:</strong> {selectedApp.details?.sourceOfFunds || 'N/A'}</div>
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <strong>Residential Address:</strong>{' '}
+                        {(() => {
+                          const addr = selectedApp.details?.address;
+                          if (!addr) return 'N/A';
+                          if (typeof addr === 'string') return addr;
+                          const parts = [addr.street || addr.line1, addr.city, addr.state, addr.pincode ? `- ${addr.pincode}` : ''].filter(Boolean);
+                          return parts.length > 0 ? parts.join(', ') : 'N/A';
+                        })()}
+                      </div>
                     </>
                   )}
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <strong>Address:</strong>{' '}
-                    {selectedApp.details?.address
-                      ? typeof selectedApp.details.address === 'string'
-                        ? selectedApp.details.address
-                        : `${selectedApp.details.address.street || ''}, ${selectedApp.details.address.city || ''}, ${selectedApp.details.address.state || ''} - ${selectedApp.details.address.pincode || ''}`
-                      : 'N/A'}
-                  </div>
                 </div>
               </div>
 
