@@ -81,12 +81,8 @@ export const CreateRequest: React.FC = () => {
         setError('Please provide a valid funding amount.');
         return;
       }
-      if (fundingDuration === 'Short-Term' && investmentPeriodYears < 2) {
-        setError('Short-Term investments require a minimum period of 2 Years.');
-        return;
-      }
-      if (fundingDuration === 'Long-Term' && investmentPeriodYears < 5) {
-        setError('Long-Term investments require a minimum period of 5 Years.');
+      if (!investmentPeriodYears || investmentPeriodYears <= 0) {
+        setError('Please enter a valid funding duration in years.');
         return;
       }
     }
@@ -176,7 +172,7 @@ export const CreateRequest: React.FC = () => {
             1
           </div>
           <span className={`text-xs font-bold ${step === 1 ? 'text-[#DE8E0A]' : 'text-slate-500'}`}>
-            Purpose & Duration
+            Investment Purpose
           </span>
         </div>
 
@@ -275,59 +271,7 @@ export const CreateRequest: React.FC = () => {
             </div>
           </div>
 
-          {/* 2. Funding Duration */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-              2. Funding Duration *
-            </label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <button
-                type="button"
-                onClick={() => handleDurationChange('Short-Term')}
-                className={`p-5 rounded-2xl border text-left transition-all ${
-                  fundingDuration === 'Short-Term'
-                    ? 'border-[#F4B41A] bg-white ring-2 ring-[#F4B41A]/30 shadow-sm'
-                    : 'border-[#EFE8D8] bg-white hover:border-[#F4B41A]/60'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-[#DE8E0A] uppercase tracking-wider">
-                    Short-Term Option
-                  </span>
-                  {fundingDuration === 'Short-Term' && (
-                    <CheckCircle2 className="w-5 h-5 text-[#DE8E0A]" />
-                  )}
-                </div>
-                <h4 className="text-sm font-bold text-slate-900">Minimum 2 Years</h4>
-                <p className="text-xs text-slate-500 mt-1">
-                  Ideal for accelerated turnaround capital, short-cycle asset rollout, and 2 to 4 year tenures.
-                </p>
-              </button>
 
-              <button
-                type="button"
-                onClick={() => handleDurationChange('Long-Term')}
-                className={`p-5 rounded-2xl border text-left transition-all ${
-                  fundingDuration === 'Long-Term'
-                    ? 'border-[#F4B41A] bg-white ring-2 ring-[#F4B41A]/30 shadow-sm'
-                    : 'border-[#EFE8D8] bg-white hover:border-[#F4B41A]/60'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-[#DE8E0A] uppercase tracking-wider">
-                    Long-Term Option
-                  </span>
-                  {fundingDuration === 'Long-Term' && (
-                    <CheckCircle2 className="w-5 h-5 text-[#DE8E0A]" />
-                  )}
-                </div>
-                <h4 className="text-sm font-bold text-slate-900">Minimum 5 Years</h4>
-                <p className="text-xs text-slate-500 mt-1">
-                  Suitable for structural facility setups, corporate investments, and multi-year long tenures (5+ years).
-                </p>
-              </button>
-            </div>
-          </div>
 
           <div className="flex justify-end pt-4">
             <Button onClick={() => setStep(2)} className="font-bold">
@@ -358,22 +302,27 @@ export const CreateRequest: React.FC = () => {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Investment Period (in Years) *
+                Funding Duration / Investment Period (in Years) *
               </label>
               <div className="relative">
                 <input
                   type="number"
-                  min={fundingDuration === 'Short-Term' ? 2 : 5}
+                  min={1}
+                  step={1}
                   value={investmentPeriodYears}
-                  onChange={(e) => setInvestmentPeriodYears(Math.max(fundingDuration === 'Short-Term' ? 2 : 5, Number(e.target.value)))}
+                  onChange={(e) => {
+                    const val = Math.max(1, Number(e.target.value));
+                    setInvestmentPeriodYears(val);
+                    setFundingDuration(val >= 5 ? 'Long-Term' : 'Short-Term');
+                  }}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-[#F4B41A]"
                 />
                 <span className="absolute right-3.5 top-2.5 text-xs text-slate-400 font-medium">
-                  Years (Min {fundingDuration === 'Short-Term' ? 2 : 5})
+                  Years ({investmentPeriodYears * 12} Months)
                 </span>
               </div>
               <span className="text-[11px] text-slate-500 mt-0.5 block">
-                {fundingDuration === 'Short-Term' ? 'Short-Term: Minimum 2 Years (longer allowed).' : 'Long-Term: Minimum 5 Years (longer allowed).'}
+                Manually specify tenure length in years.
               </span>
             </div>
           </div>
@@ -520,7 +469,7 @@ export const CreateRequest: React.FC = () => {
             <div>
               <span className="text-[11px] text-slate-400 uppercase font-bold block">Funding Duration</span>
               <span className="text-sm font-bold text-slate-900">
-                {fundingDuration} ({investmentPeriodYears} Years)
+                {investmentPeriodYears} {investmentPeriodYears === 1 ? 'Year' : 'Years'} ({investmentPeriodYears * 12} Months)
               </span>
             </div>
             <div>
