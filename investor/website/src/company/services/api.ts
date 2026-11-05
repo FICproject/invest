@@ -1,7 +1,20 @@
 import axios from 'axios';
 
+const getCompanyApiBase = () => {
+  const envUrl = (import.meta as any).env?.VITE_API_URL;
+  if (envUrl) {
+    return envUrl.replace(/\/+$/, '');
+  }
+  if (typeof window !== 'undefined' && window.location) {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return '/api';
+    }
+  }
+  return 'https://connect-invest-backend.onrender.com/api';
+};
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: getCompanyApiBase(),
   headers: {
     'Content-Type': 'application/json',
   },
