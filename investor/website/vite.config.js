@@ -20,6 +20,17 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,
+        timeout: 0,
+        proxyTimeout: 0,
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            // Suppress recurring connection refused logs when backend is offline or restarting
+            if (err.code === 'ECONNREFUSED' || err.code === 'ECONNRESET') {
+              return;
+            }
+            console.warn('[vite proxy error]', err.message);
+          });
+        },
       },
       '/uploads': {
         target: 'http://localhost:5000',

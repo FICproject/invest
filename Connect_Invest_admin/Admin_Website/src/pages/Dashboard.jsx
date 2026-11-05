@@ -82,43 +82,43 @@ export default function Dashboard({ setActiveTab }) {
 
   const trendsByPeriod = {
     '7D': [
-      { month: 'Mon', invested: 0.22, returnVal: 0.12 },
-      { month: 'Tue', invested: 0.35, returnVal: 0.20 },
-      { month: 'Wed', invested: 0.48, returnVal: 0.30 },
-      { month: 'Thu', invested: 0.65, returnVal: 0.42 },
-      { month: 'Fri', invested: 0.88, returnVal: 0.55 },
-      { month: 'Sat', invested: 1.10, returnVal: 0.75 },
-      { month: 'Sun', invested: 1.25, returnVal: 0.90 }
+      { month: 'Mon', invested: 0, returnVal: 0 },
+      { month: 'Tue', invested: 0, returnVal: 0 },
+      { month: 'Wed', invested: 0, returnVal: 0 },
+      { month: 'Thu', invested: 0, returnVal: 0 },
+      { month: 'Fri', invested: 0, returnVal: 0 },
+      { month: 'Sat', invested: 0, returnVal: 0 },
+      { month: 'Sun', invested: 0, returnVal: 0 }
     ],
     '30D': [
-      { month: 'Jan', invested: 0.52, returnVal: 0.28 },
-      { month: 'Feb', invested: 0.68, returnVal: 0.45 },
-      { month: 'Mar', invested: 0.85, returnVal: 0.52 },
-      { month: 'Apr', invested: 1.05, returnVal: 0.65 },
-      { month: 'May', invested: 1.25, returnVal: 0.82 },
-      { month: 'Jun', invested: 1.35, returnVal: 0.95 },
-      { month: 'Jul', invested: 1.45, returnVal: 1.30 }
+      { month: 'Jan', invested: 0, returnVal: 0 },
+      { month: 'Feb', invested: 0, returnVal: 0 },
+      { month: 'Mar', invested: 0, returnVal: 0 },
+      { month: 'Apr', invested: 0, returnVal: 0 },
+      { month: 'May', invested: 0, returnVal: 0 },
+      { month: 'Jun', invested: 0, returnVal: 0 },
+      { month: 'Jul', invested: 0, returnVal: 0 }
     ],
     '90D': [
-      { month: 'Nov', invested: 0.40, returnVal: 0.20 },
-      { month: 'Dec', invested: 0.65, returnVal: 0.38 },
-      { month: 'Jan', invested: 0.95, returnVal: 0.58 },
-      { month: 'Feb', invested: 1.20, returnVal: 0.80 },
-      { month: 'Mar', invested: 1.40, returnVal: 1.05 },
-      { month: 'Apr', invested: 1.65, returnVal: 1.25 },
-      { month: 'May', invested: 1.85, returnVal: 1.50 }
+      { month: 'Nov', invested: 0, returnVal: 0 },
+      { month: 'Dec', invested: 0, returnVal: 0 },
+      { month: 'Jan', invested: 0, returnVal: 0 },
+      { month: 'Feb', invested: 0, returnVal: 0 },
+      { month: 'Mar', invested: 0, returnVal: 0 },
+      { month: 'Apr', invested: 0, returnVal: 0 },
+      { month: 'May', invested: 0, returnVal: 0 }
     ],
     '1Y': [
-      { month: 'Q1', invested: 0.65, returnVal: 0.35 },
-      { month: 'Q2', invested: 1.10, returnVal: 0.70 },
-      { month: 'Q3', invested: 1.50, returnVal: 1.10 },
-      { month: 'Q4', invested: 1.90, returnVal: 1.55 }
+      { month: 'Q1', invested: 0, returnVal: 0 },
+      { month: 'Q2', invested: 0, returnVal: 0 },
+      { month: 'Q3', invested: 0, returnVal: 0 },
+      { month: 'Q4', invested: 0, returnVal: 0 }
     ],
     'ALL': [
-      { month: '2023', invested: 0.80, returnVal: 0.45 },
-      { month: '2024', invested: 1.35, returnVal: 0.90 },
-      { month: '2025', invested: 1.75, returnVal: 1.30 },
-      { month: '2026', invested: 2.10, returnVal: 1.70 }
+      { month: '2023', invested: 0, returnVal: 0 },
+      { month: '2024', invested: 0, returnVal: 0 },
+      { month: '2025', invested: 0, returnVal: 0 },
+      { month: '2026', invested: 0, returnVal: 0 }
     ]
   };
 

@@ -192,12 +192,8 @@ export async function getDashboardStats(req, res, next) {
           };
         });
       } else {
-        // Fallback default representative distribution so pie chart always renders cleanly
-        distributionData = [
-          { label: 'Corporate Debt', projectName: 'Corporate Debt', value: 45, color: '#0047BA', amount: '₹4,50,000' },
-          { label: 'Clean Energy Bonds', projectName: 'Clean Energy Bonds', value: 30, color: '#10B981', amount: '₹3,00,000' },
-          { label: 'Infrastructure Notes', projectName: 'Infrastructure Notes', value: 25, color: '#FAB800', amount: '₹2,50,000' }
-        ];
+        // No investments or offers exist yet - return empty distribution
+        distributionData = [];
       }
     }
 
@@ -3192,123 +3188,8 @@ export async function updateQueryStatus(req, res, next) {
 }
 
 async function seedInitialQueries() {
-  try {
-    // Find a company and an investor if available to attach realistic links
-    const company = await Company.findOne();
-    const investor = await InvestorProfile.findOne();
-    const offer = await Offer.findOne();
-
-    const sampleQueries = [
-      {
-        ticketId: 'TKT-108421',
-        senderType: 'investor',
-        userName: 'Aarav Patel',
-        userEmail: 'aarav.patel@example.com',
-        userPhone: '9876543210',
-        category: 'Payment & Payouts',
-        priority: 'High',
-        status: 'Open',
-        subject: 'Monthly Payout Credit Delay for Apex Solar Farm',
-        description: 'My monthly return distribution of ₹14,250 for October has not been reflected in my ICICI Bank account yet. Could you check the transaction status?',
-        relatedTransactionRef: 'PAYOUT-2026-OCT-8821',
-        investorId: investor?._id || null,
-        relatedOfferId: offer?._id || null,
-        messages: [
-          {
-            senderType: 'investor',
-            senderName: 'Aarav Patel',
-            message: 'My monthly return distribution of ₹14,250 for October has not been reflected in my ICICI Bank account yet. Could you check the transaction status?',
-            sentAt: new Date(Date.now() - 3600000 * 5)
-          }
-        ]
-      },
-      {
-        ticketId: 'TKT-108390',
-        senderType: 'company',
-        userName: company?.name || 'Apex Renewable Energy Pvt Ltd',
-        userEmail: 'finance@apexsolar.in',
-        userPhone: '9123456780',
-        category: 'Repayment & Dues',
-        priority: 'Urgent',
-        status: 'In Progress',
-        subject: 'Disbursement Cooling-off Verification for Tranche 2',
-        description: 'We have updated our primary HDFC current account for receiving the second tranche disbursement. Requesting expedited admin review of cooling-off period.',
-        relatedTransactionRef: 'DISB-REL-9921',
-        companyId: company?._id || null,
-        relatedOfferId: offer?._id || null,
-        messages: [
-          {
-            senderType: 'company',
-            senderName: 'Finance Lead (Apex)',
-            message: 'We have updated our primary HDFC current account for receiving the second tranche disbursement. Requesting expedited admin review of cooling-off period.',
-            sentAt: new Date(Date.now() - 3600000 * 24)
-          },
-          {
-            senderType: 'admin',
-            senderName: 'Master Administrator',
-            message: 'Thank you for reaching out. We have verified your HDFC Bank account statement. 3-day cooling-off finishes tomorrow at 11:00 AM IST.',
-            sentAt: new Date(Date.now() - 3600000 * 18)
-          }
-        ]
-      },
-      {
-        ticketId: 'TKT-108254',
-        senderType: 'investor',
-        userName: 'Meera Sharma',
-        userEmail: 'meera.s@gmail.com',
-        userPhone: '9988776655',
-        category: 'KYC Verification',
-        priority: 'Medium',
-        status: 'Resolved',
-        subject: 'NSDL PAN Name Mismatch Assistance',
-        description: 'Uploaded my revised Aadhaar and PAN card copy as requested by the compliance team after initial rejection.',
-        investorId: investor?._id || null,
-        resolutionNote: 'Documents re-verified with NSDL database and approved.',
-        resolvedAt: new Date(Date.now() - 3600000 * 48),
-        messages: [
-          {
-            senderType: 'investor',
-            senderName: 'Meera Sharma',
-            message: 'Uploaded my revised Aadhaar and PAN card copy as requested by the compliance team after initial rejection.',
-            sentAt: new Date(Date.now() - 3600000 * 72)
-          },
-          {
-            senderType: 'admin',
-            senderName: 'Master Administrator',
-            message: 'Your revised PAN records matched successfully. Your KYC status is now APPROVED.',
-            sentAt: new Date(Date.now() - 3600000 * 48)
-          }
-        ]
-      },
-      {
-        ticketId: 'TKT-108112',
-        senderType: 'company',
-        userName: 'Zenith Agritech Solutions',
-        userEmail: 'accounts@zenithagri.io',
-        userPhone: '9845123456',
-        category: 'Payment & Payouts',
-        priority: 'Medium',
-        status: 'Open',
-        subject: 'Inward Repayment UTR Reference Confirmation',
-        description: 'We have remitted ₹4,50,000 via RTGS for our scheduled project repayment. Inward UTR: UTR-IN-20261027-44819.',
-        relatedTransactionRef: 'UTR-IN-20261027-44819',
-        companyId: company?._id || null,
-        relatedOfferId: offer?._id || null,
-        messages: [
-          {
-            senderType: 'company',
-            senderName: 'Accounts Officer',
-            message: 'We have remitted ₹4,50,000 via RTGS for our scheduled project repayment. Inward UTR: UTR-IN-20261027-44819.',
-            sentAt: new Date(Date.now() - 3600000 * 3)
-          }
-        ]
-      }
-    ];
-
-    await Query.insertMany(sampleQueries);
-  } catch (err) {
-    console.error('Error seeding initial queries:', err);
-  }
+  // Fresh state: No mock / demo support queries
+  return;
 }
 
 // ==========================================
