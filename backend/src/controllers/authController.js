@@ -20,7 +20,7 @@ export const uploadRegistrationDocument = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'No document file uploaded. Please select a valid JPEG, PNG, or PDF file.');
   }
 
-  const fileUrl = `/uploads/${file.filename}`;
+  const fileUrl = file.secure_url || file.path || `/uploads/${file.filename}`;
   res.status(200).json({
     success: true,
     message: 'Document uploaded successfully',

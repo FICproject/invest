@@ -55,16 +55,20 @@ export const submitKyc = asyncHandler(async (req, res) => {
   // Handle uploaded files
   if (req.files) {
     if (req.files.panDocument && req.files.panDocument[0]) {
-      kyc.panDocumentUrl = `/uploads/${req.files.panDocument[0].filename}`;
+      const f = req.files.panDocument[0];
+      kyc.panDocumentUrl = f.secure_url || f.path || `/uploads/${f.filename}`;
     }
     if (req.files.addressProof && req.files.addressProof[0]) {
-      kyc.addressProofUrl = `/uploads/${req.files.addressProof[0].filename}`;
+      const f = req.files.addressProof[0];
+      kyc.addressProofUrl = f.secure_url || f.path || `/uploads/${f.filename}`;
     }
     if (req.files.selfie && req.files.selfie[0]) {
-      kyc.selfieUrl = `/uploads/${req.files.selfie[0].filename}`;
+      const f = req.files.selfie[0];
+      kyc.selfieUrl = f.secure_url || f.path || `/uploads/${f.filename}`;
     }
     if (req.files.bankProof && req.files.bankProof[0]) {
-      kyc.bankProofUrl = `/uploads/${req.files.bankProof[0].filename}`;
+      const f = req.files.bankProof[0];
+      kyc.bankProofUrl = f.secure_url || f.path || `/uploads/${f.filename}`;
     }
   }
 

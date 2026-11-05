@@ -210,7 +210,7 @@ export const createRequest = asyncHandler(async (req, res) => {
 
   const supportingDocuments = files.map(f => ({
     name: f.originalname,
-    fileUrl: `/uploads/${f.filename}`
+    fileUrl: f.secure_url || f.path || `/uploads/${f.filename}`
   }));
 
   if (payload.supportingDocuments && Array.isArray(payload.supportingDocuments)) {
@@ -303,7 +303,7 @@ export const updateRequest = asyncHandler(async (req, res) => {
   if (files.length > 0) {
     const uploadedDocs = files.map(f => ({
       name: f.originalname,
-      fileUrl: `/uploads/${f.filename}`
+      fileUrl: f.secure_url || f.path || `/uploads/${f.filename}`
     }));
     request.supportingDocuments.push(...uploadedDocs);
   }
@@ -509,7 +509,7 @@ export const createFinancialReport = asyncHandler(async (req, res) => {
     netProfitOrLoss: calculatedProfit,
     auditStatus: auditStatus || 'Company-Reported',
     auditorName,
-    reportFileUrl: file ? `/uploads/${file.filename}` : undefined,
+    reportFileUrl: file ? (file.secure_url || file.path || `/uploads/${file.filename}`) : undefined,
     notes
   });
 
@@ -717,7 +717,7 @@ export const uploadCompanyDocument = asyncHandler(async (req, res) => {
     companyId: req.company._id,
     documentType: documentType || 'Other',
     title: title || file.originalname,
-    fileUrl: `/uploads/${file.filename}`,
+    fileUrl: file.secure_url || file.path || `/uploads/${file.filename}`,
     fileSize: file.size,
     mimeType: file.mimetype,
     status: 'Pending',
