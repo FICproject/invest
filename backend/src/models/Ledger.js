@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const LedgerSchema = new mongoose.Schema(
   {
     account: {
-      type: String, // e.g. 'PLATFORM_ESCROW', 'INVESTOR_WALLET', 'COMPANY_DISBURSEMENT', 'RETURNS_POOL'
+      type: String, // e.g. 'PLATFORM_COLLECTION', 'INVESTOR_WALLET', 'COMPANY_DISBURSEMENT', 'RETURNS_POOL'
       required: true,
       index: true
     },

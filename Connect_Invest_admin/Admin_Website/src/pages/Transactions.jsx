@@ -114,7 +114,7 @@ export default function Transactions() {
             {formatINR(stats.debitsTotalPaise)}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-            Escrow company releases & investor returns
+            Company disbursements & investor returns
           </div>
         </div>
       </div>

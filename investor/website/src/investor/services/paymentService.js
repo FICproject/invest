@@ -9,11 +9,12 @@ export const paymentService = {
     });
   },
 
-  async verifyPayment(orderId, paymentId, status = 'Success') {
+  async verifyPayment(orderId, paymentId, status = 'Success', extra = {}) {
     return await api.post('/payments/verify', {
       orderId,
       paymentId,
-      status
+      status,
+      ...extra
     });
   }
 };

@@ -41,11 +41,11 @@ export const ReturnsPayouts = () => {
   }
 
   const metrics = payoutData?.metrics || {
-    totalReceived: 2000,
-    totalScheduled: 12000,
-    totalExpectedReturns: 14000,
-    upcomingCount: 2,
-    completedCount: 2
+    totalReceived: 0,
+    totalScheduled: 0,
+    totalExpectedReturns: 0,
+    upcomingCount: 0,
+    completedCount: 0
   };
 
   const baseList = activeTab === 'upcoming'
@@ -223,44 +223,78 @@ export const ReturnsPayouts = () => {
                 <thead>
                   <tr style={{ backgroundColor: 'var(--bg-surface-subtle)', borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)', fontSize: '12px' }}>
                     <th style={{ padding: '12px 16px' }}>Date</th>
-                    <th style={{ padding: '12px 16px' }}>Opportunity</th>
-                    <th style={{ padding: '12px 16px' }}>Payout Type</th>
-                    <th style={{ padding: '12px 16px' }}>Amount</th>
+                    <th style={{ padding: '12px 16px' }}>Opportunity / Project</th>
+                    <th style={{ padding: '12px 16px' }}>Invested Amount</th>
+                    <th style={{ padding: '12px 16px' }}>Rate of Return</th>
+                    <th style={{ padding: '12px 16px' }}>Tenure & Remaining</th>
+                    <th style={{ padding: '12px 16px' }}>Return Amount</th>
                     <th style={{ padding: '12px 16px' }}>Account</th>
                     {activeTab === 'completed' && <th style={{ padding: '12px 16px' }}>UTR / Reference</th>}
                     <th style={{ padding: '12px 16px' }}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {currentList.map((payout) => (
-                    <tr key={payout._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                      <td style={{ padding: '14px 16px', fontWeight: '600', color: 'var(--text-main)', whiteSpace: 'nowrap' }}>
-                        {formatDate(payout.scheduledDate || payout.paidDate)}
-                      </td>
-                      <td style={{ padding: '14px 16px', fontWeight: '600' }}>
-                        {payout.offerTitle || 'Company Investment'}
-                      </td>
-                      <td style={{ padding: '14px 16px', color: 'var(--text-muted)' }}>
-                        {payout.payoutType}
-                      </td>
-                      <td style={{ padding: '14px 16px', fontWeight: '800', color: activeTab === 'completed' ? '#10B981' : 'var(--text-main)' }}>
-                        {formatCurrency(payout.amount)}
-                      </td>
-                      <td style={{ padding: '14px 16px', color: 'var(--text-muted)', fontSize: '12.5px' }}>
-                        A/c ending in •••• {payout.bankAccountEnding || '4210'}
-                      </td>
-                      {activeTab === 'completed' && (
-                        <td style={{ padding: '14px 16px', color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: '12px' }}>
-                          {payout.utrNumber || 'CMS90182736192'}
+                  {currentList.map((payout) => {
+                    const investedCapital = payout.investedAmount || (payout.investmentId?.amount || payout.investmentId?.amountInvested || (payout.investmentId?.amountPaise ? payout.investmentId.amountPaise / 100 : 0));
+                    const project = payout.projectTitle || payout.offerTitle || payout.offerId?.title || payout.investmentId?.offerId?.title || 'Investment Project';
+                    const rate = payout.returnRate || payout.ratePercent || (payout.offerId?.rateBps ? payout.offerId.rateBps / 100 : 12);
+                    const totalTenure = payout.tenureMonths || payout.investmentId?.tenureMonths || payout.offerId?.tenures?.[0] || 12;
+                    const remaining = payout.remainingTenureMonths != null ? payout.remainingTenureMonths : totalTenure;
+                    const returnAmount = payout.amount || (payout.amountPaise ? payout.amountPaise / 100 : 0);
+
+                    return (
+                      <tr key={payout._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '14px 16px', fontWeight: '600', color: 'var(--text-main)', whiteSpace: 'nowrap' }}>
+                          {formatDate(payout.scheduledDate || payout.paidDate)}
                         </td>
-                      )}
-                      <td style={{ padding: '14px 16px' }}>
-                        <span className={`badge badge-${payout.status.toLowerCase()}`}>
-                          {payout.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                        <td style={{ padding: '14px 16px' }}>
+                          <div style={{ fontWeight: '700', color: 'var(--text-main)' }}>{project}</div>
+                          <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>{payout.payoutType || 'Monthly Return'}</div>
+                        </td>
+                        <td style={{ padding: '14px 16px', fontWeight: '700', color: 'var(--text-main)' }}>
+                          {investedCapital > 0 ? formatCurrency(investedCapital) : '—'}
+                        </td>
+                        <td style={{ padding: '14px 16px' }}>
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            color: '#10B981',
+                            fontWeight: '700',
+                            fontSize: '12px'
+                          }}>
+                            {rate}% p.a.
+                          </span>
+                        </td>
+                        <td style={{ padding: '14px 16px' }}>
+                          <div style={{ fontWeight: '600', color: 'var(--text-main)' }}>
+                            {totalTenure} Months
+                          </div>
+                          <div style={{ fontSize: '11.5px', color: remaining > 0 ? '#3B82F6' : '#10B981', fontWeight: '600' }}>
+                            {remaining > 0 ? `${remaining} mo remaining` : 'Matured'}
+                          </div>
+                        </td>
+                        <td style={{ padding: '14px 16px', fontWeight: '800', color: activeTab === 'completed' ? '#10B981' : 'var(--color-primary)' }}>
+                          {formatCurrency(returnAmount)}
+                        </td>
+                        <td style={{ padding: '14px 16px', color: 'var(--text-muted)', fontSize: '12px' }}>
+                          A/c ending •••• {payout.bankAccountEnding || '—'}
+                        </td>
+                        {activeTab === 'completed' && (
+                          <td style={{ padding: '14px 16px', color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: '12px' }}>
+                            {payout.utrNumber || payout.bankRef || 'Pending Settlement'}
+                          </td>
+                        )}
+                        <td style={{ padding: '14px 16px' }}>
+                          <span className={`badge badge-${(payout.status || 'pending').toLowerCase()}`}>
+                            {payout.status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

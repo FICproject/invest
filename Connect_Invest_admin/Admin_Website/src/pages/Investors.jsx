@@ -481,30 +481,34 @@ export default function Investors() {
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
               <button disabled={submitting} onClick={() => setReviewInvestor(null)} className="btn-secondary">
-                Cancel
+                Close
               </button>
-              <button
-                disabled={submitting}
-                onClick={() => handleKycDecision('More info needed')}
-                className="btn-secondary"
-                style={{ color: '#fbbf24' }}
-              >
-                Request More Info
-              </button>
-              <button
-                disabled={submitting}
-                onClick={() => handleKycDecision('Rejected')}
-                className="btn-danger"
-              >
-                Reject
-              </button>
-              <button
-                disabled={submitting}
-                onClick={() => handleKycDecision('Approved')}
-                className="btn-primary"
-              >
-                Approve KYC
-              </button>
+              {reviewInvestor?.kycStatus !== 'Approved' && (
+                <>
+                  <button
+                    disabled={submitting}
+                    onClick={() => handleKycDecision('More info needed')}
+                    className="btn-secondary"
+                    style={{ color: '#fbbf24' }}
+                  >
+                    Request More Info
+                  </button>
+                  <button
+                    disabled={submitting}
+                    onClick={() => handleKycDecision('Rejected')}
+                    className="btn-danger"
+                  >
+                    Reject
+                  </button>
+                  <button
+                    disabled={submitting}
+                    onClick={() => handleKycDecision('Approved')}
+                    className="btn-primary"
+                  >
+                    Approve KYC
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

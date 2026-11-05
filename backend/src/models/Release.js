@@ -6,7 +6,29 @@ const ReleaseSchema = new mongoose.Schema(
     offerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Offer',
-      required: true
+      default: null
+    },
+    investmentOfferId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'InvestmentOffer',
+      default: null
+    },
+    investmentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Investment',
+      default: null
+    },
+    offerTitle: {
+      type: String,
+      default: ''
+    },
+    investorName: {
+      type: String,
+      default: ''
+    },
+    companyName: {
+      type: String,
+      default: ''
     },
     companyId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -17,10 +39,14 @@ const ReleaseSchema = new mongoose.Schema(
       type: Number,
       required: true
     },
+    amount: {
+      type: Number,
+      default: 0
+    },
     adminId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true
+      default: null
     },
     status: {
       type: String,
@@ -29,6 +55,22 @@ const ReleaseSchema = new mongoose.Schema(
     },
     reference: {
       type: String, // Bank transfer reference to company
+      default: null
+    },
+    paymentGateway: {
+      type: String,
+      default: 'Razorpay'
+    },
+    razorpayPayoutId: {
+      type: String,
+      default: null
+    },
+    razorpayFundAccountId: {
+      type: String,
+      default: null
+    },
+    razorpayUtr: {
+      type: String,
       default: null
     },
     bankAccountSnapshot: {

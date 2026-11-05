@@ -454,7 +454,7 @@ export default function MaturityReleases() {
                   Release Matured Principal
                 </h3>
                 <div style={{ fontSize: '0.8rem', color: '#64748B', marginTop: '2px' }}>
-                  Authorize escrow disbursement back to investor account
+                  Authorize principal disbursement back to investor account
                 </div>
               </div>
             </div>

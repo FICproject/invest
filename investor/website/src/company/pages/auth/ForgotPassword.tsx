@@ -8,7 +8,6 @@ export const ForgotPassword: React.FC = () => {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [mockOtp, setMockOtp] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -20,7 +19,6 @@ export const ForgotPassword: React.FC = () => {
     try {
       const res = await authService.forgotPassword(email);
       setMessage(res.message);
-      if (res.mockOtp) setMockOtp(res.mockOtp);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to send reset link');
     } finally {
@@ -53,11 +51,6 @@ export const ForgotPassword: React.FC = () => {
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
               <span>{message}</span>
             </div>
-            {mockOtp && (
-              <p className="font-mono text-[11px] bg-white p-2 rounded border border-emerald-200">
-                Mock Verification Code: <strong>{mockOtp}</strong>
-              </p>
-            )}
             <Link
               to="/company/reset-password"
               className="inline-block mt-2 font-bold text-brand-600 hover:underline"

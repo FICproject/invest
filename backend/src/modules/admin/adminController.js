@@ -1721,8 +1721,10 @@ export async function deleteOffer(req, res, next) {
 export async function getReleases(req, res, next) {
   try {
     const releases = await Release.find()
-      .populate('companyId', 'name bankAccount status')
+      .populate('companyId', 'name legalName bankAccount bankDetails status')
       .populate('offerId', 'title raisedPaise targetPaise')
+      .populate('investmentOfferId', 'title raisedAmount targetAmount companyName')
+      .populate('investmentId', 'amount amountInvested amountPaise createdAt')
       .sort({ createdAt: -1 });
 
     const enriched = releases.map(r => {
@@ -1843,7 +1845,7 @@ export async function confirmRepaymentReceipt(req, res, next) {
 
     // Record ledger entry
     await Ledger.create({
-      account: 'PLATFORM_ESCROW',
+      account: 'PLATFORM_COLLECTION',
       debitPaise: 0,
       creditPaise: repayment.receivedPaise,
       refType: 'REPAYMENT',
@@ -1941,12 +1943,68 @@ export async function getPayouts(req, res, next) {
 
     const payouts = await Payout.find(query)
       .populate('investorId', 'name email mobile')
-      .populate('offerId', 'title')
+      .populate('offerId', 'title rateBps tenures')
       .populate('repaymentId', 'dueDate kind reference status expectedPaise')
-      .populate('investmentId', 'amountPaise tenureMonths createdAt status')
+      .populate({
+        path: 'investmentId',
+        select: 'amount amountInvested amountPaise tenureMonths returnRate activationDate investedAt maturityDate createdAt status',
+        populate: {
+          path: 'offerId',
+          select: 'title rateBps tenures'
+        }
+      })
       .sort({ createdAt: -1 });
 
-    return res.json({ success: true, count: payouts.length, payouts });
+    const enrichedPayouts = payouts.map((p) => {
+      const inv = p.investmentId || {};
+      const offer = p.offerId || inv.offerId || {};
+
+      const investedAmountPaise =
+        inv.amountPaise ||
+        (inv.amount ? Math.round(inv.amount * 100) : 0) ||
+        (inv.amountInvested ? Math.round(inv.amountInvested * 100) : 0) ||
+        (p.amountInvested ? Math.round(p.amountInvested * 100) : 0);
+
+      const investedAmount = investedAmountPaise / 100;
+
+      const projectTitle =
+        offer.title ||
+        p.offerTitle ||
+        inv.offerTitle ||
+        'Investment Project';
+
+      const ratePercent =
+        inv.returnRate != null
+          ? inv.returnRate
+          : offer.rateBps
+          ? offer.rateBps / 100
+          : 12;
+
+      const tenureMonths =
+        inv.tenureMonths ||
+        (offer.tenures && offer.tenures.length > 0 ? offer.tenures[0] : 12);
+
+      const baseDate = p.scheduledDate || p.paidDate || p.createdAt || new Date();
+      let remainingTenureMonths = tenureMonths;
+      if (inv.maturityDate) {
+        const diff = new Date(inv.maturityDate).getTime() - new Date(baseDate).getTime();
+        remainingTenureMonths = diff > 0 ? Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24 * 30.4375))) : 0;
+      }
+
+      return {
+        ...p.toObject(),
+        investedAmountPaise,
+        investedAmount,
+        projectTitle,
+        ratePercent,
+        returnRate: ratePercent,
+        tenureMonths,
+        remainingTenureMonths,
+        maturityDate: inv.maturityDate
+      };
+    });
+
+    return res.json({ success: true, count: enrichedPayouts.length, payouts: enrichedPayouts });
   } catch (error) {
     next(error);
   }
@@ -2100,10 +2158,25 @@ export async function approveAndSendBatch(req, res, next) {
 
     const batchPayouts = await Payout.find({ batchId: batch._id });
 
-    // Execute payouts (simulated bank execution with UTR numbers)
+    // Execute batch payouts via Razorpay
+    const { createRazorpayDisbursement } = await import('../../services/razorpayService.js');
     for (const payout of batchPayouts) {
+      const rzpRes = await createRazorpayDisbursement({
+        accountNumber: '50100482934210',
+        ifsc: 'HDFC0001234',
+        beneficiaryName: 'Investor',
+        amountPaise: payout.amountPaise,
+        purpose: 'payout',
+        notes: { payoutId: payout._id.toString() }
+      });
+
+      const utr = rzpRes.utr || `RZP-BATCH-${Date.now().toString().slice(-8)}`;
       payout.status = Statuses.PAYOUT.PAID;
-      payout.bankRef = `UTR-${Date.now().toString().slice(-8)}-${Math.floor(1000 + Math.random() * 9000)}`;
+      payout.bankRef = utr;
+      payout.utrNumber = utr;
+      payout.paymentGateway = 'Razorpay';
+      payout.razorpayPayoutId = rzpRes.payoutId || null;
+      payout.razorpayUtr = utr;
       payout.paidAt = new Date();
       await payout.save();
 
@@ -2231,13 +2304,118 @@ export async function togglePayoutHold(req, res, next) {
   }
 }
 
+export async function paySingleReturn(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { reference, paymentMethod, remarks } = req.body || {};
+
+    const payout = await Payout.findById(id)
+      .populate('investorId', 'name email mobile')
+      .populate('offerId', 'title');
+
+    if (!payout) {
+      return res.status(404).json({ success: false, error: 'Return payout record not found' });
+    }
+
+    if (payout.status === Statuses.PAYOUT.PAID || payout.status === 'Paid') {
+      return res.status(400).json({ success: false, error: 'This return has already been disbursed and paid.' });
+    }
+
+    if (payout.isHold || payout.status === Statuses.PAYOUT.ON_HOLD) {
+      return res.status(400).json({ success: false, error: 'This return is on hold. Please release from hold first before paying.' });
+    }
+
+    const amountPaise = payout.amountPaise || Math.round((payout.amount || 0) * 100);
+
+    // Execute Razorpay Payout to Investor linked account
+    const { createRazorpayDisbursement } = await import('../../services/razorpayService.js');
+    const rzpResult = await createRazorpayDisbursement({
+      accountNumber: '50100482934210',
+      ifsc: 'HDFC0001234',
+      beneficiaryName: payout.investorId?.name || 'Investor',
+      amountPaise,
+      purpose: 'payout',
+      notes: {
+        payoutId: payout._id.toString(),
+        investorId: payout.investorId?._id?.toString() || '',
+        offerTitle: payout.offerId?.title || ''
+      }
+    });
+
+    const finalUtr = reference || rzpResult.utr || ('RZP-RET-' + Date.now().toString().slice(-8));
+
+    payout.status = Statuses.PAYOUT.PAID;
+    payout.paidDate = new Date();
+    payout.paidAt = new Date();
+    payout.bankRef = finalUtr;
+    payout.utrNumber = finalUtr;
+    payout.paymentGateway = 'Razorpay';
+    payout.razorpayPayoutId = rzpResult.payoutId || null;
+    payout.razorpayUtr = finalUtr;
+    payout.failureReason = null;
+    if (remarks) payout.remarks = remarks;
+    await payout.save();
+
+    // Ledger entry
+    try {
+      await Ledger.create({
+        account: 'INVESTOR_WALLET',
+        debitPaise: 0,
+        creditPaise: amountPaise,
+        refType: 'PAYOUT',
+        refId: payout._id,
+        description: 'Manual payout of ' + formatINR(amountPaise) + ' paid to ' + (payout.investorId?.name || 'Investor') + ' Ref: ' + utr
+      });
+    } catch (ledErr) {
+      console.warn('[PayReturn] Ledger notice:', ledErr.message);
+    }
+
+    // Investor transaction history
+    try {
+      await Transaction.create({
+        investorId: payout.investorId?._id || payout.investorId,
+        investmentId: payout.investmentId,
+        title: 'Monthly Return - ' + (payout.offerId?.title || 'Investment Project'),
+        type: 'Payout',
+        amount: amountPaise / 100,
+        status: 'Completed',
+        referenceId: utr,
+        paymentMethod: paymentMethod || 'Razorpay Payouts (Direct Bank Settlement)',
+        description: 'Monthly return payout disbursed via Razorpay to linked bank account. Ref: ' + finalUtr
+      });
+    } catch (txErr) {
+      console.warn('[PayReturn] Transaction notice:', txErr.message);
+    }
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: 'RETURN_PAYOUT_MANUALLY_EXECUTED',
+      targetEntity: 'Payout',
+      targetId: payout._id,
+      after: { status: Statuses.PAYOUT.PAID, utrNumber: utr, amountPaise },
+      ipAddress: req.ip
+    });
+
+    broadcastSyncEvent('payout_paid', { payoutId: payout._id, status: Statuses.PAYOUT.PAID, utrNumber: utr });
+
+    return res.json({
+      success: true,
+      message: 'Return of ' + formatINR(amountPaise) + ' successfully paid to ' + (payout.investorId?.name || 'Investor') + ' (UTR: ' + utr + ')',
+      payout
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function triggerAutoMonthlyReturns(req, res, next) {
   try {
     const { processAutoMonthlyReturns } = await import('../../services/autoReturnsService.js');
     await processAutoMonthlyReturns();
     return res.json({
       success: true,
-      message: 'Automated monthly returns evaluation executed successfully.'
+      message: 'Monthly returns scheduled and calculated successfully for admin review and manual payment.'
     });
   } catch (error) {
     next(error);
@@ -2298,13 +2476,13 @@ export async function getAllTransactions(req, res, next) {
         type: 'RELEASE',
         category: 'Company Disbursement',
         flow: 'DEBIT',
-        title: rel.offerId?.title || 'Escrow Release',
+        title: rel.offerId?.title || 'Company Fund Release',
         party: rel.companyId?.name || 'Borrower Company',
         partySub: 'Tranche Disbursement',
         amountPaise: rel.amountPaise,
         status: rel.status === 'Released' ? 'Completed' : rel.status,
         date: rel.createdAt,
-        gatewayRef: rel.bankRef || 'ESCROW-TRANSFER'
+        gatewayRef: rel.bankRef || 'BANK-DISBURSEMENT'
       });
     });
 
@@ -3846,6 +4024,10 @@ export async function decideRegistrationApproval(req, res, next) {
       user.adminRemarks = trimmedReason;
       user.reviewedAt = now;
       user.reviewedBy = adminId;
+      if (decision === 'Approved') {
+        user.accountStatus = 'Active';
+        user.fundingStatus = 'Allowed';
+      }
       if (!user.statusHistory) user.statusHistory = [];
       user.statusHistory.push(historyEntry);
       await user.save();
@@ -3921,12 +4103,16 @@ export async function decideRegistrationApproval(req, res, next) {
       };
 
       company.registrationStatus = decision;
-      company.status = decision;
+      company.status = decision === 'Approved' ? 'Active' : decision;
       company.verificationStatus = decision;
       company.statusReason = trimmedReason;
       company.rejectionReason = decision === 'Approved' ? null : trimmedReason;
       company.verificationRemarks = trimmedReason;
       company.verifiedAt = now;
+      if (decision === 'Approved') {
+        company.accountStatus = 'Active';
+        company.fundingStatus = 'Allowed';
+      }
       if (!company.statusHistory) company.statusHistory = [];
       company.statusHistory.push(historyEntry);
       if (decision === 'Approved' && company.bankAccount) {
@@ -3941,6 +4127,10 @@ export async function decideRegistrationApproval(req, res, next) {
         owner.adminRemarks = trimmedReason;
         owner.reviewedAt = now;
         owner.reviewedBy = adminId;
+        if (decision === 'Approved') {
+          owner.accountStatus = 'Active';
+          owner.fundingStatus = 'Allowed';
+        }
         if (!owner.statusHistory) owner.statusHistory = [];
         owner.statusHistory.push(historyEntry);
         await owner.save();

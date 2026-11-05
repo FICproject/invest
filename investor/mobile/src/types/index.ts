@@ -98,6 +98,7 @@ export interface Investment {
   _id: string;
   investorId: string;
   offerId: InvestmentOffer;
+  amount?: number;
   amountInvested: number;
   returnRate: number;
   tenureMonths: number;
@@ -130,11 +131,20 @@ export interface Payout {
   investorId: string;
   investmentId: Investment;
   offerTitle: string;
+  projectTitle?: string;
   amount: number;
+  amountPaise?: number;
+  investedAmount?: number;
+  returnRate?: number;
+  ratePercent?: number;
+  tenureMonths?: number;
+  remainingTenureMonths?: number;
   payoutType: string;
   scheduledDate: string;
   processedDate?: string;
-  status: 'Scheduled' | 'Processing' | 'Completed' | 'Failed';
+  status: 'Scheduled' | 'Processing' | 'Completed' | 'Paid' | 'Failed' | 'Ready' | 'On Hold';
+  utrNumber?: string;
+  bankRef?: string;
 }
 
 export interface AppNotification {

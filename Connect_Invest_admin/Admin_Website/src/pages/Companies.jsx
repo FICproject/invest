@@ -626,14 +626,18 @@ export default function Companies() {
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
               <button disabled={submitting} onClick={() => setReviewCompany(null)} className="btn-secondary">
-                Cancel
+                Close
               </button>
-              <button disabled={submitting} onClick={() => handleKybDecision('Rejected')} className="btn-danger">
-                Reject KYB
-              </button>
-              <button disabled={submitting} onClick={() => handleKybDecision('Approved')} className="btn-primary">
-                Approve KYB
-              </button>
+              {reviewCompany?.verificationStatus !== 'Approved' && reviewCompany?.status !== 'Approved' && (
+                <>
+                  <button disabled={submitting} onClick={() => handleKybDecision('Rejected')} className="btn-danger">
+                    Reject KYB
+                  </button>
+                  <button disabled={submitting} onClick={() => handleKybDecision('Approved')} className="btn-primary">
+                    Approve KYB
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

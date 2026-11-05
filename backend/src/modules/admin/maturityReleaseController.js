@@ -176,7 +176,7 @@ export async function releaseMaturityPrincipal(req, res, next) {
         amount: principalPaise / 100,
         status: 'Completed',
         referenceId: utr,
-        paymentMethod: 'Direct Escrow Settlement / RTGS',
+        paymentMethod: 'Direct Bank Settlement (IMPS/NEFT/RTGS)',
         description: `Full release of invested principal upon completion of ${investment.tenureMonths || 12}-month tenure.`
       });
     } catch (txErr) {

@@ -64,6 +64,18 @@ const payoutSchema = new mongoose.Schema(
     paidDate: {
       type: Date
     },
+    paymentGateway: {
+      type: String,
+      default: 'Razorpay'
+    },
+    razorpayPayoutId: {
+      type: String,
+      default: null
+    },
+    razorpayUtr: {
+      type: String,
+      default: null
+    },
     bankAccountEnding: {
       type: String,
       default: '4210'

@@ -35,7 +35,7 @@ export const AddFundsScreen = ({ navigation }: any) => {
       setLoading(false);
       Alert.alert(
         'Deposit Request Initiated',
-        `An allocation request for ${formatCurrency(num)} has been routed through ${selectedMethod}. Escrow reference: ESC_${Date.now()}`,
+        `An allocation request for ${formatCurrency(num)} has been routed through ${selectedMethod}. Payment reference: PAY_${Date.now()}`,
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     }, 1200);
@@ -92,7 +92,7 @@ export const AddFundsScreen = ({ navigation }: any) => {
           {[
             { id: 'UPI Direct', label: 'UPI / Instant QR', sub: 'Instant transfer via Google Pay, PhonePe, Paytm' },
             { id: 'Net Banking', label: 'Internet Banking', sub: 'HDFC, ICICI, SBI, Axis & major banks' },
-            { id: 'RTGS/NEFT', label: 'Escrow Virtual Account', sub: 'Large allocation via direct RTGS transfer' },
+            { id: 'RTGS/NEFT', label: 'Platform Direct Account', sub: 'Large allocation via direct RTGS transfer' },
           ].map((method) => (
             <TouchableOpacity
               key={method.id}

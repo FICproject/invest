@@ -109,16 +109,16 @@ async function bootstrap() {
     console.warn('[Bootstrap] Auto-seed check notice:', err.message);
   }
 
-  // Initialize automated monthly returns evaluator
+  // Initialize monthly returns record generator (Generates Calculated returns for Admin manual verification & pay)
   try {
     const { processAutoMonthlyReturns } = await import('./services/autoReturnsService.js');
-    // Run initial pass on startup
+    // Run initial pass on startup to populate scheduled cycles
     processAutoMonthlyReturns();
-    // Run periodic evaluation (every 10 minutes)
+    // Run periodic evaluation (every 10 minutes) to schedule new month returns
     setInterval(processAutoMonthlyReturns, 10 * 60 * 1000);
-    console.log('[AutoReturnsScheduler] Monthly returns auto-payout scheduler initialized (10m interval)');
+    console.log('[ReturnsScheduler] Monthly returns calculation scheduler initialized (Manual Admin Pay mode)');
   } catch (schedErr) {
-    console.warn('[AutoReturnsScheduler] Notice on init:', schedErr.message);
+    console.warn('[ReturnsScheduler] Notice on init:', schedErr.message);
   }
 
   app.listen(PORT, '0.0.0.0', () => {

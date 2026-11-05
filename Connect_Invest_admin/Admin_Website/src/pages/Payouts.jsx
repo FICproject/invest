@@ -181,16 +181,43 @@ export default function Payouts() {
   };
 
   // Trigger auto returns calculation
-  const handleTriggerAutoReturns = async () => {
+  const handlePaySingleReturn = async (payout) => {
+    const amt = payout.amountPaise || Math.round((payout.amount || 0) * 100);
+    const defaultUtr = 'RZP-UTR-' + Date.now().toString().slice(-8) + '-' + Math.floor(1000 + Math.random() * 9000);
+    const refInput = window.prompt(
+      'Disburse ' + formatINR(amt) + ' via Razorpay to ' + (payout.investorId?.name || 'Investor') + ' linked bank account.\nEnter Razorpay Settlement UTR / Reference:',
+      defaultUtr
+    );
+    if (refInput === null) return;
+
+    try {
+      setSubmitting(true);
+      const res = await adminApi.paySingleReturn(payout._id, {
+        reference: refInput.trim() || defaultUtr,
+        paymentMethod: 'Razorpay Payouts (Direct Bank Settlement)',
+        remarks: 'Disbursed via Razorpay by Administrator'
+      });
+      if (res.data.success) {
+        toast.success(res.data.message || 'Return successfully marked as PAID!');
+        fetchData();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to process manual return payout');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCalculateReturns = async () => {
     try {
       setSubmitting(true);
       const res = await adminApi.triggerAutoMonthlyReturns();
       if (res.data.success) {
-        toast.success(res.data.message || 'Auto-payouts processed for eligible monthly returns!');
+        toast.success(res.data.message || 'Monthly return cycles synchronized for admin review!');
         fetchData();
       }
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to trigger auto returns');
+      toast.error(err.response?.data?.error || 'Failed to calculate returns');
     } finally {
       setSubmitting(false);
     }
@@ -262,7 +289,7 @@ export default function Payouts() {
           {viewTab === 'verification' && (
             <>
               <button
-                onClick={handleTriggerAutoReturns}
+                onClick={handleCalculateReturns}
                 disabled={submitting}
                 className="btn-secondary"
                 style={{
@@ -274,10 +301,10 @@ export default function Payouts() {
                   backgroundColor: '#EFF6FF',
                   fontWeight: 700
                 }}
-                title="Evaluate and auto-pay due monthly returns to eligible investors"
+                title="Calculate due returns for admin manual verification & payment"
               >
                 <RefreshCw size={14} className={submitting ? 'animate-spin' : ''} />
-                <span>Run Monthly Auto-Payouts</span>
+                <span>Calculate Due Returns</span>
               </button>
 
               {pendingVerification.length > 0 && (
@@ -341,7 +368,7 @@ export default function Payouts() {
             {payouts.filter(p => p.status === 'In batch' || p.status === 'Approved').length}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-            Escrow release in progress
+            Disbursement in progress
           </div>
         </div>
 
@@ -424,10 +451,12 @@ export default function Payouts() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th style={{ width: '50px', textAlign: 'center' }}>S.No</th>
+                    <th style={{ width: '45px', textAlign: 'center' }}>S.No</th>
                     <th>Investor Name & Contact</th>
                     <th>Opportunity / Project</th>
-                    <th>Return Cycle / Due</th>
+                    <th>Invested Capital</th>
+                    <th>Rate of Return</th>
+                    <th>Tenure & Remaining</th>
                     <th>Calculated Return</th>
                     <th>Verification Status</th>
                     <th>Bank Reference / Notes</th>
@@ -441,6 +470,16 @@ export default function Payouts() {
                     const isPaid = p.status === 'Paid';
                     const isInBatch = p.status === 'In batch' || p.status === 'Approved';
 
+                    const investedCapitalPaise =
+                      p.investedAmountPaise ||
+                      p.investmentId?.amountPaise ||
+                      (p.investmentId?.amount ? Math.round(p.investmentId.amount * 100) : 0) ||
+                      (p.investedAmount ? Math.round(p.investedAmount * 100) : 0);
+
+                    const rate = p.returnRate || p.ratePercent || (p.offerId?.rateBps ? p.offerId.rateBps / 100 : 12);
+                    const totalTenure = p.tenureMonths || p.investmentId?.tenureMonths || p.offerId?.tenures?.[0] || 12;
+                    const remaining = p.remainingTenureMonths != null ? p.remainingTenureMonths : totalTenure;
+
                     return (
                       <tr key={p._id}>
                         <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--text-muted)' }}>
@@ -450,15 +489,37 @@ export default function Payouts() {
                           <div style={{ fontWeight: 600 }}>{p.investorId?.name || 'Investor'}</div>
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{p.investorId?.email}</div>
                         </td>
-                        <td>{p.offerId?.title || 'Offer'}</td>
                         <td>
-                          <div style={{ fontSize: '0.825rem' }}>{p.dueDate ? new Date(p.dueDate).toLocaleDateString() : 'N/A'}</div>
+                          <div style={{ fontWeight: 600 }}>{p.projectTitle || p.offerId?.title || 'Offer'}</div>
                           <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                            {p.repaymentId ? 'Monthly Return' : 'Scheduled Distribution'}
+                            {p.dueDate ? new Date(p.dueDate).toLocaleDateString() : (p.scheduledDate ? new Date(p.scheduledDate).toLocaleDateString() : 'Monthly Return')}
+                          </div>
+                        </td>
+                        <td style={{ fontWeight: 700, color: '#0F172A', fontSize: '0.875rem' }}>
+                          {investedCapitalPaise > 0 ? formatINR(investedCapitalPaise) : '—'}
+                        </td>
+                        <td>
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            backgroundColor: '#ECFDF5',
+                            color: '#059669',
+                            fontWeight: 700,
+                            fontSize: '0.78rem'
+                          }}>
+                            {rate}% p.a.
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 600, fontSize: '0.825rem' }}>{totalTenure} Months</div>
+                          <div style={{ fontSize: '0.72rem', color: remaining > 0 ? '#2563EB' : '#059669', fontWeight: 600 }}>
+                            {remaining > 0 ? `${remaining} mo remaining` : 'Matured'}
                           </div>
                         </td>
                         <td style={{ fontWeight: 700, color: '#0047BA', fontSize: '0.95rem' }}>
-                          {formatINR(p.amountPaise)}
+                          {formatINR(p.amountPaise || (p.amount ? Math.round(p.amount * 100) : 0))}
                         </td>
                         <td>
                           <span className={`badge ${
@@ -476,41 +537,85 @@ export default function Payouts() {
                           )}
                         </td>
                         <td>
-                          {isPending && (
-                            <button
-                              onClick={() => handleVerifySingle(p._id, p.amountPaise)}
-                              disabled={submitting}
-                              className="btn-primary"
-                              style={{
-                                padding: '6px 12px',
-                                fontSize: '0.78rem',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                                backgroundColor: '#10B981'
-                              }}
-                            >
-                              <ShieldCheck size={14} />
-                              <span>Verify Return</span>
-                            </button>
-                          )}
-                          {p.status === 'Failed' && (
-                            <button
-                              onClick={() => handleRetryPayout(p._id)}
-                              className="btn-secondary"
-                              style={{ padding: '5px 10px', fontSize: '0.75rem', marginLeft: '6px' }}
-                            >
-                              Retry
-                            </button>
-                          )}
-                          {isReady && (
-                            <span style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 700 }}>
-                              Ready for Batch
-                            </span>
-                          )}
-                          {isPaid && (
-                            <span style={{ fontSize: '0.78rem', color: '#64748B' }}>Settled</span>
-                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            {isPending && (
+                              <button
+                                onClick={() => handleVerifySingle(p._id, p.amountPaise)}
+                                disabled={submitting}
+                                className="btn-primary"
+                                style={{
+                                  padding: '5px 10px',
+                                  fontSize: '0.75rem',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  backgroundColor: '#10B981'
+                                }}
+                                title="Verify return calculations and approve for payout"
+                              >
+                                <ShieldCheck size={13} />
+                                <span>Verify</span>
+                              </button>
+                            )}
+
+                            {!isPaid && (
+                              <button
+                                onClick={() => handlePaySingleReturn(p)}
+                                disabled={submitting || p.isHold || p.status === 'On Hold'}
+                                className="btn-primary"
+                                style={{
+                                  padding: '5px 10px',
+                                  fontSize: '0.75rem',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  backgroundColor: '#0047BA'
+                                }}
+                                title="Disburse return payout directly to investor linked bank account via Razorpay"
+                              >
+                                <Send size={13} />
+                                <span>Pay via Razorpay</span>
+                              </button>
+                            )}
+
+                            {!isPaid && (
+                              <button
+                                onClick={() => handleToggleHold(p)}
+                                disabled={submitting}
+                                className="btn-secondary"
+                                style={{
+                                  padding: '5px 8px',
+                                  fontSize: '0.75rem',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  borderColor: p.isHold || p.status === 'On Hold' ? '#10B981' : '#F59E0B',
+                                  color: p.isHold || p.status === 'On Hold' ? '#059669' : '#D97706',
+                                  backgroundColor: p.isHold || p.status === 'On Hold' ? '#ECFDF5' : '#FFFBEB'
+                                }}
+                                title={p.isHold || p.status === 'On Hold' ? 'Release return from Hold' : 'Place return On Hold'}
+                              >
+                                {p.isHold || p.status === 'On Hold' ? <Play size={12} /> : <Pause size={12} />}
+                                <span>{p.isHold || p.status === 'On Hold' ? 'Resume' : 'Hold'}</span>
+                              </button>
+                            )}
+
+                            {p.status === 'Failed' && (
+                              <button
+                                onClick={() => handleRetryPayout(p._id)}
+                                className="btn-secondary"
+                                style={{ padding: '5px 8px', fontSize: '0.75rem' }}
+                              >
+                                Retry
+                              </button>
+                            )}
+
+                            {isPaid && (
+                              <span style={{ fontSize: '0.78rem', color: '#10B981', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                <CheckCircle2 size={13} /> Settled
+                              </span>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );

@@ -37,6 +37,7 @@ import {
   retryPayout,
   togglePayoutHold,
   triggerAutoMonthlyReturns,
+  paySingleReturn,
   getAllTransactions,
   getAuditLogs,
   exportReport,
@@ -148,6 +149,7 @@ router.post('/repayments/:id/default', markDefault);
 // Payout Batches (Investor payouts)
 router.get('/payouts', getPayouts);
 router.post('/payouts/:id/verify', verifyPayout);
+router.post('/payouts/:id/pay', paySingleReturn);
 router.post('/payouts/verify-all', verifyAllPayouts);
 router.get('/payout-batches', getBatches);
 router.post('/payout-batches', createPayoutBatch);

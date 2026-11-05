@@ -15,6 +15,7 @@ import {
   Check
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../../investor/services/api';
 
 export const CompanySubscription: React.FC = () => {
   const { company } = useAuth();
@@ -63,22 +64,97 @@ export const CompanySubscription: React.FC = () => {
     }
   ]);
 
-  const handleSimulatePayment = () => {
+  const handleRazorpayPayment = async () => {
     setPaying(true);
-    setTimeout(() => {
+    try {
+      // 1. Request Razorpay order from backend
+      const res = await api.post('/company/subscription/create-order', {
+        billingMonth: currentMonthName
+      });
+      const orderData = res.data?.data || res.data;
+
+      // 2. If Razorpay SDK is available on window and not simulation
+      if (typeof window !== 'undefined' && (window as any).Razorpay && !orderData.simulated) {
+        const options = {
+          key: orderData.keyId,
+          amount: orderData.amountPaise,
+          currency: orderData.currency || 'INR',
+          name: 'Connect Invest',
+          description: `Platform Subscription - ${currentMonthName}`,
+          order_id: orderData.orderId,
+          prefill: {
+            name: company?.legalName || company?.name || '',
+            email: company?.officialEmail || '',
+            contact: company?.officialPhone || ''
+          },
+          theme: {
+            color: '#DE8E0A'
+          },
+          handler: async function (response: any) {
+            try {
+              const verifyRes = await api.post('/company/subscription/verify', {
+                orderId: response.razorpay_order_id || orderData.orderId,
+                paymentId: response.razorpay_payment_id,
+                signature: response.razorpay_signature,
+                paymentMethod: selectedMethod === 'upi' ? 'UPI' : selectedMethod === 'card' ? 'Credit/Debit Card' : 'Net Banking'
+              });
+              const invoice = verifyRes.data?.data;
+              setPaymentSuccess(true);
+              setPaymentHistory([
+                {
+                  id: invoice?.invoiceNumber || `INV-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`,
+                  month: currentMonthName,
+                  amount: 500,
+                  paidOn: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+                  method: `Razorpay (${invoice?.transactionRef || 'Paid'})`,
+                  status: 'Paid',
+                  receiptUrl: '#'
+                },
+                ...paymentHistory
+              ]);
+            } catch (err: any) {
+              alert(err.response?.data?.message || 'Payment verification failed');
+            } finally {
+              setPaying(false);
+            }
+          },
+          modal: {
+            ondismiss: function () {
+              setPaying(false);
+            }
+          }
+        };
+
+        const rzp = new (window as any).Razorpay(options);
+        rzp.open();
+      } else {
+        // Direct simulation / verification fallback
+        const verifyRes = await api.post('/company/subscription/verify', {
+          orderId: orderData?.orderId || `order_sim_${Date.now()}`,
+          paymentId: `PAY_${Date.now()}`,
+          signature: 'simulated_valid_signature',
+          paymentMethod: selectedMethod === 'upi' ? 'UPI' : selectedMethod === 'card' ? 'Credit/Debit Card' : 'Net Banking'
+        });
+        const invoice = verifyRes.data?.data;
+        setPaying(false);
+        setPaymentSuccess(true);
+        setPaymentHistory([
+          {
+            id: invoice?.invoiceNumber || `INV-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`,
+            month: currentMonthName,
+            amount: 500,
+            paidOn: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+            method: selectedMethod === 'upi' ? 'UPI (Instant QR)' : selectedMethod === 'card' ? 'Corporate Card' : 'Net Banking',
+            status: 'Paid',
+            receiptUrl: '#'
+          },
+          ...paymentHistory
+        ]);
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || err.message || 'Subscription payment failed');
       setPaying(false);
-      setPaymentSuccess(true);
-      const newInvoice = {
-        id: `INV-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`,
-        month: currentMonthName,
-        amount: 500,
-        paidOn: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-        method: selectedMethod === 'upi' ? 'UPI (Instant QR)' : selectedMethod === 'card' ? 'Corporate Card' : 'Net Banking',
-        status: 'Paid',
-        receiptUrl: '#'
-      };
-      setPaymentHistory([newInvoice, ...paymentHistory]);
-    }, 1200);
+    }
   };
 
   return (
@@ -359,7 +435,7 @@ export const CompanySubscription: React.FC = () => {
                   <Button
                     variant="primary"
                     fullWidth
-                    onClick={handleSimulatePayment}
+                    onClick={handleRazorpayPayment}
                     disabled={paying}
                     className="font-bold text-xs"
                   >

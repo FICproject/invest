@@ -8,6 +8,11 @@ import {
   resubmitCompany
 } from '../controllers/companyAuthController.js';
 import {
+  getCompanySubscription,
+  createCompanySubscriptionOrder,
+  verifyCompanySubscription
+} from '../controllers/companySubscriptionController.js';
+import {
   getCompanyProfile,
   updateCompanyProfile,
   addDirector,
@@ -82,6 +87,11 @@ router.delete('/documents/:id', deleteCompanyDocument);
 // Notifications
 router.get('/notifications', getCompanyNotifications);
 router.put('/notifications/:id/read', markCompanyNotificationRead);
+
+// Subscription & Razorpay Billing
+router.get('/subscription', getCompanySubscription);
+router.post('/subscription/create-order', createCompanySubscriptionOrder);
+router.post('/subscription/verify', verifyCompanySubscription);
 
 export default router;
 

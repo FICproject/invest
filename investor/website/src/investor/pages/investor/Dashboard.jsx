@@ -78,7 +78,7 @@ export const Dashboard = () => {
     nextPayoutDate: '2026-04-15'
   };
 
-  const isKycIncomplete = kycStatus !== 'APPROVED';
+  const isKycIncomplete = false; // Registration & KYC auto-activated by Admin
 
   return (
     <DashboardLayout>

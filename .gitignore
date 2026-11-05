@@ -21,7 +21,10 @@ data/db/
 WiredTiger*
 mongod.lock
 
-# Logs
+# Uploaded documents during testing
+backend/uploads/
+uploads/
+
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

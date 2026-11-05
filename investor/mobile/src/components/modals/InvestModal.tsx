@@ -42,7 +42,7 @@ export const InvestModal: React.FC<InvestModalProps> = ({
   const { refreshAll } = usePortfolioContext();
 
   const [amount, setAmount] = useState<string>('');
-  const [selectedMethod, setSelectedMethod] = useState<string>('UPI / Net Banking');
+  const [selectedMethod, setSelectedMethod] = useState<string>('Razorpay Gateway (UPI, Cards, NetBanking)');
   const [calculation, setCalculation] = useState<ReturnCalculation | null>(null);
   const [loadingCalc, setLoadingCalc] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -247,7 +247,12 @@ export const InvestModal: React.FC<InvestModalProps> = ({
 
             {/* Payment Method Selector */}
             <Text style={styles.sectionHeading}>Payment Gateway / Method</Text>
-            {['UPI / Net Banking', 'IMPS / NEFT Escrow Transfer', 'Connect Investor Wallet'].map((method) => (
+            {[
+              'Razorpay Gateway (UPI, Cards, NetBanking)',
+              'UPI / Net Banking',
+              'IMPS / NEFT Direct Transfer',
+              'Connect Investor Wallet'
+            ].map((method) => (
               <TouchableOpacity
                 key={method}
                 style={[

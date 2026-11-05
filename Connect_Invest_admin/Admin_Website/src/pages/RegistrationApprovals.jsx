@@ -135,6 +135,38 @@ export default function RegistrationApprovals() {
 
     try {
       setSubmitting(true);
+
+      // Optimistically update the UI status immediately
+      setApplications(prev =>
+        prev.map(item =>
+          item.id === app.id
+            ? { ...item, registrationStatus: decision, rejectionReason: decision === 'Approved' ? null : trimmedReason }
+            : item
+        )
+      );
+
+      // Optimistically update KPI stats immediately
+      setStats(prev => {
+        const wasPending = app.registrationStatus === 'Pending Approval';
+        const isNowApproved = decision === 'Approved';
+        const isNowRejected = decision === 'Rejected';
+        const isNowResubmission = decision === 'Resubmission Required';
+
+        return {
+          ...prev,
+          totalPending: wasPending ? Math.max(0, (prev.totalPending || 1) - 1) : prev.totalPending,
+          pendingInvestors: wasPending && app.type === 'investor' ? Math.max(0, (prev.pendingInvestors || 1) - 1) : prev.pendingInvestors,
+          pendingCompanies: wasPending && app.type === 'company' ? Math.max(0, (prev.pendingCompanies || 1) - 1) : prev.pendingCompanies,
+          totalApproved: isNowApproved ? (prev.totalApproved || 0) + 1 : prev.totalApproved,
+          totalRejected: isNowRejected ? (prev.totalRejected || 0) + 1 : prev.totalRejected,
+          resubmissionsNeeded: isNowResubmission ? (prev.resubmissionsNeeded || 0) + 1 : prev.resubmissionsNeeded
+        };
+      });
+
+      // Close review modal immediately
+      setSelectedApp(null);
+      setDecisionReason('');
+
       const res = await adminApi.decideApproval(app.id, {
         type: app.type,
         decision,
@@ -148,11 +180,10 @@ export default function RegistrationApprovals() {
           message: res.data.message || `Application marked as ${decision}.`
         });
 
-        setSelectedApp(null);
-        setDecisionReason('');
         fetchApplications(true);
       }
     } catch (err) {
+      fetchApplications(true);
       addToast({
         type: 'error',
         title: 'Decision submission failed',

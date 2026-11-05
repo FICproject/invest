@@ -6,8 +6,12 @@ import { Payout } from '../models/Payout.js';
 import { Notification } from '../models/Notification.js';
 import { KYC } from '../models/KYC.js';
 import { Company } from '../models/Company.js';
+import { Release } from '../models/Release.js';
+import { User } from '../models/User.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { createRazorpayOrder, verifyRazorpaySignature } from '../services/razorpayService.js';
+import { broadcastSyncEvent } from '../services/sse.js';
 
 // @route   POST /api/payments/create-order
 // @desc    Initiate investment payment order
@@ -69,15 +73,28 @@ export const createOrder = asyncHandler(async (req, res) => {
     }
   }
 
-  const orderId = 'ORD_' + Date.now() + '_' + Math.floor(1000 + Math.random() * 9000);
+  // Generate Razorpay Order
+  const rzpOrder = await createRazorpayOrder({
+    amountPaise: investAmount * 100,
+    currency: 'INR',
+    receipt: `rcpt_inv_${Date.now()}`,
+    notes: {
+      investorId: investorId.toString(),
+      offerId: offer._id.toString(),
+      offerTitle: offer.title
+    }
+  });
+
+  const orderId = rzpOrder.orderId;
 
   const payment = await Payment.create({
     investorId,
     offerId,
     orderId,
+    razorpayOrderId: rzpOrder.orderId,
     amount: investAmount,
     currency: 'INR',
-    paymentMethod: paymentMethod || 'Net Banking',
+    paymentMethod: paymentMethod || 'Razorpay Gateway',
     status: 'Created'
   });
 
@@ -86,12 +103,16 @@ export const createOrder = asyncHandler(async (req, res) => {
     message: 'Payment order generated successfully.',
     data: {
       orderId: payment.orderId,
+      razorpayOrderId: rzpOrder.orderId,
+      keyId: rzpOrder.key,
       amount: payment.amount,
+      amountPaise: Math.round(payment.amount * 100),
       currency: payment.currency,
       offerTitle: offer.title,
       companyName: offer.companyName,
       returnRate: offer.returnRate,
-      tenureMonths: offer.tenureMonths
+      tenureMonths: offer.tenureMonths,
+      simulated: rzpOrder.simulated || false
     }
   });
 });
@@ -99,16 +120,38 @@ export const createOrder = asyncHandler(async (req, res) => {
 // @route   POST /api/payments/verify
 // @desc    Verify payment callback and create confirmed investment & ledger records
 export const verifyPayment = asyncHandler(async (req, res) => {
-  const { orderId, paymentId, status } = req.body;
+  const { orderId, paymentId, signature, razorpayOrderId, razorpayPaymentId, razorpaySignature, status } = req.body;
   const investorId = req.user._id;
 
-  if (!orderId) {
+  const effectiveOrderId = orderId || razorpayOrderId;
+  const effectivePaymentId = paymentId || razorpayPaymentId;
+  const effectiveSignature = signature || razorpaySignature;
+
+  if (!effectiveOrderId) {
     throw new ApiError(400, 'Payment Order ID is required for verification.');
   }
 
-  const payment = await Payment.findOne({ orderId, investorId });
+  const payment = await Payment.findOne({
+    $or: [{ orderId: effectiveOrderId }, { razorpayOrderId: effectiveOrderId }],
+    investorId
+  });
   if (!payment) {
     throw new ApiError(404, 'Payment order not found.');
+  }
+
+  // If Razorpay signature is passed, verify cryptographic hash
+  if (effectiveSignature) {
+    const isValid = verifyRazorpaySignature({
+      orderId: effectiveOrderId,
+      paymentId: effectivePaymentId,
+      signature: effectiveSignature
+    });
+    if (!isValid) {
+      payment.status = 'Failed';
+      payment.failureReason = 'Razorpay signature verification failed';
+      await payment.save();
+      throw new ApiError(400, 'Invalid payment signature. Transaction security verification failed.');
+    }
   }
 
   if (status === 'Failed') {
@@ -173,7 +216,9 @@ export const verifyPayment = asyncHandler(async (req, res) => {
 
   // 3. Update payment status
   payment.status = 'Success';
-  payment.paymentId = paymentId || 'PAY_' + Date.now();
+  payment.paymentId = effectivePaymentId || 'PAY_' + Date.now();
+  if (effectivePaymentId) payment.razorpayPaymentId = effectivePaymentId;
+  if (effectiveSignature) payment.razorpaySignature = effectiveSignature;
   await payment.save();
 
   // 4. Create confirmed transaction record
@@ -207,7 +252,7 @@ export const verifyPayment = asyncHandler(async (req, res) => {
     });
   }
 
-  // 6. Create congratulatory notification
+  // 6. Create congratulatory notification for Investor
   await Notification.create({
     investorId,
     title: 'Investment Confirmed!',
@@ -216,9 +261,62 @@ export const verifyPayment = asyncHandler(async (req, res) => {
     link: '/investor/my-investments'
   });
 
+  // 7. PRD Flow: Forward funds to company via Admin Fund Release queue
+  // When an investor pays for a project, a Release record is created in PREPARED status
+  // so the Platform Administrator can review, verify, and forward/disburse the collected fund to the respective company.
+  try {
+    let targetCompany = null;
+    if (offer.companyId) {
+      targetCompany = await Company.findById(offer.companyId);
+    }
+    if (!targetCompany && offer.companyName) {
+      targetCompany = await Company.findOne({
+        $or: [
+          { name: new RegExp(`^${offer.companyName.trim()}$`, 'i') },
+          { legalName: new RegExp(`^${offer.companyName.trim()}$`, 'i') },
+          { brandName: new RegExp(`^${offer.companyName.trim()}$`, 'i') }
+        ]
+      });
+    }
+
+    if (targetCompany) {
+      // Find an admin user to attach
+      const adminUser = await User.findOne({ role: 'admin' });
+
+      const bankSnapshot = targetCompany.bankAccount || {
+        holderName: targetCompany.bankDetails?.accountHolderName || targetCompany.name,
+        accountNo: targetCompany.bankDetails?.accountNumber || 'Pending Account Details',
+        ifsc: targetCompany.bankDetails?.ifscCode || 'N/A',
+        bankName: targetCompany.bankDetails?.bankName || 'Company Bank'
+      };
+
+      const releaseRecord = await Release.create({
+        investmentOfferId: offer._id,
+        investmentId: investment._id,
+        offerTitle: offer.title,
+        companyName: targetCompany.name || offer.companyName,
+        companyId: targetCompany._id,
+        amountPaise: Math.round(principal * 100),
+        amount: principal,
+        investorName: req.user?.name || 'Investor',
+        adminId: adminUser?._id || null,
+        status: 'Prepared',
+        bankAccountSnapshot: bankSnapshot
+      });
+
+      broadcastSyncEvent('release_created', {
+        releaseId: releaseRecord._id,
+        companyName: targetCompany.name,
+        amount: principal
+      });
+    }
+  } catch (releaseErr) {
+    console.warn('[PaymentController] Fund release creation notice:', releaseErr.message);
+  }
+
   res.status(200).json({
     success: true,
-    message: 'Investment confirmed successfully! Funds allocated and payout schedule initialized.',
+    message: 'Investment confirmed successfully! Funds received and queued for Admin disbursement to the company.',
     data: {
       investmentId: investment._id,
       certificateNumber: investment.certificateNumber,

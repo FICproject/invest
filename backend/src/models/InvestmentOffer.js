@@ -12,6 +12,11 @@ const investmentOfferSchema = new mongoose.Schema(
       required: [true, 'Please provide company name'],
       trim: true
     },
+    companyId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Company',
+      default: null
+    },
     type: {
       type: String,
       enum: ['Company', 'Project'],

@@ -82,9 +82,9 @@ export const WalletScreen = ({ navigation }: any) => {
         <View style={styles.walletCard}>
           <View style={styles.walletHeader}>
             <Text style={styles.walletLabel}>Cumulative Yield Disbursed</Text>
-            <View style={styles.escrowBadge}>
+            <View style={styles.verifiedBadge}>
               <Icon name="shield" size={13} color={COLORS.gold} />
-              <Text style={styles.escrowText}>Escrow Protected</Text>
+              <Text style={styles.verifiedText}>Direct Verified</Text>
             </View>
           </View>
 
@@ -98,30 +98,55 @@ export const WalletScreen = ({ navigation }: any) => {
           </View>
         </View>
 
-        {/* Upcoming Scheduled Distributions */}
+        {/* Upcoming Scheduled Distributions with Full Breakdown */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Upcoming Scheduled Payouts</Text>
+          <Text style={styles.sectionTitle}>Upcoming Scheduled Returns</Text>
           {loading ? (
-            <Loader message="Loading payouts..." />
+            <Loader message="Loading returns..." />
           ) : upcomingPayouts.length > 0 ? (
-            upcomingPayouts.slice(0, 4).map((payout) => (
-              <View key={payout._id} style={styles.payoutCard}>
-                <View style={styles.payoutLeft}>
-                  <Text style={styles.payoutCompany} numberOfLines={1}>
-                    {payout.offerTitle}
-                  </Text>
-                  <Text style={styles.payoutDate}>
-                    Due: {formatDate(payout.scheduledDate)} • {payout.payoutType}
-                  </Text>
+            upcomingPayouts.slice(0, 6).map((payout) => {
+              const project = payout.projectTitle || payout.offerTitle || 'Investment Project';
+              const capital = payout.investedAmount || payout.investmentId?.amount || 0;
+              const rate = payout.returnRate || payout.ratePercent || 12;
+              const totalTenure = payout.tenureMonths || 12;
+              const remaining = payout.remainingTenureMonths != null ? payout.remainingTenureMonths : totalTenure;
+
+              return (
+                <View key={payout._id} style={styles.payoutCard}>
+                  <View style={styles.payoutLeft}>
+                    <Text style={styles.payoutCompany} numberOfLines={1}>
+                      {project}
+                    </Text>
+                    <Text style={styles.payoutDate}>
+                      Due: {formatDate(payout.scheduledDate)} • {payout.payoutType || 'Monthly Return'}
+                    </Text>
+
+                    {/* Return Details Row: Invested, Rate, Tenure */}
+                    <View style={styles.payoutMetaRow}>
+                      {capital > 0 && (
+                        <View style={styles.metaChip}>
+                          <Text style={styles.metaChipLabel}>Invested: </Text>
+                          <Text style={styles.metaChipValue}>{formatCurrency(capital)}</Text>
+                        </View>
+                      )}
+                      <View style={[styles.metaChip, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
+                        <Text style={[styles.metaChipValue, { color: '#059669' }]}>{rate}% p.a.</Text>
+                      </View>
+                      <View style={styles.metaChip}>
+                        <Text style={styles.metaChipValue}>{totalTenure}m ({remaining}m left)</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.payoutRight}>
+                    <Text style={styles.payoutAmount}>
+                      {formatCurrency(payout.amount)}
+                    </Text>
+                    <Badge label={payout.status || 'Scheduled'} variant="warning" size="sm" />
+                  </View>
                 </View>
-                <View style={styles.payoutRight}>
-                  <Text style={styles.payoutAmount}>
-                    {formatCurrency(payout.amount)}
-                  </Text>
-                  <Badge label="Scheduled" variant="warning" size="sm" />
-                </View>
-              </View>
-            ))
+              );
+            })
           ) : (
             <View style={styles.emptyPayoutsBox}>
               <Text style={styles.emptyPayoutsText}>
@@ -224,7 +249,7 @@ const styles = StyleSheet.create({
     color: COLORS.goldLight,
     fontWeight: '500',
   },
-  escrowBadge: {
+  verifiedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(200, 150, 62, 0.2)',
@@ -233,7 +258,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
     gap: 4,
   },
-  escrowText: {
+  verifiedText: {
     fontSize: 10,
     color: COLORS.goldLight,
     fontWeight: '600',
@@ -314,6 +339,30 @@ const styles = StyleSheet.create({
   payoutDate: {
     fontSize: 11,
     color: COLORS.textSecondary,
+    marginBottom: 4,
+  },
+  payoutMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 2,
+  },
+  metaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surfaceSubtle,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: RADIUS.xs,
+  },
+  metaChipLabel: {
+    fontSize: 10,
+    color: COLORS.textSecondary,
+  },
+  metaChipValue: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
   },
   payoutRight: {
     alignItems: 'flex-end',

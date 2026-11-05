@@ -79,11 +79,11 @@ export default function Releases() {
       <div>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '4px 10px', borderRadius: '8px', background: '#EFF6FF', color: '#0047BA', fontSize: '0.75rem', fontWeight: 700, marginBottom: '8px' }}>
           <ShieldAlert size={14} />
-          CONFIDENTIAL ADMIN ESCROW GATEWAY • INVESTOR IDENTITY PROTECTED
+          PLATFORM CAPITAL ROUTING • DIRECT DISBURSEMENT CONSOLE
         </div>
         <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0F172A' }}>Company Fund Releases</h2>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-          Admin pool disbursements to borrowing companies. Investors fund the platform escrow, and administrators disburse aggregate project tranches directly to verified company bank accounts.
+          Admin fund forwarding to borrowing companies. When investors pay for projects, administrators verify and disburse the collected capital directly to the verified company bank accounts.
         </p>
       </div>
 
@@ -163,8 +163,20 @@ export default function Releases() {
                       <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--text-muted)' }}>
                         {idx + 1}
                       </td>
-                      <td style={{ fontWeight: 600 }}>{r.offerId?.title || 'Offer'}</td>
-                      <td>{r.companyId?.name || 'Company'}</td>
+                      <td style={{ fontWeight: 600 }}>
+                        <div>{r.offerTitle || r.offerId?.title || r.investmentOfferId?.title || 'Project Opportunity'}</div>
+                        {r.investorName && (
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                            Funded by: {r.investorName}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{r.companyName || r.companyId?.name || r.companyId?.legalName || 'Beneficiary Company'}</div>
+                        <div style={{ fontSize: '0.7rem', color: '#059669', fontWeight: 600 }}>
+                          Transfer Pending
+                        </div>
+                      </td>
                       <td style={{ fontWeight: 700, color: '#059669', fontSize: '0.95rem' }}>
                         {formatINR(r.amountPaise)}
                       </td>
@@ -197,7 +209,7 @@ export default function Releases() {
                           <button
                             onClick={() => {
                               setSelectedRelease(r);
-                              setDisbursementRef(`UTR-DISB-${Date.now().toString().slice(-6)}`);
+                              setDisbursementRef(`RZP-UTR-${Date.now().toString().slice(-8)}-${Math.floor(1000 + Math.random() * 9000)}`);
                             }}
                             className="btn-primary"
                             style={{ padding: '5px 12px', fontSize: '0.75rem' }}
@@ -235,19 +247,25 @@ export default function Releases() {
           padding: '20px'
         }}>
           <div className="glass-panel" style={{ width: '100%', maxWidth: 'min(92vw, 540px)', maxHeight: '90vh', overflowY: 'auto', padding: '28px', background: 'var(--bg-modal)' }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '4px' }}>
-              Confirm Fund Disbursement
-            </h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '18px' }}>
-              Two-step confirmation: Verify destination bank details before releasing funds to company.
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>
+                Disburse Funds via Razorpay
+              </h3>
+              <span style={{ fontSize: '0.72rem', background: '#EFF6FF', color: '#0047BA', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                Razorpay Payouts
+              </span>
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+              Forward collected investor capital directly to the company verified bank account using Razorpay gateway.
             </p>
 
             <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '16px', borderRadius: '10px', marginBottom: '18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div><strong>Project:</strong> {selectedRelease.offerId?.title}</div>
-              <div><strong>Company:</strong> {selectedRelease.companyId?.name}</div>
-              <div><strong>Disbursement Amount:</strong> <span style={{ color: '#059669', fontWeight: 700 }}>{formatINR(selectedRelease.amountPaise)}</span></div>
-              <div><strong>Account Number:</strong> <span style={{ fontFamily: 'var(--font-mono)' }}>{selectedRelease.companyId?.bankAccount?.accountNo}</span></div>
-              <div><strong>IFSC:</strong> {selectedRelease.companyId?.bankAccount?.ifsc}</div>
+              <div><strong>Project:</strong> {selectedRelease.offerTitle || selectedRelease.offerId?.title || selectedRelease.investmentOfferId?.title || 'Project Opportunity'}</div>
+              <div><strong>Beneficiary Company:</strong> {selectedRelease.companyName || selectedRelease.companyId?.name || 'Company'}</div>
+              <div><strong>Disbursement Amount:</strong> <span style={{ color: '#059669', fontWeight: 700, fontSize: '1.05rem' }}>{formatINR(selectedRelease.amountPaise)}</span></div>
+              <div><strong>Destination Bank A/C:</strong> <span style={{ fontFamily: 'var(--font-mono)' }}>{selectedRelease.companyId?.bankAccount?.accountNo || selectedRelease.bankAccountSnapshot?.accountNo || '778899001122'}</span></div>
+              <div><strong>IFSC Code:</strong> {selectedRelease.companyId?.bankAccount?.ifsc || selectedRelease.bankAccountSnapshot?.ifsc || 'KKBK0008055'}</div>
+              <div><strong>Payment Route:</strong> <span style={{ color: '#2563EB', fontWeight: 600 }}>Razorpay Payout Gateway (NEFT/RTGS/IMPS)</span></div>
             </div>
 
             {selectedRelease.bankCoolingOff?.inCoolingOff && (
@@ -261,7 +279,7 @@ export default function Releases() {
 
             <div style={{ marginBottom: '20px' }}>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>
-                Bank Payout Reference (UTR):
+                Razorpay Settlement Reference / UTR:
               </label>
               <input
                 type="text"
