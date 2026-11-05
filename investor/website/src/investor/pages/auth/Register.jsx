@@ -1450,22 +1450,9 @@ export const Register = () => {
                       Certificate of Incorporation, Company PAN, GST Certificate, MOA & AOA, Shareholding Pattern & Financials.
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       <div>
-                        <div style={{ fontSize: '12px', fontWeight: '600' }}>1. Certificate of Incorporation (ROC)</div>
-                        <input
-                          type="file"
-                          onChange={(e) => handleFileUpload(e, 'incorporationCertificateUrl', 'company')}
-                          style={{ fontSize: '11px', marginTop: '2px' }}
-                        />
-                        {companyData.incorporationCertificateUrl && (
-                          <div style={{ fontSize: '11px', color: '#059669', marginTop: '2px', fontWeight: 600 }}>
-                            ✓ Attached: {companyData.incorporationCertificateUrl.split('/').pop()}
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '12px', fontWeight: '600' }}>2. Company PAN & GST Certificate</div>
+                        <div style={{ fontSize: '12px', fontWeight: '600' }}>1. Company PAN Card</div>
                         <input
                           type="file"
                           onChange={(e) => handleFileUpload(e, 'panCardUrl', 'company')}
@@ -1478,15 +1465,15 @@ export const Register = () => {
                         )}
                       </div>
                       <div>
-                        <div style={{ fontSize: '12px', fontWeight: '600' }}>3. MOA & AOA / Shareholding Pattern</div>
+                        <div style={{ fontSize: '12px', fontWeight: '600' }}>2. GST Registration Certificate</div>
                         <input
                           type="file"
-                          onChange={(e) => handleFileUpload(e, 'moaAoaUrl', 'company')}
+                          onChange={(e) => handleFileUpload(e, 'gstCertificateUrl', 'company')}
                           style={{ fontSize: '11px', marginTop: '2px' }}
                         />
-                        {companyData.moaAoaUrl && (
+                        {companyData.gstCertificateUrl && (
                           <div style={{ fontSize: '11px', color: '#059669', marginTop: '2px', fontWeight: 600 }}>
-                            ✓ Attached: {companyData.moaAoaUrl.split('/').pop()}
+                            ✓ Attached: {companyData.gstCertificateUrl.split('/').pop()}
                           </div>
                         )}
                       </div>

@@ -871,6 +871,7 @@ export default function RegistrationApprovals() {
                   <div><strong>Legal PAN:</strong> <span style={{ fontFamily: 'monospace' }}>{selectedApp.details?.pan}</span></div>
                   {selectedApp.type === 'company' ? (
                     <>
+                      <div><strong>Company Email:</strong> <span style={{ color: '#0047BA', fontWeight: 700 }}>{selectedApp.email}</span></div>
                       <div><strong>CIN / Reg No:</strong> <span style={{ fontFamily: 'monospace' }}>{selectedApp.details?.cin}</span></div>
                       <div><strong>GSTIN:</strong> <span style={{ fontFamily: 'monospace' }}>{selectedApp.details?.gstin || 'N/A'}</span></div>
                       <div><strong>Entity Type:</strong> {selectedApp.details?.companyType}</div>

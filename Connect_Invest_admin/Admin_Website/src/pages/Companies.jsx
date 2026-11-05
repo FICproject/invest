@@ -270,8 +270,10 @@ export default function Companies() {
                         <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{c.regNo}</span>
                       </td>
                       <td>
-                        <div>{c.ownerUserId?.name}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{c.ownerUserId?.email}</div>
+                        <div style={{ fontWeight: 600 }}>{c.officialEmail || c.email || c.ownerUserId?.email}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          Rep: {c.ownerUserId?.name || 'Authorized Rep'}
+                        </div>
                       </td>
                       <td style={{ textAlign: 'center' }}>
                         <span className={`badge ${c.status === 'Approved' ? 'badge-emerald' :
@@ -526,7 +528,8 @@ export default function Companies() {
             </p>
 
             <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '8px', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div><strong>Owner:</strong> {reviewCompany.ownerUserId?.name} ({reviewCompany.ownerUserId?.email})</div>
+              <div><strong>Company Email:</strong> <span style={{ color: '#0047BA', fontWeight: 600 }}>{reviewCompany.officialEmail || reviewCompany.email || reviewCompany.ownerUserId?.email}</span></div>
+              <div><strong>Authorized Representative:</strong> {reviewCompany.ownerUserId?.name} ({reviewCompany.ownerUserId?.email || 'N/A'})</div>
               <div><strong>Sector:</strong> {reviewCompany.profile?.sector || 'General'}</div>
               <div><strong>Bank Account:</strong> {reviewCompany.bankAccount?.accountNo || 'None'} ({reviewCompany.bankAccount?.ifsc || 'N/A'})</div>
               <div><strong>Cooling-Off:</strong> {reviewCompany.bankCoolingOff?.inCoolingOff ? `ACTIVE (${reviewCompany.bankCoolingOff.hoursRemaining} hours left)` : 'Completed / Ready'}</div>

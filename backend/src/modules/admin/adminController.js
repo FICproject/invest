@@ -3850,13 +3850,8 @@ export async function getAllApprovals(req, res, next) {
         }
 
         const documents = [
-          { name: 'Certificate of Incorporation', key: 'incorporation', url: normalizeDocUrl(c.documents?.incorporationCertificateUrl || '/uploads/sample-incorporation.pdf'), type: 'legal' },
           { name: 'Company PAN Card', key: 'panCard', url: normalizeDocUrl(c.documents?.panCardUrl || '/uploads/sample-company-pan.png'), type: 'identity' },
-          { name: 'GST Registration Certificate', key: 'gst', url: normalizeDocUrl(c.documents?.gstCertificateUrl || '/uploads/sample-gst.pdf'), type: 'tax' },
-          { name: 'MOA & AOA Charter', key: 'moaAoa', url: normalizeDocUrl(c.documents?.moaAoaUrl || '/uploads/sample-moa.pdf'), type: 'legal' },
-          { name: 'Shareholding Pattern', key: 'shareholding', url: normalizeDocUrl(c.documents?.shareholdingPatternUrl || '/uploads/sample-shareholding.pdf'), type: 'compliance' },
-          { name: 'Audited Financial Statements', key: 'financials', url: normalizeDocUrl(c.documents?.financialStatementsUrl || '/uploads/sample-financials.pdf'), type: 'financial' },
-          { name: 'Cancelled Cheque', key: 'cancelledCheque', url: normalizeDocUrl(c.bankDetails?.chequeUrl || '/uploads/sample-cheque.png'), type: 'financial' }
+          { name: 'GST Registration Certificate', key: 'gst', url: normalizeDocUrl(c.documents?.gstCertificateUrl || '/uploads/sample-gst.pdf'), type: 'tax' }
         ];
 
         companyList.push({

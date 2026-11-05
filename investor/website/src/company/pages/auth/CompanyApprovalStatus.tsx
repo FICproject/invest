@@ -570,13 +570,6 @@ export const CompanyApprovalStatus: React.FC = () => {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94A3B8', marginBottom: '6px' }}>Certificate of Incorporation (PDF/JPG)</label>
-                <input type="file" onChange={e => handleFileUpload(e, 'incorporationCertificateUrl')} style={{ width: '100%', color: '#94A3B8' }} />
-                {uploadingField === 'incorporationCertificateUrl' && <span style={{ fontSize: '0.78rem', color: '#F59E0B' }}>Uploading...</span>}
-                {formData.incorporationCertificateUrl && <span style={{ fontSize: '0.78rem', color: '#22C55E' }}>✓ Uploaded</span>}
-              </div>
-
-              <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', color: '#94A3B8', marginBottom: '6px' }}>Company PAN Card Document</label>
                 <input type="file" onChange={e => handleFileUpload(e, 'panCardUrl')} style={{ width: '100%', color: '#94A3B8' }} />
                 {uploadingField === 'panCardUrl' && <span style={{ fontSize: '0.78rem', color: '#F59E0B' }}>Uploading...</span>}
@@ -584,17 +577,10 @@ export const CompanyApprovalStatus: React.FC = () => {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94A3B8', marginBottom: '6px' }}>MOA & AOA Charter (PDF)</label>
-                <input type="file" onChange={e => handleFileUpload(e, 'moaAoaUrl')} style={{ width: '100%', color: '#94A3B8' }} />
-                {uploadingField === 'moaAoaUrl' && <span style={{ fontSize: '0.78rem', color: '#F59E0B' }}>Uploading...</span>}
-                {formData.moaAoaUrl && <span style={{ fontSize: '0.78rem', color: '#22C55E' }}>✓ Uploaded</span>}
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94A3B8', marginBottom: '6px' }}>Cancelled Cheque / Bank Statement</label>
-                <input type="file" onChange={e => handleFileUpload(e, 'cancelledChequeUrl')} style={{ width: '100%', color: '#94A3B8' }} />
-                {uploadingField === 'cancelledChequeUrl' && <span style={{ fontSize: '0.78rem', color: '#F59E0B' }}>Uploading...</span>}
-                {formData.cancelledChequeUrl && <span style={{ fontSize: '0.78rem', color: '#22C55E' }}>✓ Uploaded</span>}
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94A3B8', marginBottom: '6px' }}>GST Registration Certificate</label>
+                <input type="file" onChange={e => handleFileUpload(e, 'gstCertificateUrl')} style={{ width: '100%', color: '#94A3B8' }} />
+                {uploadingField === 'gstCertificateUrl' && <span style={{ fontSize: '0.78rem', color: '#F59E0B' }}>Uploading...</span>}
+                {formData.gstCertificateUrl && <span style={{ fontSize: '0.78rem', color: '#22C55E' }}>✓ Uploaded</span>}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>

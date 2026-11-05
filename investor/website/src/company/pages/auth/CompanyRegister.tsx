@@ -589,24 +589,11 @@ export const CompanyRegister: React.FC = () => {
               <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 space-y-3">
                 <div className="text-xs font-bold text-slate-800">Company Documents Checklist</div>
                 <div className="text-[11px] text-slate-500">
-                  Certificate of Incorporation, Company PAN, GST Certificate, MOA/AOA, and Financials.
+                  Upload Company PAN Card and GST Registration Certificate.
                 </div>
-                <div className="space-y-2 text-xs">
+                <div className="space-y-3 text-xs">
                   <div>
-                    <span className="font-semibold text-slate-700">1. Certificate of Incorporation:</span>
-                    <input
-                      type="file"
-                      onChange={(e) => handleFileUpload(e, 'incorporationCertificateUrl')}
-                      className="block mt-1 text-[11px]"
-                    />
-                    {formData.incorporationCertificateUrl && (
-                      <div className="text-[11px] text-emerald-600 font-semibold mt-0.5">
-                        ✓ Attached: {formData.incorporationCertificateUrl.split('/').pop()}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <span className="font-semibold text-slate-700">2. Company PAN & GST:</span>
+                    <span className="font-semibold text-slate-700">1. Company PAN Card:</span>
                     <input
                       type="file"
                       onChange={(e) => handleFileUpload(e, 'panCardUrl')}
@@ -619,15 +606,15 @@ export const CompanyRegister: React.FC = () => {
                     )}
                   </div>
                   <div>
-                    <span className="font-semibold text-slate-700">3. MOA & AOA:</span>
+                    <span className="font-semibold text-slate-700">2. GST Registration Certificate:</span>
                     <input
                       type="file"
-                      onChange={(e) => handleFileUpload(e, 'moaAoaUrl')}
+                      onChange={(e) => handleFileUpload(e, 'gstCertificateUrl')}
                       className="block mt-1 text-[11px]"
                     />
-                    {formData.moaAoaUrl && (
+                    {formData.gstCertificateUrl && (
                       <div className="text-[11px] text-emerald-600 font-semibold mt-0.5">
-                        ✓ Attached: {formData.moaAoaUrl.split('/').pop()}
+                        ✓ Attached: {formData.gstCertificateUrl.split('/').pop()}
                       </div>
                     )}
                   </div>
