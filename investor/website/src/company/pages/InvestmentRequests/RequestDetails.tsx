@@ -117,7 +117,8 @@ export const RequestDetails: React.FC = () => {
       investmentPeriodYears: request.proposedDurationMonths
         ? Math.max(1, Math.round(request.proposedDurationMonths / 12))
         : (request.adminSuggestions?.durationMonths ? Math.max(1, Math.round(request.adminSuggestions.durationMonths / 12)) : prev.investmentPeriodYears),
-      minInvestment: request.proposedMinInvestment || request.adminSuggestions?.minInvestment || prev.minInvestment
+      minInvestment: request.proposedMinInvestment || request.adminSuggestions?.minInvestment || prev.minInvestment,
+      maxInvestment: request.proposedMaxInvestment || request.adminSuggestions?.maxInvestment || prev.maxInvestment
     }));
     setIsEditing(true);
   };

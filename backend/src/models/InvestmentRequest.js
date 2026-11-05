@@ -83,11 +83,13 @@ const investmentRequestSchema = new mongoose.Schema(
     proposedReturnRate: { type: Number, default: null },
     proposedDurationMonths: { type: Number, default: null },
     proposedMinInvestment: { type: Number, default: null },
+    proposedMaxInvestment: { type: Number, default: null },
     adminSuggestions: {
       fundingTarget: { type: Number },
       returnRate: { type: Number },
       durationMonths: { type: Number },
       minInvestment: { type: Number },
+      maxInvestment: { type: Number },
       notes: { type: String },
       suggestedAt: { type: Date },
       suggestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }

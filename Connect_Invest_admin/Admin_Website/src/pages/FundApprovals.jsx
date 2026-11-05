@@ -62,6 +62,7 @@ export default function FundApprovals() {
   const [proposedReturnRate, setProposedReturnRate] = useState('');
   const [proposedDurationMonths, setProposedDurationMonths] = useState('');
   const [proposedMinInvestment, setProposedMinInvestment] = useState('');
+  const [proposedMaxInvestment, setProposedMaxInvestment] = useState('');
   const [feedback, setFeedback] = useState('');
   const [publishToMarketplace, setPublishToMarketplace] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -141,6 +142,11 @@ export default function FundApprovals() {
         ? String(request.proposedMinInvestment)
         : String(request.minInvestment || '')
     );
+    setProposedMaxInvestment(
+      request.proposedMaxInvestment !== null && request.proposedMaxInvestment !== undefined
+        ? String(request.proposedMaxInvestment)
+        : String(request.maxInvestment || '')
+    );
     setFeedback(request.reviewerFeedback || '');
     setPublishToMarketplace(true);
   };
@@ -183,7 +189,8 @@ export default function FundApprovals() {
         proposedFundingTarget: proposedFundingTarget ? Number(proposedFundingTarget) : undefined,
         proposedReturnRate: proposedReturnRate ? Number(proposedReturnRate) : undefined,
         proposedDurationMonths: proposedDurationMonths ? Number(proposedDurationMonths) : undefined,
-        proposedMinInvestment: proposedMinInvestment ? Number(proposedMinInvestment) : undefined
+        proposedMinInvestment: proposedMinInvestment ? Number(proposedMinInvestment) : undefined,
+        proposedMaxInvestment: proposedMaxInvestment ? Number(proposedMaxInvestment) : undefined
       };
 
       const res = await adminApi.decideFundingRequest(selectedRequest._id, payload);
@@ -1482,6 +1489,35 @@ export default function FundApprovals() {
                             value={proposedMinInvestment}
                             onChange={e => setProposedMinInvestment(e.target.value)}
                             placeholder="e.g. 25000"
+                            style={{
+                              width: '100%',
+                              padding: '9px 12px 9px 28px',
+                              borderRadius: '8px',
+                              border: '1px solid #FCD34D',
+                              backgroundColor: '#FFFFFF',
+                              fontSize: '0.86rem',
+                              fontWeight: 700,
+                              outline: 'none',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Proposed Max Investment */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#78350F', marginBottom: '6px' }}>
+                          Proposed Max Investment (₹):
+                        </label>
+                        <div style={{ position: 'relative' }}>
+                          <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: '#92400E' }}>
+                            ₹
+                          </span>
+                          <input
+                            type="number"
+                            value={proposedMaxInvestment}
+                            onChange={e => setProposedMaxInvestment(e.target.value)}
+                            placeholder="e.g. 500000"
                             style={{
                               width: '100%',
                               padding: '9px 12px 9px 28px',

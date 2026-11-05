@@ -4340,7 +4340,8 @@ export async function decideFundingRequest(req, res, next) {
       proposedFundingTarget,
       proposedReturnRate,
       proposedDurationMonths,
-      proposedMinInvestment
+      proposedMinInvestment,
+      proposedMaxInvestment
     } = req.body;
 
     const request = await InvestmentRequest.findById(id).populate('companyId');
@@ -4525,12 +4526,16 @@ export async function decideFundingRequest(req, res, next) {
       const pMin = (proposedMinInvestment !== undefined && proposedMinInvestment !== null && proposedMinInvestment !== '')
         ? Number(proposedMinInvestment)
         : null;
+      const pMax = (proposedMaxInvestment !== undefined && proposedMaxInvestment !== null && proposedMaxInvestment !== '')
+        ? Number(proposedMaxInvestment)
+        : null;
 
       request.status = 'Resubmission Required';
       request.proposedFundingTarget = pTarget;
       request.proposedReturnRate = pRate;
       request.proposedDurationMonths = pMonths;
       request.proposedMinInvestment = pMin;
+      request.proposedMaxInvestment = pMax;
       request.reviewerFeedback = trimmedFeedback || 'Please update the requested parameters (fund amount, interest rate, tenure, etc.) and resubmit.';
       request.reviewedBy = req.user._id;
       request.reviewedAt = new Date();
@@ -4540,6 +4545,7 @@ export async function decideFundingRequest(req, res, next) {
         returnRate: pRate,
         durationMonths: pMonths,
         minInvestment: pMin,
+        maxInvestment: pMax,
         notes: trimmedFeedback,
         suggestedAt: new Date(),
         suggestedBy: req.user._id
@@ -4555,6 +4561,7 @@ export async function decideFundingRequest(req, res, next) {
         proposedReturnRate: pRate,
         proposedDurationMonths: pMonths,
         proposedMinInvestment: pMin,
+        proposedMaxInvestment: pMax,
         originalFundingTarget: request.fundingTarget,
         originalReturnRate: request.expectedReturnRate || request.agreedReturnRate
       });
