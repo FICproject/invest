@@ -107,7 +107,7 @@ export const RequestDetails: React.FC = () => {
   };
 
   const isResubmissionNeeded = ['Resubmission Required', 'Changes Requested', 'Additional Information Required'].includes(request.status);
-  const canEdit = ['Draft', 'Submitted', 'Under Review', 'Resubmission Required', 'Changes Requested', 'Additional Information Required'].includes(request.status);
+  const canEdit = request.status === 'Draft' || isResubmissionNeeded;
 
   const applyProposedChanges = () => {
     setEditForm(prev => ({

@@ -288,6 +288,10 @@ export const updateRequest = asyncHandler(async (req, res) => {
   if (!request) throw new ApiError(404, 'Investment request not found');
 
   // Allow editing if Draft, Submitted, or Under Review (or if rejected/changes requested)
+  const editableStatuses = ['Draft', 'Resubmission Required', 'Changes Requested', 'Additional Information Required'];
+  if (!editableStatuses.includes(request.status)) {
+    throw new ApiError(403, 'Funding request is submitted or locked and cannot be edited unless admin requests changes.');
+  }
   if (['Approved', 'Funded', 'Funding Completed'].includes(request.status)) {
     throw new ApiError(403, 'Approved or Funded requests cannot be modified.');
   }
