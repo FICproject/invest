@@ -1,15 +1,17 @@
 // realTimeSync.js - SSE Client for Connect Invest Website (Investor & Company)
 const getSseUrl = () => {
-  if (typeof window !== 'undefined' && window.location) {
-    const customApi = import.meta.env?.VITE_API_URL;
-    if (customApi) {
-      // Remove trailing /api/v1 or /api if present and point to /api/v1/events
-      const origin = customApi.replace(/\/api(\/v1)?\/?$/, '');
-      return `${origin}/api/v1/events`;
-    }
-    return '/api/v1/events';
+  const customApi = import.meta.env?.VITE_API_URL;
+  if (customApi) {
+    // Remove trailing /api/v1 or /api if present and point to /api/v1/events
+    const origin = customApi.replace(/\/api(\/v1)?\/?$/, '');
+    return `${origin}/api/v1/events`;
   }
-  return 'http://localhost:5000/api/v1/events';
+  if (typeof window !== 'undefined' && window.location) {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return '/api/v1/events';
+    }
+  }
+  return 'https://connect-invest-backend.onrender.com/api/v1/events';
 };
 
 const SSE_URL = getSseUrl();
