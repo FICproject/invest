@@ -35,5 +35,17 @@ export const investorService = {
 
   async respondToCounter(id, data) {
     return await api.post(`/investor/investments/${id}/respond`, data);
+  },
+
+  async getSubscription() {
+    return await api.get('/investor/subscription');
+  },
+
+  async createSubscriptionOrder(data = {}) {
+    return await api.post('/investor/subscription/create-order', data);
+  },
+
+  async verifySubscription(data) {
+    return await api.post('/investor/subscription/verify', data);
   }
 };

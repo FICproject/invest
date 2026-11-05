@@ -25,6 +25,7 @@ export const Sidebar = ({ isOpen, onClose, isCollapsedDesktop = false }) => {
     { name: 'Portfolio & Returns', path: '/investor/returns-payouts', icon: TrendingUp },
     { name: 'Transactions & Payments', path: '/investor/transactions', icon: CreditCard },
     { name: 'Statements & Report', path: '/investor/statements', icon: FileText },
+    { name: 'Subscription', path: '/investor/subscription', icon: CreditCard },
     { name: 'Notifications', path: '/investor/notifications', icon: Bell, badgeCount: 3 },
     { name: 'Help & Support', path: '/investor/support', icon: HelpCircle },
     { name: 'Profile & Settings', path: '/investor/profile', icon: Settings }

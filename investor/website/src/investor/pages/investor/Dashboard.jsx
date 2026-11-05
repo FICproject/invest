@@ -176,7 +176,7 @@ export const Dashboard = () => {
             },
             {
               label: 'Next Payout Date',
-              value: metrics.nextPayoutDate ? formatDate(metrics.nextPayoutDate) : '15 Apr 2026',
+              value: metrics.nextPayoutDate ? formatDate(metrics.nextPayoutDate) : 'N/A',
               icon: Calendar,
               color: 'var(--color-primary)'
             }

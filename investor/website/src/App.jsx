@@ -39,6 +39,7 @@ import { BankDetails } from './investor/pages/investor/BankDetails';
 import { Notifications as InvestorNotifications } from './investor/pages/investor/Notifications';
 import { Statements } from './investor/pages/investor/Statements';
 import { Support } from './investor/pages/investor/Support';
+import { InvestorSubscription } from './investor/pages/investor/InvestorSubscription';
 
 // Company Pages & Layout
 import { DashboardLayout as CompanyDashboardLayout } from './company/components/layout/DashboardLayout';

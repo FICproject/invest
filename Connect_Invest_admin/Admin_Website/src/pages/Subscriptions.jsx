@@ -52,6 +52,40 @@ export default function Subscriptions() {
   });
 
   const [selectedSub, setSelectedSub] = useState(null);
+  const [pricing, setPricing] = useState({ companyFee: 500, investorFee: 500 });
+  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
+  const [updatingPricing, setUpdatingPricing] = useState(false);
+  const [feeForm, setFeeForm] = useState({ companyFee: 500, investorFee: 500 });
+
+  const fetchPricing = async () => {
+    try {
+      const res = await adminApi.getSubscriptionPricing();
+      if (res.data.success && res.data.pricing) {
+        setPricing(res.data.pricing);
+        setFeeForm(res.data.pricing);
+      }
+    } catch (e) {
+      console.warn('Failed to load subscription pricing:', e);
+    }
+  };
+
+  const handleUpdatePricing = async (e) => {
+    e.preventDefault();
+    try {
+      setUpdatingPricing(true);
+      const res = await adminApi.updateSubscriptionPricing(feeForm);
+      if (res.data.success) {
+        toast.success('Subscription fee updated successfully');
+        setPricing(res.data.pricing);
+        setIsPricingModalOpen(false);
+        fetchSubscriptions();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update subscription fee');
+    } finally {
+      setUpdatingPricing(false);
+    }
+  };
 
   const fetchSubscriptions = async () => {
     try {
@@ -170,7 +204,7 @@ export default function Subscriptions() {
             Subscriptions & Platform Fees
           </h2>
           <p style={{ fontSize: '0.86rem', color: 'var(--text-muted)', marginTop: '4px', margin: 0 }}>
-            Monitor and record the ₹500 monthly SaaS service fee charged to active investors and listed companies.
+            Current Platform Service Fee: Company: ₹{pricing.companyFee}/mo • Investor: ₹{pricing.investorFee}/mo.
           </p>
         </div>
 
@@ -237,7 +271,7 @@ export default function Subscriptions() {
                 ₹{Number(stats.mrr || (stats.activeSubscribers * 500) || 0).toLocaleString('en-IN')}
               </span>
             </div>
-            <div style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: '3px' }}>₹500 / mo per active account</div>
+            <div style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: '3px' }}>₹{pricing.investorFee || 500} / mo per active account</div>
           </div>
         </div>
 

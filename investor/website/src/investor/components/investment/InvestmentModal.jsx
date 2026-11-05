@@ -18,7 +18,7 @@ export const InvestmentModal = ({ isOpen, onClose, offer, onInvestmentSuccess })
 
   const [amount, setAmount] = useState(min);
   const [paymentMethod, setPaymentMethod] = useState('Net Banking');
-  const [submissionMode, setSubmissionMode] = useState('request'); // 'request' | 'instant'
+  const submissionMode = 'request';
   const [investorNote, setInvestorNote] = useState('');
   const [step, setStep] = useState('input'); // 'input' | 'processing' | 'success' | 'kyc_blocked'
   const [error, setError] = useState('');
@@ -270,58 +270,6 @@ export const InvestmentModal = ({ isOpen, onClose, offer, onInvestmentSuccess })
             </div>
           </div>
 
-          {/* Submission Mode Selector */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '8px' }}>
-              Investment Submission Type
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <div
-                onClick={() => setSubmissionMode('request')}
-                style={{
-                  padding: '12px 14px',
-                  borderRadius: '10px',
-                  border: submissionMode === 'request' ? '2px solid var(--color-primary)' : '1px solid var(--border-color)',
-                  backgroundColor: submissionMode === 'request' ? 'var(--color-primary-subtle)' : 'var(--bg-surface)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                <Send size={16} color={submissionMode === 'request' ? 'var(--color-primary)' : 'var(--text-muted)'} />
-                <div>
-                  <div style={{ fontSize: '13px', fontWeight: '700', color: submissionMode === 'request' ? 'var(--color-primary)' : 'var(--text-main)' }}>
-                    Request Approval
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Admin reviews & allocates</div>
-                </div>
-              </div>
-
-              <div
-                onClick={() => setSubmissionMode('instant')}
-                style={{
-                  padding: '12px 14px',
-                  borderRadius: '10px',
-                  border: submissionMode === 'instant' ? '2px solid var(--color-primary)' : '1px solid var(--border-color)',
-                  backgroundColor: submissionMode === 'instant' ? 'var(--color-primary-subtle)' : 'var(--bg-surface)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                <CreditCard size={16} color={submissionMode === 'instant' ? 'var(--color-primary)' : 'var(--text-muted)'} />
-                <div>
-                  <div style={{ fontSize: '13px', fontWeight: '700', color: submissionMode === 'instant' ? 'var(--color-primary)' : 'var(--text-main)' }}>
-                    Instant Checkout
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Direct gateway payment</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Investment Amount Input */}
           <div style={{ marginBottom: '20px' }}>
             <Input
@@ -360,39 +308,6 @@ export const InvestmentModal = ({ isOpen, onClose, offer, onInvestmentSuccess })
                   resize: 'vertical'
                 }}
               />
-            </div>
-          )}
-
-          {/* Payment Method Selector for Instant Checkout */}
-          {submissionMode === 'instant' && (
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '8px' }}>
-                Select Payment Method
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                {['Net Banking', 'UPI', 'Bank Transfer', 'Debit/Credit Card'].map((method) => (
-                  <div
-                    key={method}
-                    onClick={() => setPaymentMethod(method)}
-                    style={{
-                      padding: '10px 14px',
-                      borderRadius: '8px',
-                      border: paymentMethod === method ? '2px solid var(--color-primary)' : '1px solid var(--border-color)',
-                      backgroundColor: paymentMethod === method ? 'var(--color-primary-subtle)' : 'var(--bg-surface)',
-                      cursor: 'pointer',
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      color: paymentMethod === method ? 'var(--color-primary)' : 'var(--text-main)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    <CreditCard size={16} />
-                    <span>{method}</span>
-                  </div>
-                ))}
-              </div>
             </div>
           )}
 

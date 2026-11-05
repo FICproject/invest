@@ -3,6 +3,7 @@ import { Company } from '../models/Company.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/ApiError.js';
 import { createRazorpayOrder, verifyRazorpaySignature } from '../services/razorpayService.js';
+import { getSubscriptionFeeConfig } from '../services/configService.js';
 
 // @route   GET /api/company/subscription
 // @desc    Get subscription status and history for logged-in company
@@ -21,13 +22,16 @@ export const getCompanySubscription = asyncHandler(async (req, res) => {
   const currentMonth = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
   const activeSubscription = history.find(s => s.status === 'Paid' && s.billingMonth === currentMonth);
 
+  const feeConfig = await getSubscriptionFeeConfig();
+  const companyFee = feeConfig.companyFee;
+
   res.status(200).json({
     success: true,
     data: {
       isSubscribed: !!activeSubscription,
       currentPlan: {
         name: 'SaaS Platform License',
-        amount: 500,
+        amount: companyFee,
         billingCycle: 'Monthly',
         billingMonth: currentMonth
       },
@@ -37,14 +41,16 @@ export const getCompanySubscription = asyncHandler(async (req, res) => {
 });
 
 // @route   POST /api/company/subscription/create-order
-// @desc    Create Razorpay Order for monthly platform subscription (₹500)
+// @desc    Create Razorpay Order for monthly platform subscription
 export const createCompanySubscriptionOrder = asyncHandler(async (req, res) => {
   const companyUser = req.user;
   const company = await Company.findOne({
     $or: [{ ownerId: companyUser._id }, { officialEmail: companyUser.email }]
   });
 
-  const amountPaise = 50000; // ₹500
+  const feeConfig = await getSubscriptionFeeConfig();
+  const companyFee = feeConfig.companyFee;
+  const amountPaise = companyFee * 100;
   const billingMonth = req.body.billingMonth || new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
   const rzpOrder = await createRazorpayOrder({
@@ -64,7 +70,7 @@ export const createCompanySubscriptionOrder = asyncHandler(async (req, res) => {
     message: 'Subscription Razorpay order generated successfully.',
     data: {
       orderId: rzpOrder.orderId,
-      amount: 500,
+      amount: companyFee,
       amountPaise,
       currency: 'INR',
       keyId: rzpOrder.key,
@@ -95,6 +101,9 @@ export const verifyCompanySubscription = asyncHandler(async (req, res) => {
     }
   }
 
+  const feeConfig = await getSubscriptionFeeConfig();
+  const companyFee = feeConfig.companyFee;
+
   const currentMonth = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
   const nextDueDate = new Date();
   nextDueDate.setMonth(nextDueDate.getMonth() + 1);
@@ -109,8 +118,8 @@ export const verifyCompanySubscription = asyncHandler(async (req, res) => {
     subscriberEmail: company?.officialEmail || companyUser.email,
     subscriberMobile: company?.officialPhone || companyUser.mobile || '',
     planName: 'SaaS Platform License',
-    amount: 500,
-    amountPaise: 50000,
+    amount: companyFee,
+    amountPaise: companyFee * 100,
     billingCycle: 'Monthly',
     billingMonth: currentMonth,
     paymentDate: new Date(),
@@ -128,4 +137,3 @@ export const verifyCompanySubscription = asyncHandler(async (req, res) => {
     data: subscription
   });
 });
-

@@ -36,6 +36,7 @@ export const CompanySubscription: React.FC = () => {
 
   const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [subscriptionAmount, setSubscriptionAmount] = useState(500);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
   // Fetch real subscription status and payments from backend on load
@@ -45,6 +46,9 @@ export const CompanySubscription: React.FC = () => {
       const res = await api.get('/company/subscription');
       if (res.data?.success && res.data?.data) {
         setIsSubscribed(Boolean(res.data.data.isSubscribed));
+        if (res.data.data.currentPlan?.amount) {
+          setSubscriptionAmount(res.data.data.currentPlan.amount);
+        }
         const list = (res.data.data.history || []).map((s: any) => ({
           id: s.invoiceNumber || s._id,
           month: s.billingMonth,
@@ -227,7 +231,7 @@ export const CompanySubscription: React.FC = () => {
                 Monthly Fee
               </div>
               <div className="text-2xl font-black text-slate-900 font-display">
-                ₹500 <span className="text-xs text-slate-400 font-normal">/ month</span>
+                ₹{subscriptionAmount} <span className="text-xs text-slate-400 font-normal">/ month</span>
               </div>
             </div>
             <div className="h-8 w-[1px] bg-slate-200" />
@@ -392,7 +396,7 @@ export const CompanySubscription: React.FC = () => {
                     <div className="text-xs text-slate-600 font-semibold">Monthly Platform Access Fee</div>
                     <div className="text-[11px] text-slate-400">Includes all portal tools & investor sync</div>
                   </div>
-                  <div className="text-xl font-black text-slate-900 font-display">₹500</div>
+                  <div className="text-xl font-black text-slate-900 font-display">₹{subscriptionAmount}</div>
                 </div>
 
                 {/* Method selector */}

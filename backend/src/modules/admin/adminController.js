@@ -1,3 +1,4 @@
+import { PlatformConfig } from '../../models/PlatformConfig.js';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -3243,6 +3244,67 @@ export async function recordSubscriptionPayment(req, res, next) {
       success: true,
       message: `Subscription invoice ${invoiceNumber} created successfully`,
       subscription
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getSubscriptionPricing(req, res, next) {
+  try {
+    let config = await PlatformConfig.findOne({ key: 'subscription_fees' });
+    if (!config) {
+      config = await PlatformConfig.create({
+        key: 'subscription_fees',
+        value: { companyFee: 500, investorFee: 500 },
+        description: 'Monthly platform membership subscription fees (INR)'
+      });
+    }
+    return res.json({
+      success: true,
+      pricing: {
+        companyFee: Number(config.value?.companyFee) || 500,
+        investorFee: Number(config.value?.investorFee) || 500
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateSubscriptionPricing(req, res, next) {
+  try {
+    const { companyFee, investorFee } = req.body;
+    let config = await PlatformConfig.findOne({ key: 'subscription_fees' });
+    if (!config) {
+      config = new PlatformConfig({
+        key: 'subscription_fees',
+        value: { companyFee: 500, investorFee: 500 },
+        description: 'Monthly platform membership subscription fees (INR)'
+      });
+    }
+    
+    config.value = {
+      companyFee: companyFee !== undefined ? Number(companyFee) : (config.value?.companyFee || 500),
+      investorFee: investorFee !== undefined ? Number(investorFee) : (config.value?.investorFee || 500)
+    };
+    config.updatedBy = req.user?._id;
+    await config.save();
+
+    await logAction({
+      actorId: req.user._id,
+      role: req.user.role,
+      action: 'SUBSCRIPTION_PRICING_UPDATED',
+      targetEntity: 'PlatformConfig',
+      targetId: config._id,
+      after: config.value,
+      ipAddress: req.ip
+    });
+
+    return res.json({
+      success: true,
+      message: 'Subscription fees updated successfully',
+      pricing: config.value
     });
   } catch (error) {
     next(error);

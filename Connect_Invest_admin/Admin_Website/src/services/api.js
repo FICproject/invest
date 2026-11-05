@@ -141,6 +141,8 @@ export const adminApi = {
   getSubscriptions: params => api.get('/admin/subscriptions', { params }),
   recordSubscription: data => api.post('/admin/subscriptions', data),
   updateSubscriptionStatus: (id, data) => api.put(`/admin/subscriptions/${id}/status`, data),
+  getSubscriptionPricing: () => api.get('/admin/subscriptions/pricing'),
+  updateSubscriptionPricing: (data) => api.put('/admin/subscriptions/pricing', data),
 
   // Equity Cap Table & Dividends
   getCompanyCapTable: companyId => api.get(`/admin/companies/${companyId}/cap-table`),

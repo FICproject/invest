@@ -49,6 +49,8 @@ import {
   getSubscriptions,
   recordSubscriptionPayment,
   updateSubscriptionStatus,
+  getSubscriptionPricing,
+  updateSubscriptionPricing,
   getCompanyCapTable,
   getDividends,
   declareDividend,
@@ -183,5 +185,7 @@ router.put('/queries/:id/status', updateQueryStatus);
 router.get('/subscriptions', getSubscriptions);
 router.post('/subscriptions', recordSubscriptionPayment);
 router.put('/subscriptions/:id/status', updateSubscriptionStatus);
+router.get('/subscriptions/pricing', getSubscriptionPricing);
+router.put('/subscriptions/pricing', updateSubscriptionPricing);
 
 export default router;
