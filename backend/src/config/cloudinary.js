@@ -38,3 +38,4 @@ export function uploadToCloudinary(buffer, options = {}) {
 }
 
 export default cloudinary;
+
