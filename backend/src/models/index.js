@@ -24,4 +24,6 @@ export * from './Payment.js';
 export * from './ShareAllocation.js';
 export * from './Shareholder.js';
 export * from './Transaction.js';
+export * from './ReturnAgreement.js';
+export * from './ReturnPayment.js';
 

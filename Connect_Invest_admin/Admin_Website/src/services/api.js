@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const getApiBase = () => {
+export const getApiBase = () => {
   // 1. Check for configured environment variable first (Vercel / Production deployment)
   const envApi = import.meta.env?.VITE_API_URL;
   if (envApi) {
@@ -14,6 +14,11 @@ const getApiBase = () => {
   }
   // Fallback to Live Render Backend
   return 'https://connect-invest-backend.onrender.com/api/v1';
+};
+
+export const getBackendOrigin = () => {
+  const base = getApiBase();
+  return base.replace(/\/api(\/v1)?\/?$/, '');
 };
 
 const API_BASE = getApiBase();
@@ -108,8 +113,9 @@ export const adminApi = {
   getReleases: () => api.get('/admin/releases'),
   approveRelease: (id, data) => api.post(`/admin/releases/${id}/approve`, data),
 
-  // Repayments
+  // Repayments & Company Returns
   getRepayments: params => api.get('/admin/repayments', { params }),
+  getCompanyReturns: params => api.get('/admin/company-returns', { params }),
   confirmRepaymentReceipt: (id, data) => api.post(`/admin/repayments/${id}/receipt`, data),
   markDefault: (id, data) => api.post(`/admin/repayments/${id}/default`, data),
 

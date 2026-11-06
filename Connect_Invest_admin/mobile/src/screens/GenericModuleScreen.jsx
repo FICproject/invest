@@ -18,7 +18,10 @@ import {
   Clock,
   Building2,
   Users,
-  Briefcase
+  Briefcase,
+  CheckSquare,
+  Send,
+  ShieldCheck
 } from '../components/Icons';
 import Header from '../components/Header';
 import { adminApi, formatINR } from '../services/api';
@@ -38,15 +41,30 @@ export default function GenericModuleScreen({ tabId, onOpenSidebar, setActiveTab
   const [refreshing, setRefreshing] = useState(false);
 
   const metaMap = {
+    fund_approvals: {
+      title: 'Fund Approvals',
+      subtitle: 'Underwriting evaluation & decision workflow for company capital raising proposals',
+      icon: CheckSquare
+    },
+    investment_approvals: {
+      title: 'Investment Approvals',
+      subtitle: 'Review, approve, reject, or request resubmission on investor investment applications',
+      icon: TrendingUp
+    },
     investments_portfolio: {
       title: 'Investments',
       subtitle: 'Active & matured investor capital allocations',
       icon: TrendingUp
     },
     releases: {
-      title: 'Payments & Transactions',
-      subtitle: 'Fund releases, repayments & escrow flows',
-      icon: CreditCard
+      title: 'Company Fund Releases',
+      subtitle: 'Disburse and route capital collected from investors directly to borrower companies',
+      icon: Send
+    },
+    maturity_releases: {
+      title: 'Maturity Releases',
+      subtitle: 'Disburse and return principal capital to investors upon completion of investment tenure',
+      icon: Send
     },
     subscriptions: {
       title: 'Subscriptions',

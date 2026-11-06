@@ -23,7 +23,22 @@ import { Button } from '../../components/common/Button';
 import { useAuth as useInvestorAuth } from '../../context/AuthContext';
 import { useAuth as useCompanyAuth } from '../../../company/context/AuthContext';
 import { authService as companyAuthService } from '../../../company/services';
-import { evaluatePasswordStrength, validateEmail, validateMobile } from '../../utils/validators';
+import {
+  evaluatePasswordStrength,
+  validateEmail,
+  validateMobile,
+  validatePAN,
+  validateAadhaar,
+  validateBankAccount,
+  validateIFSC,
+  validateDOB,
+  validateCIN,
+  validateGSTIN,
+  getMaxDOB18YearsAgo,
+  getTodayDateString,
+  maskAadhaar,
+  ERROR_MESSAGES
+} from '../../utils/validators';
 
 export const Register = () => {
   const navigate = useNavigate();
@@ -140,6 +155,12 @@ export const Register = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Field-level error & touched states for real-time validation
+  const [investorFieldErrors, setInvestorFieldErrors] = useState({});
+  const [investorTouched, setInvestorTouched] = useState({});
+  const [companyFieldErrors, setCompanyFieldErrors] = useState({});
+  const [companyTouched, setCompanyTouched] = useState({});
+
   const passwordStrength = evaluatePasswordStrength(
     activeRole === 'investor' ? investorData.password : companyData.password
   );
@@ -149,20 +170,232 @@ export const Register = () => {
     setError('');
   };
 
+  // --- Real-time single field validator for Investor ---
+  const validateInvestorField = (name, val, data = investorData) => {
+    switch (name) {
+      case 'name':
+        if (!val || !val.trim()) return 'Please enter your Full Legal Name.';
+        return '';
+      case 'email':
+        if (!val || !val.trim()) return 'Please enter your Email Address.';
+        if (!validateEmail(val)) return 'Please enter a valid Email Address.';
+        return '';
+      case 'mobile':
+        if (!val || !val.trim()) return ERROR_MESSAGES.MOBILE_INVALID;
+        if (!validateMobile(val)) return ERROR_MESSAGES.MOBILE_INVALID;
+        return '';
+      case 'password':
+        if (!val || val.length < 6) return 'Password must be at least 6 characters.';
+        return '';
+      case 'confirmPassword':
+        if (!val) return 'Please confirm your password.';
+        if (val !== data.password) return 'Passwords do not match.';
+        return '';
+      case 'dateOfBirth': {
+        const res = validateDOB(val);
+        return res.valid ? '' : res.message;
+      }
+      case 'pan':
+        if (!val || !val.trim()) return ERROR_MESSAGES.PAN_INVALID;
+        if (!validatePAN(val)) return ERROR_MESSAGES.PAN_INVALID;
+        return '';
+      case 'aadhaarNumber':
+        if (val && !validateAadhaar(val)) return ERROR_MESSAGES.AADHAAR_INVALID;
+        return '';
+      case 'residentialAddress':
+        if (!val || !val.trim()) return 'Please enter your Residential Address.';
+        return '';
+      case 'city':
+        if (!val || !val.trim()) return 'Please enter City.';
+        return '';
+      case 'state':
+        if (!val || !val.trim()) return 'Please enter State.';
+        return '';
+      case 'pincode':
+        if (!val || !val.trim()) return 'Please enter Pincode.';
+        if (!/^\d{6}$/.test(val.trim())) return 'Please enter a valid 6-digit Pincode.';
+        return '';
+      case 'accountHolderName':
+        if (!val || !val.trim()) return 'Please enter Account Holder Name.';
+        return '';
+      case 'bankName':
+        if (!val || !val.trim()) return 'Please enter Bank Name.';
+        return '';
+      case 'accountNumber':
+        if (!val || !val.trim()) return ERROR_MESSAGES.BANK_ACCOUNT_INVALID;
+        if (!validateBankAccount(val)) return ERROR_MESSAGES.BANK_ACCOUNT_INVALID;
+        return '';
+      case 'ifscCode':
+        if (!val || !val.trim()) return ERROR_MESSAGES.IFSC_INVALID;
+        if (!validateIFSC(val)) return ERROR_MESSAGES.IFSC_INVALID;
+        return '';
+      default:
+        return '';
+    }
+  };
+
+  // --- Real-time single field validator for Company ---
+  const validateCompanyField = (name, val, data = companyData) => {
+    switch (name) {
+      case 'companyLegalName':
+        if (!val || !val.trim()) return 'Please enter Registered Company Name.';
+        return '';
+      case 'companyEmail':
+        if (!val || !val.trim()) return 'Please enter Company Email Address.';
+        if (!validateEmail(val)) return 'Please enter a valid Company Email Address.';
+        return '';
+      case 'companyMobile':
+        if (!val || !val.trim()) return ERROR_MESSAGES.MOBILE_INVALID;
+        if (!validateMobile(val)) return ERROR_MESSAGES.MOBILE_INVALID;
+        return '';
+      case 'password':
+        if (!val || val.length < 6) return 'Password must be at least 6 characters.';
+        return '';
+      case 'confirmPassword':
+        if (!val) return 'Please confirm your password.';
+        if (val !== data.password) return 'Passwords do not match.';
+        return '';
+      case 'pan':
+        if (!val || !val.trim()) return ERROR_MESSAGES.PAN_INVALID;
+        if (!validatePAN(val)) return ERROR_MESSAGES.PAN_INVALID;
+        return '';
+      case 'cin':
+        if (val && !validateCIN(val)) return ERROR_MESSAGES.CIN_INVALID;
+        return '';
+      case 'gstin':
+        if (val && !validateGSTIN(val)) return ERROR_MESSAGES.GSTIN_INVALID;
+        return '';
+      case 'incorporationDate':
+        if (val) {
+          const d = new Date(val);
+          const today = new Date();
+          today.setHours(23, 59, 59, 999);
+          if (isNaN(d.getTime()) || d > today) {
+            return ERROR_MESSAGES.INCORPORATION_FUTURE;
+          }
+        }
+        return '';
+      case 'registeredAddress':
+        if (!val || !val.trim()) return 'Please enter Registered Office Address.';
+        return '';
+      case 'city':
+        if (!val || !val.trim()) return 'Please enter City.';
+        return '';
+      case 'state':
+        if (!val || !val.trim()) return 'Please enter State.';
+        return '';
+      case 'pincode':
+        if (!val || !val.trim()) return 'Please enter Pincode.';
+        if (!/^\d{6}$/.test(val.trim())) return 'Please enter a valid 6-digit Pincode.';
+        return '';
+      case 'name':
+        if (!val || !val.trim()) return 'Please enter Representative Full Name.';
+        return '';
+      case 'repDesignation':
+        if (!val || !val.trim()) return 'Please enter Representative Designation.';
+        return '';
+      case 'email':
+        if (!val || !val.trim()) return 'Please enter Representative Work Email.';
+        if (!validateEmail(val)) return 'Please enter a valid Email Address.';
+        return '';
+      case 'mobile':
+        if (!val || !val.trim()) return ERROR_MESSAGES.MOBILE_INVALID;
+        if (!validateMobile(val)) return ERROR_MESSAGES.MOBILE_INVALID;
+        return '';
+      case 'repPan':
+        if (val && !validatePAN(val)) return ERROR_MESSAGES.PAN_INVALID;
+        return '';
+      case 'accountHolderName':
+        if (!val || !val.trim()) return 'Please enter Bank Account Holder Name.';
+        return '';
+      case 'bankName':
+        if (!val || !val.trim()) return 'Please enter Bank Name.';
+        return '';
+      case 'accountNumber':
+        if (!val || !val.trim()) return ERROR_MESSAGES.BANK_ACCOUNT_INVALID;
+        if (!validateBankAccount(val)) return ERROR_MESSAGES.BANK_ACCOUNT_INVALID;
+        return '';
+      case 'ifscCode':
+        if (!val || !val.trim()) return ERROR_MESSAGES.IFSC_INVALID;
+        if (!validateIFSC(val)) return ERROR_MESSAGES.IFSC_INVALID;
+        return '';
+      default:
+        return '';
+    }
+  };
+
   const handleInvestorChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setInvestorData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+    let finalValue = type === 'checkbox' ? checked : value;
+
+    // Real-time input restrictions and formatting
+    if (name === 'mobile') {
+      finalValue = value.replace(/\D/g, '').slice(0, 10);
+    } else if (name === 'pan') {
+      finalValue = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+    } else if (name === 'aadhaarNumber') {
+      finalValue = value.replace(/\D/g, '').slice(0, 12);
+    } else if (name === 'accountNumber') {
+      finalValue = value.replace(/\D/g, '').slice(0, 18);
+    } else if (name === 'ifscCode') {
+      finalValue = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11);
+    } else if (name === 'pincode') {
+      finalValue = value.replace(/\D/g, '').slice(0, 6);
+    }
+
+    const updated = { ...investorData, [name]: finalValue };
+    setInvestorData(updated);
+
+    if (investorTouched[name]) {
+      const fieldErr = validateInvestorField(name, finalValue, updated);
+      setInvestorFieldErrors((prev) => ({ ...prev, [name]: fieldErr }));
+    }
+  };
+
+  const handleInvestorBlur = (name) => {
+    setInvestorTouched((prev) => ({ ...prev, [name]: true }));
+    const fieldErr = validateInvestorField(name, investorData[name], investorData);
+    setInvestorFieldErrors((prev) => ({ ...prev, [name]: fieldErr }));
   };
 
   const handleCompanyChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setCompanyData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+    let finalValue = type === 'checkbox' ? checked : value;
+
+    // Real-time input restrictions and formatting
+    if (name === 'companyMobile') {
+      finalValue = value.replace(/\D/g, '').slice(0, 10);
+    } else if (name === 'mobile') {
+      finalValue = value.replace(/\D/g, '').slice(0, 10);
+    } else if (name === 'pan') {
+      finalValue = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+    } else if (name === 'cin') {
+      finalValue = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 21);
+    } else if (name === 'gstin') {
+      finalValue = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15);
+    } else if (name === 'repPan') {
+      finalValue = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+    } else if (name === 'accountNumber') {
+      finalValue = value.replace(/\D/g, '').slice(0, 18);
+    } else if (name === 'ifscCode') {
+      finalValue = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11);
+    } else if (name === 'pincode') {
+      finalValue = value.replace(/\D/g, '').slice(0, 6);
+    }
+
+    const updated = { ...companyData, [name]: finalValue };
+    setCompanyData(updated);
+
+    if (companyTouched[name]) {
+      const fieldErr = validateCompanyField(name, finalValue, updated);
+      setCompanyFieldErrors((prev) => ({ ...prev, [name]: fieldErr }));
+    }
+  };
+
+  const handleCompanyBlur = (name) => {
+    setCompanyTouched((prev) => ({ ...prev, [name]: true }));
+    const fieldErr = validateCompanyField(name, companyData[name], companyData);
+    setCompanyFieldErrors((prev) => ({ ...prev, [name]: fieldErr }));
   };
 
   const [uploadingField, setUploadingField] = useState(null);
@@ -204,28 +437,41 @@ export const Register = () => {
   // --- INVESTOR STEP VALIDATIONS ---
   const validateInvestorStep = (step) => {
     setError('');
+    const newErrors = {};
+    const newTouched = {};
+
     if (step === 1) {
-      if (!investorData.name.trim()) return 'Please enter your Full Legal Name.';
-      if (!validateEmail(investorData.email)) return 'Please enter a valid Email Address.';
-      if (!validateMobile(investorData.mobile)) return 'Please enter a valid 10-digit Mobile Number.';
-      if (investorData.password.length < 6) return 'Password must be at least 6 characters.';
-      if (investorData.password !== investorData.confirmPassword) return 'Passwords do not match.';
-      if (!investorData.dateOfBirth) return 'Please enter your Date of Birth.';
+      ['name', 'email', 'mobile', 'password', 'confirmPassword', 'dateOfBirth'].forEach((f) => {
+        newTouched[f] = true;
+        const err = validateInvestorField(f, investorData[f], investorData);
+        if (err) newErrors[f] = err;
+      });
     }
     if (step === 2) {
-      if (!investorData.pan.trim() || investorData.pan.trim().length !== 10) return 'Please enter a valid 10-character PAN Number.';
-      if (!investorData.residentialAddress.trim()) return 'Please enter your Residential Address.';
-      if (!investorData.city.trim() || !investorData.state.trim() || !investorData.pincode.trim()) return 'Please fill in City, State, and Pincode.';
+      ['pan', 'aadhaarNumber', 'residentialAddress', 'city', 'state', 'pincode'].forEach((f) => {
+        newTouched[f] = true;
+        const err = validateInvestorField(f, investorData[f], investorData);
+        if (err) newErrors[f] = err;
+      });
     }
     if (step === 3) {
-      if (!investorData.accountHolderName.trim()) return 'Please enter Account Holder Name.';
-      if (!investorData.bankName.trim()) return 'Please enter Bank Name.';
-      if (!investorData.accountNumber.trim()) return 'Please enter Bank Account Number.';
-      if (!investorData.ifscCode.trim()) return 'Please enter Bank IFSC Code.';
+      ['accountHolderName', 'bankName', 'accountNumber', 'ifscCode'].forEach((f) => {
+        newTouched[f] = true;
+        const err = validateInvestorField(f, investorData[f], investorData);
+        if (err) newErrors[f] = err;
+      });
     }
     if (step === 4) {
       if (!investorData.investmentExperience) return 'Please select your investment experience.';
       if (!investorData.preferredInvestmentType) return 'Please select preferred investment type.';
+    }
+
+    setInvestorTouched((prev) => ({ ...prev, ...newTouched }));
+    setInvestorFieldErrors((prev) => ({ ...prev, ...newErrors }));
+
+    const errorKeys = Object.keys(newErrors);
+    if (errorKeys.length > 0) {
+      return newErrors[errorKeys[0]];
     }
     return null;
   };
@@ -248,29 +494,44 @@ export const Register = () => {
   // --- COMPANY STEP VALIDATIONS ---
   const validateCompanyStep = (step) => {
     setError('');
+    const newErrors = {};
+    const newTouched = {};
+
     if (step === 1) {
-      if (!companyData.companyLegalName.trim()) return 'Please enter Registered Company Name.';
-      if (!validateEmail(companyData.companyEmail)) return 'Please enter a valid Company Email Address.';
-      if (!validateMobile(companyData.companyMobile)) return 'Please enter Official Mobile Number.';
-      if (companyData.password.length < 6) return 'Password must be at least 6 characters.';
-      if (companyData.password !== companyData.confirmPassword) return 'Passwords do not match.';
+      ['companyLegalName', 'companyEmail', 'companyMobile', 'password', 'confirmPassword'].forEach((f) => {
+        newTouched[f] = true;
+        const err = validateCompanyField(f, companyData[f], companyData);
+        if (err) newErrors[f] = err;
+      });
     }
     if (step === 2) {
-      if (!companyData.pan.trim() || companyData.pan.trim().length !== 10) return 'Please enter a valid 10-character Company PAN.';
-      if (!companyData.registeredAddress.trim()) return 'Please enter Registered Office Address.';
-      if (!companyData.city.trim() || !companyData.state.trim() || !companyData.pincode.trim()) return 'Please enter City, State, and Pincode.';
+      ['pan', 'cin', 'gstin', 'incorporationDate', 'registeredAddress', 'city', 'state', 'pincode'].forEach((f) => {
+        newTouched[f] = true;
+        const err = validateCompanyField(f, companyData[f], companyData);
+        if (err) newErrors[f] = err;
+      });
     }
     if (step === 3) {
-      if (!companyData.name.trim()) return 'Please enter Representative Full Name.';
-      if (!companyData.repDesignation.trim()) return 'Please enter Representative Designation.';
-      if (!validateEmail(companyData.email)) return 'Please enter Representative Work Email.';
-      if (!validateMobile(companyData.mobile)) return 'Please enter Representative Mobile Number.';
+      ['name', 'repDesignation', 'email', 'mobile', 'repPan'].forEach((f) => {
+        newTouched[f] = true;
+        const err = validateCompanyField(f, companyData[f], companyData);
+        if (err) newErrors[f] = err;
+      });
     }
     if (step === 4) {
-      if (!companyData.accountHolderName.trim()) return 'Please enter Bank Account Holder Name.';
-      if (!companyData.bankName.trim()) return 'Please enter Bank Name.';
-      if (!companyData.accountNumber.trim()) return 'Please enter Account Number.';
-      if (!companyData.ifscCode.trim()) return 'Please enter IFSC Code.';
+      ['accountHolderName', 'bankName', 'accountNumber', 'ifscCode'].forEach((f) => {
+        newTouched[f] = true;
+        const err = validateCompanyField(f, companyData[f], companyData);
+        if (err) newErrors[f] = err;
+      });
+    }
+
+    setCompanyTouched((prev) => ({ ...prev, ...newTouched }));
+    setCompanyFieldErrors((prev) => ({ ...prev, ...newErrors }));
+
+    const errorKeys = Object.keys(newErrors);
+    if (errorKeys.length > 0) {
+      return newErrors[errorKeys[0]];
     }
     return null;
   };
@@ -295,8 +556,18 @@ export const Register = () => {
     e.preventDefault();
     setError('');
 
-    if (!investorData.termsAccepted || !investorData.privacyPolicyAccepted || !investorData.riskDisclosureAccepted) {
-      setError('You must accept Terms, Privacy Policy, and Risk Disclosures.');
+    // Re-validate all steps to guarantee data integrity
+    for (let s = 1; s <= 3; s++) {
+      const stepErr = validateInvestorStep(s);
+      if (stepErr) {
+        setError(stepErr);
+        setInvestorStep(s);
+        return;
+      }
+    }
+
+    if (!investorData.termsAccepted || !investorData.privacyPolicyAccepted) {
+      setError('You must accept Terms and Conditions and Privacy Policy.');
       return;
     }
 
@@ -347,6 +618,16 @@ export const Register = () => {
   const handleCompanySubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    // Re-validate all steps to guarantee data integrity
+    for (let s = 1; s <= 4; s++) {
+      const stepErr = validateCompanyStep(s);
+      if (stepErr) {
+        setError(stepErr);
+        setCompanyStep(s);
+        return;
+      }
+    }
 
     if (!companyData.termsAccepted) {
       setError('Please accept terms and declarations to finish registration.');
@@ -728,6 +1009,8 @@ export const Register = () => {
                     name="name"
                     value={investorData.name}
                     onChange={handleInvestorChange}
+                    onBlur={() => handleInvestorBlur('name')}
+                    error={investorTouched.name ? investorFieldErrors.name : ''}
                     placeholder="As per PAN Card"
                     required
                   />
@@ -738,6 +1021,8 @@ export const Register = () => {
                       type="email"
                       value={investorData.email}
                       onChange={handleInvestorChange}
+                      onBlur={() => handleInvestorBlur('email')}
+                      error={investorTouched.email ? investorFieldErrors.email : ''}
                       placeholder="name@example.com"
                       required
                     />
@@ -746,7 +1031,10 @@ export const Register = () => {
                       name="mobile"
                       value={investorData.mobile}
                       onChange={handleInvestorChange}
+                      onBlur={() => handleInvestorBlur('mobile')}
+                      error={investorTouched.mobile ? investorFieldErrors.mobile : ''}
                       placeholder="10-digit mobile"
+                      maxLength={10}
                       required
                     />
                   </div>
@@ -757,6 +1045,8 @@ export const Register = () => {
                       type="password"
                       value={investorData.password}
                       onChange={handleInvestorChange}
+                      onBlur={() => handleInvestorBlur('password')}
+                      error={investorTouched.password ? investorFieldErrors.password : ''}
                       placeholder="Min 6 characters"
                       required
                     />
@@ -766,6 +1056,8 @@ export const Register = () => {
                       type="password"
                       value={investorData.confirmPassword}
                       onChange={handleInvestorChange}
+                      onBlur={() => handleInvestorBlur('confirmPassword')}
+                      error={investorTouched.confirmPassword ? investorFieldErrors.confirmPassword : ''}
                       placeholder="Re-enter password"
                       required
                     />
@@ -776,6 +1068,10 @@ export const Register = () => {
                     type="date"
                     value={investorData.dateOfBirth}
                     onChange={handleInvestorChange}
+                    onBlur={() => handleInvestorBlur('dateOfBirth')}
+                    error={investorTouched.dateOfBirth ? investorFieldErrors.dateOfBirth : ''}
+                    max={getMaxDOB18YearsAgo()}
+                    helperText="You must be at least 18 years old to register."
                     required
                   />
                 </div>
@@ -790,7 +1086,10 @@ export const Register = () => {
                       name="pan"
                       value={investorData.pan}
                       onChange={handleInvestorChange}
+                      onBlur={() => handleInvestorBlur('pan')}
+                      error={investorTouched.pan ? investorFieldErrors.pan : ''}
                       placeholder="e.g. ABCDE1234F"
+                      maxLength={10}
                       required
                     />
                     <Input
@@ -798,7 +1097,11 @@ export const Register = () => {
                       name="aadhaarNumber"
                       value={investorData.aadhaarNumber}
                       onChange={handleInvestorChange}
+                      onBlur={() => handleInvestorBlur('aadhaarNumber')}
+                      error={investorTouched.aadhaarNumber ? investorFieldErrors.aadhaarNumber : ''}
                       placeholder="12-digit Aadhaar number"
+                      maxLength={12}
+                      helperText={investorData.aadhaarNumber && investorData.aadhaarNumber.length === 12 ? `Verified format: ${maskAadhaar(investorData.aadhaarNumber)}` : 'Must contain exactly 12 digits'}
                     />
                   </div>
 
@@ -807,6 +1110,8 @@ export const Register = () => {
                     name="residentialAddress"
                     value={investorData.residentialAddress}
                     onChange={handleInvestorChange}
+                    onBlur={() => handleInvestorBlur('residentialAddress')}
+                    error={investorTouched.residentialAddress ? investorFieldErrors.residentialAddress : ''}
                     placeholder="Flat / House No, Street, Landmark"
                     required
                   />
@@ -817,6 +1122,8 @@ export const Register = () => {
                       name="city"
                       value={investorData.city}
                       onChange={handleInvestorChange}
+                      onBlur={() => handleInvestorBlur('city')}
+                      error={investorTouched.city ? investorFieldErrors.city : ''}
                       placeholder="e.g. Mumbai"
                       required
                     />
@@ -825,6 +1132,8 @@ export const Register = () => {
                       name="state"
                       value={investorData.state}
                       onChange={handleInvestorChange}
+                      onBlur={() => handleInvestorBlur('state')}
+                      error={investorTouched.state ? investorFieldErrors.state : ''}
                       placeholder="e.g. Maharashtra"
                       required
                     />
@@ -833,7 +1142,10 @@ export const Register = () => {
                       name="pincode"
                       value={investorData.pincode}
                       onChange={handleInvestorChange}
+                      onBlur={() => handleInvestorBlur('pincode')}
+                      error={investorTouched.pincode ? investorFieldErrors.pincode : ''}
                       placeholder="6-digit PIN"
+                      maxLength={6}
                       required
                     />
                   </div>
@@ -891,6 +1203,8 @@ export const Register = () => {
                     name="accountHolderName"
                     value={investorData.accountHolderName}
                     onChange={handleInvestorChange}
+                    onBlur={() => handleInvestorBlur('accountHolderName')}
+                    error={investorTouched.accountHolderName ? investorFieldErrors.accountHolderName : ''}
                     placeholder="As registered with your bank"
                     required
                   />
@@ -900,6 +1214,8 @@ export const Register = () => {
                       name="bankName"
                       value={investorData.bankName}
                       onChange={handleInvestorChange}
+                      onBlur={() => handleInvestorBlur('bankName')}
+                      error={investorTouched.bankName ? investorFieldErrors.bankName : ''}
                       placeholder="e.g. HDFC Bank, ICICI Bank"
                       required
                     />
@@ -908,7 +1224,10 @@ export const Register = () => {
                       name="ifscCode"
                       value={investorData.ifscCode}
                       onChange={handleInvestorChange}
-                      placeholder="11-character IFSC"
+                      onBlur={() => handleInvestorBlur('ifscCode')}
+                      error={investorTouched.ifscCode ? investorFieldErrors.ifscCode : ''}
+                      placeholder="e.g. HDFC0001234"
+                      maxLength={11}
                       required
                     />
                   </div>
@@ -917,28 +1236,12 @@ export const Register = () => {
                     name="accountNumber"
                     value={investorData.accountNumber}
                     onChange={handleInvestorChange}
-                    placeholder="Enter bank account number"
+                    onBlur={() => handleInvestorBlur('accountNumber')}
+                    error={investorTouched.accountNumber ? investorFieldErrors.accountNumber : ''}
+                    placeholder="9 to 18 digits bank account number"
+                    maxLength={18}
                     required
                   />
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '6px' }}>
-                      Cancelled Cheque or Bank Proof (Optional during signup)
-                    </label>
-                    <div style={{ border: '2px dashed #D1D5DB', borderRadius: '10px', padding: '16px', textAlign: 'center', backgroundColor: '#F9FAFB' }}>
-                      <UploadCloud size={24} color="#B37400" style={{ margin: '0 auto 6px' }} />
-                      <div style={{ fontSize: '12px', color: '#4B5563' }}>Upload cancelled cheque or account statement (PDF/JPG)</div>
-                      <input
-                        type="file"
-                        onChange={(e) => handleFileUpload(e, 'cancelledChequeUrl', 'investor')}
-                        style={{ marginTop: '8px', fontSize: '12px' }}
-                      />
-                      {investorData.cancelledChequeUrl && (
-                        <div style={{ fontSize: '11px', color: '#059669', marginTop: '4px', fontWeight: 600 }}>
-                          ✓ Attached: {investorData.cancelledChequeUrl.split('/').pop()}
-                        </div>
-                      )}
-                    </div>
-                  </div>
                 </div>
               )}
 
@@ -1047,17 +1350,6 @@ export const Register = () => {
                       />
                       <span>I agree to the <strong>Privacy Policy</strong> and data processing for KYC.</span>
                     </label>
-
-                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '12.5px', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        name="riskDisclosureAccepted"
-                        checked={investorData.riskDisclosureAccepted}
-                        onChange={handleInvestorChange}
-                        style={{ marginTop: '2px' }}
-                      />
-                      <span><strong>Risk Disclosure Acknowledgement:</strong> I understand that private market investments involve capital risks and past performance does not guarantee future results.</span>
-                    </label>
                   </div>
                 </div>
               )}
@@ -1144,6 +1436,8 @@ export const Register = () => {
                     name="companyLegalName"
                     value={companyData.companyLegalName}
                     onChange={handleCompanyChange}
+                    onBlur={() => handleCompanyBlur('companyLegalName')}
+                    error={companyTouched.companyLegalName ? companyFieldErrors.companyLegalName : ''}
                     placeholder="As registered with MCA / ROC"
                     required
                   />
@@ -1170,6 +1464,8 @@ export const Register = () => {
                       type="email"
                       value={companyData.companyEmail}
                       onChange={handleCompanyChange}
+                      onBlur={() => handleCompanyBlur('companyEmail')}
+                      error={companyTouched.companyEmail ? companyFieldErrors.companyEmail : ''}
                       placeholder="contact@company.com"
                       required
                     />
@@ -1178,7 +1474,10 @@ export const Register = () => {
                       name="companyMobile"
                       value={companyData.companyMobile}
                       onChange={handleCompanyChange}
-                      placeholder="Official phone"
+                      onBlur={() => handleCompanyBlur('companyMobile')}
+                      error={companyTouched.companyMobile ? companyFieldErrors.companyMobile : ''}
+                      placeholder="10-digit mobile"
+                      maxLength={10}
                       required
                     />
                   </div>
@@ -1221,6 +1520,8 @@ export const Register = () => {
                       type="password"
                       value={companyData.password}
                       onChange={handleCompanyChange}
+                      onBlur={() => handleCompanyBlur('password')}
+                      error={companyTouched.password ? companyFieldErrors.password : ''}
                       placeholder="Min 6 characters"
                       required
                     />
@@ -1230,6 +1531,8 @@ export const Register = () => {
                       type="password"
                       value={companyData.confirmPassword}
                       onChange={handleCompanyChange}
+                      onBlur={() => handleCompanyBlur('confirmPassword')}
+                      error={companyTouched.confirmPassword ? companyFieldErrors.confirmPassword : ''}
                       placeholder="Re-enter password"
                       required
                     />
@@ -1246,7 +1549,10 @@ export const Register = () => {
                       name="pan"
                       value={companyData.pan}
                       onChange={handleCompanyChange}
-                      placeholder="10-character PAN"
+                      onBlur={() => handleCompanyBlur('pan')}
+                      error={companyTouched.pan ? companyFieldErrors.pan : ''}
+                      placeholder="e.g. ABCDE1234F"
+                      maxLength={10}
                       required
                     />
                     <Input
@@ -1254,7 +1560,10 @@ export const Register = () => {
                       name="cin"
                       value={companyData.cin}
                       onChange={handleCompanyChange}
-                      placeholder="21-character CIN"
+                      onBlur={() => handleCompanyBlur('cin')}
+                      error={companyTouched.cin ? companyFieldErrors.cin : ''}
+                      placeholder="e.g. U12345MH2020PTC123456"
+                      maxLength={21}
                     />
                   </div>
 
@@ -1264,7 +1573,10 @@ export const Register = () => {
                       name="gstin"
                       value={companyData.gstin}
                       onChange={handleCompanyChange}
-                      placeholder="15-character GSTIN"
+                      onBlur={() => handleCompanyBlur('gstin')}
+                      error={companyTouched.gstin ? companyFieldErrors.gstin : ''}
+                      placeholder="e.g. 27ABCDE1234F1Z5"
+                      maxLength={15}
                     />
                     <Input
                       label="Date of Incorporation"
@@ -1272,6 +1584,9 @@ export const Register = () => {
                       type="date"
                       value={companyData.incorporationDate}
                       onChange={handleCompanyChange}
+                      onBlur={() => handleCompanyBlur('incorporationDate')}
+                      error={companyTouched.incorporationDate ? companyFieldErrors.incorporationDate : ''}
+                      max={getTodayDateString()}
                     />
                   </div>
 
@@ -1280,6 +1595,8 @@ export const Register = () => {
                     name="registeredAddress"
                     value={companyData.registeredAddress}
                     onChange={handleCompanyChange}
+                    onBlur={() => handleCompanyBlur('registeredAddress')}
+                    error={companyTouched.registeredAddress ? companyFieldErrors.registeredAddress : ''}
                     placeholder="Floor, Building, Road / Area"
                     required
                   />
@@ -1290,6 +1607,8 @@ export const Register = () => {
                       name="city"
                       value={companyData.city}
                       onChange={handleCompanyChange}
+                      onBlur={() => handleCompanyBlur('city')}
+                      error={companyTouched.city ? companyFieldErrors.city : ''}
                       placeholder="City"
                       required
                     />
@@ -1298,6 +1617,8 @@ export const Register = () => {
                       name="state"
                       value={companyData.state}
                       onChange={handleCompanyChange}
+                      onBlur={() => handleCompanyBlur('state')}
+                      error={companyTouched.state ? companyFieldErrors.state : ''}
                       placeholder="State"
                       required
                     />
@@ -1306,7 +1627,10 @@ export const Register = () => {
                       name="pincode"
                       value={companyData.pincode}
                       onChange={handleCompanyChange}
-                      placeholder="Pincode"
+                      onBlur={() => handleCompanyBlur('pincode')}
+                      error={companyTouched.pincode ? companyFieldErrors.pincode : ''}
+                      placeholder="6-digit PIN"
+                      maxLength={6}
                       required
                     />
                   </div>
@@ -1334,6 +1658,8 @@ export const Register = () => {
                       name="name"
                       value={companyData.name}
                       onChange={handleCompanyChange}
+                      onBlur={() => handleCompanyBlur('name')}
+                      error={companyTouched.name ? companyFieldErrors.name : ''}
                       placeholder="Managing Director / Founder"
                       required
                     />
@@ -1342,6 +1668,8 @@ export const Register = () => {
                       name="repDesignation"
                       value={companyData.repDesignation}
                       onChange={handleCompanyChange}
+                      onBlur={() => handleCompanyBlur('repDesignation')}
+                      error={companyTouched.repDesignation ? companyFieldErrors.repDesignation : ''}
                       placeholder="e.g. CEO, Managing Director"
                       required
                     />
@@ -1354,6 +1682,8 @@ export const Register = () => {
                       type="email"
                       value={companyData.email}
                       onChange={handleCompanyChange}
+                      onBlur={() => handleCompanyBlur('email')}
+                      error={companyTouched.email ? companyFieldErrors.email : ''}
                       placeholder="rep@company.com"
                       required
                     />
@@ -1362,7 +1692,10 @@ export const Register = () => {
                       name="mobile"
                       value={companyData.mobile}
                       onChange={handleCompanyChange}
+                      onBlur={() => handleCompanyBlur('mobile')}
+                      error={companyTouched.mobile ? companyFieldErrors.mobile : ''}
                       placeholder="10-digit mobile"
+                      maxLength={10}
                       required
                     />
                   </div>
@@ -1372,7 +1705,10 @@ export const Register = () => {
                     name="repPan"
                     value={companyData.repPan}
                     onChange={handleCompanyChange}
-                    placeholder="Representative personal PAN"
+                    onBlur={() => handleCompanyBlur('repPan')}
+                    error={companyTouched.repPan ? companyFieldErrors.repPan : ''}
+                    placeholder="e.g. ABCDE1234F"
+                    maxLength={10}
                   />
 
                   <div style={{ border: '1px solid #E5E7EB', borderRadius: '10px', padding: '12px', backgroundColor: '#F9FAFB' }}>
@@ -1392,6 +1728,8 @@ export const Register = () => {
                     name="accountHolderName"
                     value={companyData.accountHolderName}
                     onChange={handleCompanyChange}
+                    onBlur={() => handleCompanyBlur('accountHolderName')}
+                    error={companyTouched.accountHolderName ? companyFieldErrors.accountHolderName : ''}
                     placeholder="e.g. Nexus Tech Innovations Pvt Ltd"
                     required
                   />
@@ -1401,6 +1739,8 @@ export const Register = () => {
                       name="bankName"
                       value={companyData.bankName}
                       onChange={handleCompanyChange}
+                      onBlur={() => handleCompanyBlur('bankName')}
+                      error={companyTouched.bankName ? companyFieldErrors.bankName : ''}
                       placeholder="e.g. Axis Bank, HDFC"
                       required
                     />
@@ -1409,7 +1749,10 @@ export const Register = () => {
                       name="ifscCode"
                       value={companyData.ifscCode}
                       onChange={handleCompanyChange}
+                      onBlur={() => handleCompanyBlur('ifscCode')}
+                      error={companyTouched.ifscCode ? companyFieldErrors.ifscCode : ''}
                       placeholder="11-character IFSC"
+                      maxLength={11}
                       required
                     />
                   </div>
@@ -1418,7 +1761,10 @@ export const Register = () => {
                     name="accountNumber"
                     value={companyData.accountNumber}
                     onChange={handleCompanyChange}
-                    placeholder="Enter current account number"
+                    onBlur={() => handleCompanyBlur('accountNumber')}
+                    error={companyTouched.accountNumber ? companyFieldErrors.accountNumber : ''}
+                    placeholder="9 to 18 digits bank account number"
+                    maxLength={18}
                     required
                   />
                   <div>

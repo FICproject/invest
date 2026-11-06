@@ -18,6 +18,17 @@ import { Input } from '../../../investor/components/common/Input';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services';
 import logoImg from '../../assets/logo.png';
+import {
+  validateMobile,
+  validatePAN,
+  validateBankAccount,
+  validateIFSC,
+  validateEmail,
+  validateCIN,
+  validateGSTIN,
+  getTodayDateString,
+  ERROR_MESSAGES
+} from '../../utils/validators';
 
 export const CompanyRegister: React.FC = () => {
   const navigate = useNavigate();
@@ -26,6 +37,8 @@ export const CompanyRegister: React.FC = () => {
   const [step, setStep] = useState(1);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   // 5-STEP COMPANY FORM STATE
   const [formData, setFormData] = useState({
@@ -72,40 +85,172 @@ export const CompanyRegister: React.FC = () => {
     termsAccepted: true
   });
 
+  const validateField = (name: string, val: any, data = formData): string => {
+    switch (name) {
+      case 'companyLegalName':
+        if (!val || !val.trim()) return 'Please enter Registered Company Name.';
+        return '';
+      case 'companyEmail':
+        if (!val || !val.trim()) return 'Please enter Company Email Address.';
+        if (!validateEmail(val)) return 'Please enter a valid Company Email Address.';
+        return '';
+      case 'companyMobile':
+        if (!val || !val.trim()) return ERROR_MESSAGES.MOBILE_INVALID;
+        if (!validateMobile(val)) return ERROR_MESSAGES.MOBILE_INVALID;
+        return '';
+      case 'password':
+        if (!val || val.length < 6) return 'Password must be at least 6 characters.';
+        return '';
+      case 'confirmPassword':
+        if (!val) return 'Please confirm your password.';
+        if (val !== data.password) return 'Passwords do not match.';
+        return '';
+      case 'pan':
+        if (!val || !val.trim()) return ERROR_MESSAGES.PAN_INVALID;
+        if (!validatePAN(val)) return ERROR_MESSAGES.PAN_INVALID;
+        return '';
+      case 'cin':
+        if (val && !validateCIN(val)) return ERROR_MESSAGES.CIN_INVALID;
+        return '';
+      case 'gstin':
+        if (val && !validateGSTIN(val)) return ERROR_MESSAGES.GSTIN_INVALID;
+        return '';
+      case 'incorporationDate':
+        if (val) {
+          const d = new Date(val);
+          const today = new Date();
+          today.setHours(23, 59, 59, 999);
+          if (isNaN(d.getTime()) || d > today) {
+            return ERROR_MESSAGES.INCORPORATION_FUTURE;
+          }
+        }
+        return '';
+      case 'registeredAddress':
+        if (!val || !val.trim()) return 'Please enter Registered Office Address.';
+        return '';
+      case 'city':
+        if (!val || !val.trim()) return 'Please enter City.';
+        return '';
+      case 'state':
+        if (!val || !val.trim()) return 'Please enter State.';
+        return '';
+      case 'pincode':
+        if (!val || !val.trim()) return 'Please enter Pincode.';
+        if (!/^\d{6}$/.test(val.trim())) return 'Please enter a valid 6-digit Pincode.';
+        return '';
+      case 'name':
+        if (!val || !val.trim()) return 'Please enter Representative Full Name.';
+        return '';
+      case 'repDesignation':
+        if (!val || !val.trim()) return 'Please enter Representative Designation.';
+        return '';
+      case 'email':
+        if (!val || !val.trim()) return 'Please enter Representative Work Email.';
+        if (!validateEmail(val)) return 'Please enter a valid Email Address.';
+        return '';
+      case 'mobile':
+        if (!val || !val.trim()) return ERROR_MESSAGES.MOBILE_INVALID;
+        if (!validateMobile(val)) return ERROR_MESSAGES.MOBILE_INVALID;
+        return '';
+      case 'repPan':
+        if (val && !validatePAN(val)) return ERROR_MESSAGES.PAN_INVALID;
+        return '';
+      case 'accountHolderName':
+        if (!val || !val.trim()) return 'Please enter Bank Account Holder Name.';
+        return '';
+      case 'bankName':
+        if (!val || !val.trim()) return 'Please enter Bank Name.';
+        return '';
+      case 'accountNumber':
+        if (!val || !val.trim()) return ERROR_MESSAGES.BANK_ACCOUNT_INVALID;
+        if (!validateBankAccount(val)) return ERROR_MESSAGES.BANK_ACCOUNT_INVALID;
+        return '';
+      case 'ifscCode':
+        if (!val || !val.trim()) return ERROR_MESSAGES.IFSC_INVALID;
+        if (!validateIFSC(val)) return ERROR_MESSAGES.IFSC_INVALID;
+        return '';
+      default:
+        return '';
+    }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+    let finalVal: any = type === 'checkbox' ? checked : value;
+
+    // Real-time input restrictions and formatting
+    if (name === 'companyMobile' || name === 'mobile') {
+      finalVal = value.replace(/\D/g, '').slice(0, 10);
+    } else if (name === 'pan' || name === 'repPan') {
+      finalVal = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+    } else if (name === 'cin') {
+      finalVal = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 21);
+    } else if (name === 'gstin') {
+      finalVal = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15);
+    } else if (name === 'accountNumber') {
+      finalVal = value.replace(/\D/g, '').slice(0, 18);
+    } else if (name === 'ifscCode') {
+      finalVal = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11);
+    } else if (name === 'pincode') {
+      finalVal = value.replace(/\D/g, '').slice(0, 6);
+    }
+
+    const updated = { ...formData, [name]: finalVal };
+    setFormData(updated);
+
+    if (touched[name]) {
+      const err = validateField(name, finalVal, updated);
+      setFieldErrors((prev) => ({ ...prev, [name]: err }));
+    }
+  };
+
+  const handleBlur = (name: string) => {
+    setTouched((prev) => ({ ...prev, [name]: true }));
+    const err = validateField(name, (formData as any)[name], formData);
+    setFieldErrors((prev) => ({ ...prev, [name]: err }));
   };
 
   const validateStep = (s: number) => {
     setError('');
+    const newErrors: Record<string, string> = {};
+    const newTouched: Record<string, boolean> = {};
+
     if (s === 1) {
-      if (!formData.companyLegalName.trim()) return 'Please enter Registered Company Name.';
-      if (!formData.companyEmail.trim()) return 'Please enter Company Email Address.';
-      if (!formData.companyMobile.trim()) return 'Please enter Official Mobile Number.';
-      if (formData.password.length < 6) return 'Password must be at least 6 characters.';
-      if (formData.password !== formData.confirmPassword) return 'Passwords do not match.';
+      ['companyLegalName', 'companyEmail', 'companyMobile', 'password', 'confirmPassword'].forEach((f) => {
+        newTouched[f] = true;
+        const err = validateField(f, (formData as any)[f], formData);
+        if (err) newErrors[f] = err;
+      });
     }
     if (s === 2) {
-      if (!formData.pan.trim() || formData.pan.trim().length !== 10) return 'Please enter a valid 10-character Company PAN.';
-      if (!formData.registeredAddress.trim()) return 'Please enter Registered Office Address.';
-      if (!formData.city.trim() || !formData.state.trim() || !formData.pincode.trim()) return 'Please enter City, State, and Pincode.';
+      ['pan', 'cin', 'gstin', 'incorporationDate', 'registeredAddress', 'city', 'state', 'pincode'].forEach((f) => {
+        newTouched[f] = true;
+        const err = validateField(f, (formData as any)[f], formData);
+        if (err) newErrors[f] = err;
+      });
     }
     if (s === 3) {
-      if (!formData.name.trim()) return 'Please enter Representative Full Name.';
-      if (!formData.repDesignation.trim()) return 'Please enter Representative Designation.';
-      if (!formData.email.trim()) return 'Please enter Representative Work Email.';
-      if (!formData.mobile.trim()) return 'Please enter Representative Mobile Number.';
+      ['name', 'repDesignation', 'email', 'mobile', 'repPan'].forEach((f) => {
+        newTouched[f] = true;
+        const err = validateField(f, (formData as any)[f], formData);
+        if (err) newErrors[f] = err;
+      });
     }
     if (s === 4) {
-      if (!formData.accountHolderName.trim()) return 'Please enter Bank Account Holder Name.';
-      if (!formData.bankName.trim()) return 'Please enter Bank Name.';
-      if (!formData.accountNumber.trim()) return 'Please enter Account Number.';
-      if (!formData.ifscCode.trim()) return 'Please enter IFSC Code.';
+      ['accountHolderName', 'bankName', 'accountNumber', 'ifscCode'].forEach((f) => {
+        newTouched[f] = true;
+        const err = validateField(f, (formData as any)[f], formData);
+        if (err) newErrors[f] = err;
+      });
+    }
+
+    setTouched((prev) => ({ ...prev, ...newTouched }));
+    setFieldErrors((prev) => ({ ...prev, ...newErrors }));
+
+    const keys = Object.keys(newErrors);
+    if (keys.length > 0) {
+      return newErrors[keys[0]];
     }
     return null;
   };
@@ -154,6 +299,16 @@ export const CompanyRegister: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // Re-validate all steps to guarantee data integrity
+    for (let s = 1; s <= 4; s++) {
+      const stepErr = validateStep(s);
+      if (stepErr) {
+        setError(stepErr);
+        setStep(s);
+        return;
+      }
+    }
 
     if (!formData.termsAccepted) {
       setError('Please accept terms and declarations to finish registration.');
@@ -293,6 +448,8 @@ export const CompanyRegister: React.FC = () => {
                 name="companyLegalName"
                 value={formData.companyLegalName}
                 onChange={handleChange}
+                onBlur={() => handleBlur('companyLegalName')}
+                error={touched.companyLegalName ? fieldErrors.companyLegalName : ''}
                 placeholder="As registered with MCA"
                 required
               />
@@ -319,6 +476,8 @@ export const CompanyRegister: React.FC = () => {
                   type="email"
                   value={formData.companyEmail}
                   onChange={handleChange}
+                  onBlur={() => handleBlur('companyEmail')}
+                  error={touched.companyEmail ? fieldErrors.companyEmail : ''}
                   placeholder="official@company.com"
                   required
                 />
@@ -327,7 +486,10 @@ export const CompanyRegister: React.FC = () => {
                   name="companyMobile"
                   value={formData.companyMobile}
                   onChange={handleChange}
+                  onBlur={() => handleBlur('companyMobile')}
+                  error={touched.companyMobile ? fieldErrors.companyMobile : ''}
                   placeholder="10-digit mobile"
+                  maxLength={10}
                   required
                 />
               </div>
@@ -370,6 +532,8 @@ export const CompanyRegister: React.FC = () => {
                   type="password"
                   value={formData.password}
                   onChange={handleChange}
+                  onBlur={() => handleBlur('password')}
+                  error={touched.password ? fieldErrors.password : ''}
                   placeholder="Min 6 characters"
                   required
                 />
@@ -379,6 +543,8 @@ export const CompanyRegister: React.FC = () => {
                   type="password"
                   value={formData.confirmPassword}
                   onChange={handleChange}
+                  onBlur={() => handleBlur('confirmPassword')}
+                  error={touched.confirmPassword ? fieldErrors.confirmPassword : ''}
                   placeholder="Re-enter password"
                   required
                 />
@@ -395,7 +561,10 @@ export const CompanyRegister: React.FC = () => {
                   name="pan"
                   value={formData.pan}
                   onChange={handleChange}
-                  placeholder="10-character PAN"
+                  onBlur={() => handleBlur('pan')}
+                  error={touched.pan ? fieldErrors.pan : ''}
+                  placeholder="e.g. ABCDE1234F"
+                  maxLength={10}
                   required
                 />
                 <Input
@@ -403,7 +572,10 @@ export const CompanyRegister: React.FC = () => {
                   name="cin"
                   value={formData.cin}
                   onChange={handleChange}
-                  placeholder="21-character CIN"
+                  onBlur={() => handleBlur('cin')}
+                  error={touched.cin ? fieldErrors.cin : ''}
+                  placeholder="e.g. U12345MH2020PTC123456"
+                  maxLength={21}
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -412,7 +584,10 @@ export const CompanyRegister: React.FC = () => {
                   name="gstin"
                   value={formData.gstin}
                   onChange={handleChange}
-                  placeholder="15-character GSTIN"
+                  onBlur={() => handleBlur('gstin')}
+                  error={touched.gstin ? fieldErrors.gstin : ''}
+                  placeholder="e.g. 27ABCDE1234F1Z5"
+                  maxLength={15}
                 />
                 <Input
                   label="Date of Incorporation"
@@ -420,6 +595,9 @@ export const CompanyRegister: React.FC = () => {
                   type="date"
                   value={formData.incorporationDate}
                   onChange={handleChange}
+                  onBlur={() => handleBlur('incorporationDate')}
+                  error={touched.incorporationDate ? fieldErrors.incorporationDate : ''}
+                  max={getTodayDateString()}
                 />
               </div>
               <Input
@@ -427,6 +605,8 @@ export const CompanyRegister: React.FC = () => {
                 name="registeredAddress"
                 value={formData.registeredAddress}
                 onChange={handleChange}
+                onBlur={() => handleBlur('registeredAddress')}
+                error={touched.registeredAddress ? fieldErrors.registeredAddress : ''}
                 placeholder="Floor, Building, Road / Street"
                 required
               />
@@ -436,6 +616,8 @@ export const CompanyRegister: React.FC = () => {
                   name="city"
                   value={formData.city}
                   onChange={handleChange}
+                  onBlur={() => handleBlur('city')}
+                  error={touched.city ? fieldErrors.city : ''}
                   placeholder="City"
                   required
                 />
@@ -444,6 +626,8 @@ export const CompanyRegister: React.FC = () => {
                   name="state"
                   value={formData.state}
                   onChange={handleChange}
+                  onBlur={() => handleBlur('state')}
+                  error={touched.state ? fieldErrors.state : ''}
                   placeholder="State"
                   required
                 />
@@ -452,7 +636,10 @@ export const CompanyRegister: React.FC = () => {
                   name="pincode"
                   value={formData.pincode}
                   onChange={handleChange}
+                  onBlur={() => handleBlur('pincode')}
+                  error={touched.pincode ? fieldErrors.pincode : ''}
                   placeholder="Pincode"
+                  maxLength={6}
                   required
                 />
               </div>
@@ -479,6 +666,8 @@ export const CompanyRegister: React.FC = () => {
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
+                  onBlur={() => handleBlur('name')}
+                  error={touched.name ? fieldErrors.name : ''}
                   placeholder="Full legal name"
                   required
                 />
@@ -487,6 +676,8 @@ export const CompanyRegister: React.FC = () => {
                   name="repDesignation"
                   value={formData.repDesignation}
                   onChange={handleChange}
+                  onBlur={() => handleBlur('repDesignation')}
+                  error={touched.repDesignation ? fieldErrors.repDesignation : ''}
                   placeholder="e.g. Managing Director / Founder"
                   required
                 />
@@ -498,6 +689,8 @@ export const CompanyRegister: React.FC = () => {
                   type="email"
                   value={formData.email}
                   onChange={handleChange}
+                  onBlur={() => handleBlur('email')}
+                  error={touched.email ? fieldErrors.email : ''}
                   placeholder="rep@company.com"
                   required
                 />
@@ -506,7 +699,10 @@ export const CompanyRegister: React.FC = () => {
                   name="mobile"
                   value={formData.mobile}
                   onChange={handleChange}
+                  onBlur={() => handleBlur('mobile')}
+                  error={touched.mobile ? fieldErrors.mobile : ''}
                   placeholder="10-digit mobile"
+                  maxLength={10}
                   required
                 />
               </div>
@@ -515,7 +711,10 @@ export const CompanyRegister: React.FC = () => {
                 name="repPan"
                 value={formData.repPan}
                 onChange={handleChange}
-                placeholder="Personal PAN of signatory"
+                onBlur={() => handleBlur('repPan')}
+                error={touched.repPan ? fieldErrors.repPan : ''}
+                placeholder="e.g. ABCDE1234F"
+                maxLength={10}
               />
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
                 <div className="text-xs font-bold text-slate-800">Identity Verification</div>
@@ -534,6 +733,8 @@ export const CompanyRegister: React.FC = () => {
                 name="accountHolderName"
                 value={formData.accountHolderName}
                 onChange={handleChange}
+                onBlur={() => handleBlur('accountHolderName')}
+                error={touched.accountHolderName ? fieldErrors.accountHolderName : ''}
                 placeholder="Company bank account title"
                 required
               />
@@ -543,6 +744,8 @@ export const CompanyRegister: React.FC = () => {
                   name="bankName"
                   value={formData.bankName}
                   onChange={handleChange}
+                  onBlur={() => handleBlur('bankName')}
+                  error={touched.bankName ? fieldErrors.bankName : ''}
                   placeholder="e.g. Axis Bank, HDFC Bank"
                   required
                 />
@@ -551,7 +754,10 @@ export const CompanyRegister: React.FC = () => {
                   name="ifscCode"
                   value={formData.ifscCode}
                   onChange={handleChange}
+                  onBlur={() => handleBlur('ifscCode')}
+                  error={touched.ifscCode ? fieldErrors.ifscCode : ''}
                   placeholder="11-character IFSC"
+                  maxLength={11}
                   required
                 />
               </div>
@@ -560,7 +766,10 @@ export const CompanyRegister: React.FC = () => {
                 name="accountNumber"
                 value={formData.accountNumber}
                 onChange={handleChange}
-                placeholder="Corporate account number"
+                onBlur={() => handleBlur('accountNumber')}
+                error={touched.accountNumber ? fieldErrors.accountNumber : ''}
+                placeholder="9 to 18 digits corporate account number"
+                maxLength={18}
                 required
               />
               <div>

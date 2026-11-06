@@ -103,20 +103,24 @@ export const Loader: React.FC<{ text?: string }> = ({ text = 'Loading data...' }
 
 export const Badge: React.FC<{
   children: React.ReactNode;
-  variant?: 'success' | 'warning' | 'danger' | 'info' | 'purple' | 'slate';
-}> = ({ children, variant = 'slate' }) => {
-  const styles = {
+  variant?: 'success' | 'warning' | 'danger' | 'info' | 'purple' | 'slate' | 'brand' | 'outline' | 'neutral';
+  className?: string;
+}> = ({ children, variant = 'slate', className = '' }) => {
+  const styles: Record<string, string> = {
     success: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     warning: 'bg-[#FFF9ED] text-[#B37400] border-[#F4E9CD]',
     danger: 'bg-rose-50 text-rose-700 border-rose-200',
     info: 'bg-blue-50 text-blue-700 border-blue-200',
     purple: 'bg-[#FFF9ED] text-[#DE8E0A] border-[#F4E9CD]',
     slate: 'bg-slate-100 text-slate-700 border-slate-200',
+    neutral: 'bg-slate-100 text-slate-700 border-slate-200',
+    brand: 'bg-[#FFF9ED] text-[#9A6200] border-[#F4E9CD]',
+    outline: 'bg-white text-slate-700 border-slate-200',
   };
 
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${styles[variant]}`}
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${styles[variant] || styles.slate} ${className}`}
     >
       {children}
     </span>

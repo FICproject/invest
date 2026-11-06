@@ -146,6 +146,39 @@ export const documentService = {
   },
 };
 
+export const returnService = {
+  getOverview: async () => {
+    const res = await api.get('/company/returns/overview');
+    return res.data;
+  },
+  getAgreements: async () => {
+    const res = await api.get('/company/returns/agreements');
+    return res.data;
+  },
+  getSchedule: async (agreementId: string) => {
+    const res = await api.get(`/company/returns/schedule/${agreementId}`);
+    return res.data;
+  },
+  createOrder: async (returnPaymentId: string) => {
+    const res = await api.post('/company/returns/create-order', { returnPaymentId });
+    return res.data;
+  },
+  verifyPayment: async (data: {
+    returnPaymentId: string;
+    orderId?: string;
+    paymentId: string;
+    signature?: string;
+    paymentMethod?: string;
+  }) => {
+    const res = await api.post('/company/returns/verify-payment', data);
+    return res.data;
+  },
+  getReceipt: async (paymentId: string) => {
+    const res = await api.get(`/company/returns/receipt/${paymentId}`);
+    return res.data;
+  }
+};
+
 export const notificationService = {
   getNotifications: async () => {
     const res = await api.get('/company/notifications');

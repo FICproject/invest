@@ -7,6 +7,11 @@ import { Notification } from '../models/Notification.js';
 import { KYC } from '../models/KYC.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import {
+  validateBankAccount,
+  validateIFSC,
+  ERROR_MESSAGES
+} from '../utils/validators.js';
 
 // @route   GET /api/investor/dashboard
 // @desc    Get aggregated dashboard summary figures, portfolio allocation, and charts
@@ -253,6 +258,14 @@ export const updateBankDetails = asyncHandler(async (req, res) => {
 
   if (!bankName || !accountNumber || !ifscCode || !accountHolderName) {
     throw new ApiError(400, 'Please provide complete bank details: Bank Name, Account Number, IFSC, and Account Holder Name.');
+  }
+
+  if (!validateBankAccount(accountNumber)) {
+    throw new ApiError(400, ERROR_MESSAGES.BANK_ACCOUNT_INVALID);
+  }
+
+  if (!validateIFSC(ifscCode)) {
+    throw new ApiError(400, ERROR_MESSAGES.IFSC_INVALID);
   }
 
   let profile = await InvestorProfile.findOne({ userId: req.user._id });

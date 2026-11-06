@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 
 // Default development host
 // Works for both reverse-port physical devices and emulators
-const DEFAULT_HOST = 'http://localhost:5000';
+const DEFAULT_HOST = 'http://192.168.1.171:5000';
 
 export const api = axios.create({
   baseURL: `${DEFAULT_HOST}/api/v1`,
@@ -31,9 +31,8 @@ export async function getApiHost() {
 // Request interceptor to attach JWT token
 api.interceptors.request.use(async config => {
   try {
-    // If running with USB adb reverse, always prioritize localhost:5000 directly
     const savedHost = await AsyncStorage.getItem('ci_api_host');
-    if (savedHost && !savedHost.includes('192.168.0.163') && !savedHost.includes('192.168.0.151')) {
+    if (savedHost) {
       config.baseURL = `${savedHost}/api/v1`;
     } else {
       config.baseURL = `${DEFAULT_HOST}/api/v1`;
@@ -64,8 +63,7 @@ api.interceptors.response.use(
       !originalRequest._retry
     ) {
       originalRequest._retry = true;
-      // Current PC Wi-Fi IPs to attempt (192.168.1.168 or 192.168.0.181)
-      const currentWifiIp = '192.168.1.168';
+      const currentWifiIp = '192.168.1.171';
       const wifiBase = `http://${currentWifiIp}:5000/api/v1`;
       originalRequest.baseURL = wifiBase;
       api.defaults.baseURL = wifiBase;

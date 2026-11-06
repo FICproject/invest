@@ -21,7 +21,7 @@ import {
   FolderKanban,
   Users
 } from 'lucide-react';
-import { adminApi, formatINR, rupeesToPaise } from '../services/api';
+import { adminApi, formatINR, rupeesToPaise, getApiBase } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import DocumentPreviewModal from '../components/DocumentPreviewModal';
 
@@ -1385,7 +1385,8 @@ export default function Offers() {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
                     {selectedRequest.supportingDocuments.map((doc, dIdx) => {
                       const docFilename = (doc.fileUrl || '').split('/').pop();
-                      const downloadUrl = `/api/v1/admin/documents/${docFilename}/download`;
+                      const apiBase = getApiBase();
+                      const downloadUrl = `${apiBase}/admin/documents/${docFilename}/download`;
                       return (
                         <div
                           key={dIdx}

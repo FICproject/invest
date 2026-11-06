@@ -1,63 +1,189 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Badge, Loader, Modal } from '../../components/common';
-import { financialService } from '../../services';
+import { returnService } from '../../services';
+import { useAuth } from '../../context/AuthContext';
+import { RazorpayCheckoutModal } from '../../../investor/components/payment/RazorpayCheckoutModal';
 import {
   Coins,
   TrendingUp,
-  Plus,
   Calendar,
   CheckCircle2,
   Clock,
   Building,
-  FolderKanban,
   ArrowDownLeft,
   ArrowUpRight,
-  History,
-  AlertCircle
+  AlertCircle,
+  FileText,
+  CreditCard,
+  RefreshCw,
+  ExternalLink,
+  ChevronRight,
+  ShieldCheck,
+  Check
 } from 'lucide-react';
 
 export const FixedTermReturns: React.FC = () => {
-  const [data, setData] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'company' | 'project' | 'repayments' | 'dividends'>('company');
+  const { company } = useAuth();
+  const [overview, setOverview] = useState<any>(null);
+  const [agreements, setAgreements] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Dividend Declaration Modal
-  const [modalOpen, setModalOpen] = useState(false);
-  const [newDividend, setNewDividend] = useState({
-    declarationDate: new Date().toISOString().split('T')[0],
-    recordDate: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
-    payoutDate: new Date(Date.now() + 28 * 86400000).toISOString().split('T')[0],
-    financialYear: 'FY 2025-26',
-    dividendType: 'Interim',
-    amountPerShare: 3.0,
-    boardResolutionRef: 'BR-DIV-2026/03',
-    notes: 'Approved dividend disbursement to be transferred via direct bank mandate.',
-  });
+  // Schedule Modal
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [activeAgreementSchedule, setActiveAgreementSchedule] = useState<any>(null);
+  const [loadingSchedule, setLoadingSchedule] = useState(false);
 
-  const fetchData = async () => {
-    setIsLoading(true);
+  // Receipt Modal
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [receiptData, setReceiptData] = useState<any>(null);
+  const [loadingReceipt, setLoadingReceipt] = useState(false);
+
+  // Razorpay Checkout State
+  const [activeCheckoutOrder, setActiveCheckoutOrder] = useState<any>(null);
+  const [payingPaymentId, setPayingPaymentId] = useState<string | null>(null);
+  const [paymentSuccessToast, setPaymentSuccessToast] = useState<string | null>(null);
+
+  const fetchReturnsData = async () => {
     try {
-      const res = await financialService.getReturnsAndDividends();
-      setData(res);
-    } catch (e) {
-      console.error(e);
+      const [overviewRes, agreementsRes] = await Promise.all([
+        returnService.getOverview(),
+        returnService.getAgreements()
+      ]);
+      if (overviewRes?.success) setOverview(overviewRes.data);
+      if (agreementsRes?.success) setAgreements(agreementsRes.data || []);
+    } catch (err) {
+      console.error('[FixedTermReturns] Error loading returns data:', err);
     } finally {
       setIsLoading(false);
+      setRefreshing(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    fetchReturnsData();
   }, []);
 
-  const handleDeclareDividend = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchReturnsData();
+  };
+
+  const handleViewSchedule = async (agreementId: string) => {
     try {
-      await financialService.declareDividend(newDividend);
-      setModalOpen(false);
-      await fetchData();
+      setLoadingSchedule(true);
+      setScheduleModalOpen(true);
+      const res = await returnService.getSchedule(agreementId);
+      if (res?.success) {
+        setActiveAgreementSchedule(res.data);
+      }
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to record dividend declaration.');
+      alert(err.response?.data?.message || 'Failed to load return schedule');
+      setScheduleModalOpen(false);
+    } finally {
+      setLoadingSchedule(false);
+    }
+  };
+
+  const handleViewReceipt = async (paymentId: string) => {
+    try {
+      setLoadingReceipt(true);
+      setReceiptModalOpen(true);
+      const res = await returnService.getReceipt(paymentId);
+      if (res?.success) {
+        setReceiptData(res.data);
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Receipt not available');
+      setReceiptModalOpen(false);
+    } finally {
+      setLoadingReceipt(false);
+    }
+  };
+
+  // Initiate Pay Now via Razorpay
+  const handleInitiatePayment = async (returnPaymentId: string, agreementTitle?: string) => {
+    try {
+      setPayingPaymentId(returnPaymentId);
+      const res = await returnService.createOrder(returnPaymentId);
+      const orderData = res?.data;
+
+      if (!orderData || !orderData.orderId) {
+        throw new Error('Failed to initiate Razorpay order.');
+      }
+
+      // Check if live window.Razorpay SDK is available
+      if (
+        typeof window !== 'undefined' &&
+        (window as any).Razorpay &&
+        !orderData.simulated &&
+        orderData.keyId &&
+        !orderData.keyId.includes('placeholder')
+      ) {
+        const options = {
+          key: orderData.keyId,
+          amount: orderData.amountPaise,
+          currency: 'INR',
+          name: 'Connect Invest',
+          description: `Monthly Return - ${orderData.paymentPeriod}`,
+          order_id: orderData.orderId,
+          prefill: {
+            name: (company as any)?.legalName || (company as any)?.name || '',
+            email: (company as any)?.officialEmail || '',
+            contact: (company as any)?.officialPhone || ''
+          },
+          theme: { color: '#0F1E36' },
+          handler: async function (response: any) {
+            await handlePaymentVerificationSuccess(returnPaymentId, orderData.orderId, response);
+          },
+          modal: {
+            ondismiss: function () {
+              setPayingPaymentId(null);
+            }
+          }
+        };
+        const rzp = new (window as any).Razorpay(options);
+        rzp.open();
+      } else {
+        // Open the test/simulated modal
+        setActiveCheckoutOrder({
+          ...orderData,
+          returnPaymentId,
+          title: `Monthly Return - ${orderData.paymentPeriod}`,
+          companyName: (company as any)?.legalName || (company as any)?.name || 'Borrower Company'
+        });
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || err.message || 'Payment initiation failed');
+      setPayingPaymentId(null);
+    }
+  };
+
+  const handlePaymentVerificationSuccess = async (returnPaymentId: string, orderId: string, response: any) => {
+    try {
+      const verifyRes = await returnService.verifyPayment({
+        returnPaymentId,
+        orderId: response.razorpay_order_id || orderId,
+        paymentId: response.razorpay_payment_id || response.paymentId || `pay_sim_${Date.now()}`,
+        signature: response.razorpay_signature || response.signature || 'test_sig',
+        paymentMethod: response.paymentMethod || 'Razorpay Gateway'
+      });
+
+      if (verifyRes?.success) {
+        setPaymentSuccessToast(`Payment of ₹${verifyRes.data?.payment?.amountPaid?.toLocaleString('en-IN')} confirmed! Ref: ${verifyRes.data?.receiptReference}`);
+        setActiveCheckoutOrder(null);
+        setPayingPaymentId(null);
+        // Refresh data
+        await fetchReturnsData();
+        // If schedule modal was open, refresh it as well
+        if (activeAgreementSchedule?.agreement?._id) {
+          const updatedScheduleRes = await returnService.getSchedule(activeAgreementSchedule.agreement._id);
+          if (updatedScheduleRes?.success) setActiveAgreementSchedule(updatedScheduleRes.data);
+        }
+      }
+    } catch (vErr: any) {
+      alert(vErr.response?.data?.message || 'Payment verification failed');
+      setPayingPaymentId(null);
     }
   };
 
@@ -65,364 +191,500 @@ export const FixedTermReturns: React.FC = () => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
-      maximumFractionDigits: 0,
+      maximumFractionDigits: 0
     }).format(val || 0);
   };
 
-  if (isLoading) return <Loader text="Loading Returns and Dividends data..." />;
-
-  const summary = data?.summary || {
-    totalReceived: 0,
-    totalRepaid: 0,
-    pendingRepayments: 0,
-    averageReturnRate: 14.5,
+  const formatDate = (dateStr: any) => {
+    if (!dateStr) return 'N/A';
+    return new Date(dateStr).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
   };
 
-  const companyInvestments = data?.companyInvestments || [];
-  const projectInvestments = data?.projectInvestments || [];
-  const upcomingRepayments = data?.upcomingRepayments || [];
-  const repaymentHistory = data?.repaymentHistory || [];
-  const dividends = data?.dividends || [];
+  if (isLoading) return <Loader text="Loading Returns Management System..." />;
+
+  const metrics = overview?.metrics || {
+    totalInvestmentReceived: 0,
+    agreedMonthlyReturnAmount: 0,
+    monthlyReturnRate: 0,
+    totalReturnsPaid: 0,
+    upcomingReturns: 0,
+    pendingReturns: 0,
+    overdueReturns: 0,
+    nextPaymentDueDate: null
+  };
 
   return (
     <div className="space-y-6">
+      {/* Toast Notification */}
+      {paymentSuccessToast && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-emerald-800 text-sm shadow-sm animate-fadeIn">
+          <div className="flex items-center gap-2 font-medium">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+            <span>{paymentSuccessToast}</span>
+          </div>
+          <button
+            onClick={() => setPaymentSuccessToast(null)}
+            className="text-emerald-700 hover:text-emerald-900 font-bold ml-4 text-xs"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 font-display">
-            Returns and Dividends
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 font-display flex items-center gap-2">
+            Returns Management
+            <Badge variant="brand">Fixed-Term Agreement</Badge>
           </h1>
-          <p className="text-xs text-slate-500">
-            Monitor capital received from Connect Invest, track pending obligations, repayment dates, and separate Company vs Project investments.
+          <p className="text-xs text-slate-500 mt-0.5">
+            Manage your contractual monthly return obligations, view agreement schedules, and disburse scheduled returns securely via Razorpay.
           </p>
         </div>
 
-        {activeTab === 'dividends' && (
-          <Button onClick={() => setModalOpen(true)} className="font-bold">
-            <Plus className="w-4 h-4 mr-1.5" />
-            Declare Dividend
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="text-xs font-semibold"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
           </Button>
-        )}
+        </div>
       </div>
 
-      {/* 4 Core KPI Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-5 border-l-4 border-l-[#F4B41A] bg-white">
+      {/* 8 Dynamic Summary Cards (Section 2.A) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        {/* Total Investment Amount Received */}
+        <Card className="p-4 border-l-4 border-l-brand-600 bg-white">
           <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
             <span>Total Capital Received</span>
-            <ArrowDownLeft className="w-4 h-4 text-emerald-600" />
+            <ArrowDownLeft className="w-4 h-4 text-brand-600" />
           </div>
-          <div className="text-2xl font-black text-slate-900 font-display">
-            {formatINR(summary.totalReceived)}
+          <div className="text-xl font-black text-slate-900 font-display">
+            {formatINR(metrics.totalInvestmentReceived)}
           </div>
-          <span className="text-[11px] text-slate-500 mt-1 block">From Connect Invest network</span>
+          <span className="text-[11px] text-slate-400 mt-0.5 block">Approved & disbursed</span>
         </Card>
 
-        <Card className="p-5 border-l-4 border-l-emerald-500 bg-white">
+        {/* Agreed Monthly Return Amount */}
+        <Card className="p-4 border-l-4 border-l-[#F4B41A] bg-white">
           <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
-            <span>Total Amount Repaid</span>
+            <span>Agreed Monthly Return</span>
+            <Coins className="w-4 h-4 text-[#DE8E0A]" />
+          </div>
+          <div className="text-xl font-black text-slate-900 font-display">
+            {formatINR(metrics.agreedMonthlyReturnAmount)}
+          </div>
+          <span className="text-[11px] text-slate-400 mt-0.5 block">Combined monthly cycle</span>
+        </Card>
+
+        {/* Monthly Return Rate */}
+        <Card className="p-4 border-l-4 border-l-indigo-500 bg-white">
+          <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+            <span>Monthly Return Rate</span>
+            <TrendingUp className="w-4 h-4 text-indigo-600" />
+          </div>
+          <div className="text-xl font-black text-indigo-700 font-display">
+            {metrics.monthlyReturnRate}% / mo
+          </div>
+          <span className="text-[11px] text-slate-400 mt-0.5 block">As per approved agreements</span>
+        </Card>
+
+        {/* Total Returns Paid */}
+        <Card className="p-4 border-l-4 border-l-emerald-500 bg-white">
+          <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+            <span>Total Returns Paid</span>
             <ArrowUpRight className="w-4 h-4 text-emerald-600" />
           </div>
-          <div className="text-2xl font-black text-emerald-700 font-display">
-            {formatINR(summary.totalRepaid)}
+          <div className="text-xl font-black text-emerald-700 font-display">
+            {formatINR(metrics.totalReturnsPaid)}
           </div>
-          <span className="text-[11px] text-slate-500 mt-1 block">Principal & interest settled</span>
+          <span className="text-[11px] text-slate-400 mt-0.5 block">Disbursed successfully</span>
         </Card>
 
-        <Card className="p-5 border-l-4 border-l-amber-500 bg-white">
+        {/* Upcoming Returns */}
+        <Card className="p-4 border-l-4 border-l-sky-500 bg-white">
           <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
-            <span>Pending Repayments</span>
-            <Clock className="w-4 h-4 text-amber-600" />
+            <span>Upcoming Returns</span>
+            <Clock className="w-4 h-4 text-sky-600" />
           </div>
-          <div className="text-2xl font-black text-amber-700 font-display">
-            {formatINR(summary.pendingRepayments)}
+          <div className="text-xl font-black text-sky-700 font-display">
+            {formatINR(metrics.upcomingReturns)}
           </div>
-          <span className="text-[11px] text-slate-500 mt-1 block">Remaining dues & upcoming yields</span>
+          <span className="text-[11px] text-slate-400 mt-0.5 block">Scheduled upcoming cycles</span>
         </Card>
 
-        <Card className="p-5 border-l-4 border-l-brand-500 bg-white">
+        {/* Pending Returns */}
+        <Card className="p-4 border-l-4 border-l-amber-500 bg-white">
           <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
-            <span>Avg Return Rate</span>
-            <Coins className="w-4 h-4 text-brand-600" />
+            <span>Pending Returns (Due)</span>
+            <AlertCircle className="w-4 h-4 text-amber-600" />
           </div>
-          <div className="text-2xl font-black text-slate-900 font-display">
-            {summary.averageReturnRate}% p.a.
+          <div className="text-xl font-black text-amber-700 font-display">
+            {formatINR(metrics.pendingReturns)}
           </div>
-          <span className="text-[11px] text-slate-500 mt-1 block">Contractual yield rate</span>
+          <span className="text-[11px] text-slate-400 mt-0.5 block">Payment due now</span>
+        </Card>
+
+        {/* Overdue Returns */}
+        <Card className="p-4 border-l-4 border-l-rose-500 bg-white">
+          <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+            <span>Overdue Returns</span>
+            <AlertCircle className="w-4 h-4 text-rose-600" />
+          </div>
+          <div className="text-xl font-black text-rose-700 font-display">
+            {formatINR(metrics.overdueReturns)}
+          </div>
+          <span className="text-[11px] text-slate-400 mt-0.5 block">Grace period exceeded</span>
+        </Card>
+
+        {/* Next Payment Due Date */}
+        <Card className="p-4 border-l-4 border-l-purple-500 bg-white">
+          <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+            <span>Next Payment Due Date</span>
+            <Calendar className="w-4 h-4 text-purple-600" />
+          </div>
+          <div className="text-lg font-black text-purple-900 font-display">
+            {formatDate(metrics.nextPaymentDueDate)}
+          </div>
+          <span className="text-[11px] text-slate-400 mt-0.5 block">Upcoming cycle deadline</span>
         </Card>
       </div>
 
-      {/* Upcoming Repayment Dates Banner */}
-      {upcomingRepayments.length > 0 && (
-        <Card className="p-5 bg-[#FFFDF7] border-[#F4E9CD]">
-          <div className="flex items-center justify-between mb-3 border-b border-[#F4E9CD] pb-2">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-[#DE8E0A]" />
-              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                Upcoming Repayment Dates & Scheduled Servicing
-              </h3>
-            </div>
-            <span className="text-[11px] text-slate-500 font-medium">Automatic bank settlement</span>
+      {/* Investment-wise Returns Table (Section 2.B) */}
+      <Card className="overflow-hidden bg-white shadow-sm border border-slate-200">
+        <div className="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 className="text-base font-bold text-slate-900 font-display">
+              Investment-wise Return Agreements
+            </h2>
+            <p className="text-xs text-slate-500">
+              Contractual obligations are isolated per investment agreement. Do not combine terms across different agreements.
+            </p>
           </div>
+          <Badge variant="outline" className="text-xs">
+            {agreements.length} Active Agreement{agreements.length === 1 ? '' : 's'}
+          </Badge>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {upcomingRepayments.map((rep: any, idx: number) => (
-              <div key={idx} className="p-3.5 rounded-xl bg-white border border-[#EFE8D8] flex items-center justify-between">
-                <div>
-                  <div className="font-bold text-xs text-slate-900">{rep.title}</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    Due: {new Date(rep.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-bold text-xs text-[#DE8E0A]">{formatINR(rep.amount)}</div>
-                  <Badge variant="warning">{rep.status}</Badge>
-                </div>
-              </div>
-            ))}
+        {agreements.length === 0 ? (
+          <div className="p-12 text-center">
+            <Coins className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <h3 className="text-sm font-bold text-slate-700">No Return Obligations Found</h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+              Return schedules activate automatically when Admin disburses approved investment funds to your verified corporate bank account.
+            </p>
           </div>
-        </Card>
-      )}
-
-      {/* Tabs Switcher */}
-      <div className="flex border-b border-[#F2EBD9] space-x-6">
-        <button
-          onClick={() => setActiveTab('company')}
-          className={`flex items-center space-x-2 pb-3 text-xs sm:text-sm font-bold border-b-2 transition ${
-            activeTab === 'company'
-              ? 'border-[#DE8E0A] text-[#DE8E0A]'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <Building className="w-4 h-4" />
-          <span>Company Investments ({companyInvestments.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('project')}
-          className={`flex items-center space-x-2 pb-3 text-xs sm:text-sm font-bold border-b-2 transition ${
-            activeTab === 'project'
-              ? 'border-[#DE8E0A] text-[#DE8E0A]'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <FolderKanban className="w-4 h-4" />
-          <span>Project Investments ({projectInvestments.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('repayments')}
-          className={`flex items-center space-x-2 pb-3 text-xs sm:text-sm font-bold border-b-2 transition ${
-            activeTab === 'repayments'
-              ? 'border-[#DE8E0A] text-[#DE8E0A]'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <History className="w-4 h-4" />
-          <span>Payment History ({repaymentHistory.length})</span>
-        </button>
-
-      </div>
-
-      {/* TAB 1 & 2: Company or Project Investments */}
-      {(activeTab === 'company' || activeTab === 'project') && (
-        <Card className="p-0 overflow-hidden">
+        ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#FFFDF7] text-slate-500 uppercase tracking-wider border-b border-[#F2EBD9]">
-                <tr>
-                  <th className="p-4">Investment Opportunity</th>
-                  <th className="p-4">Investor / Creditor</th>
-                  <th className="p-4">Principal Amount</th>
-                  <th className="p-4">Return Rate</th>
-                  <th className="p-4">Expected Yield</th>
-                  <th className="p-4">Repaid Amount</th>
-                  <th className="p-4">Pending Repayment</th>
-                  <th className="p-4">Next Payment Date</th>
-                  <th className="p-4">Status</th>
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
+                  <th className="p-3.5">Investment ID</th>
+                  <th className="p-3.5">Investor</th>
+                  <th className="p-3.5">Amount Received</th>
+                  <th className="p-3.5">Agreed Rate</th>
+                  <th className="p-3.5">Monthly Amount</th>
+                  <th className="p-3.5">Disbursement Date</th>
+                  <th className="p-3.5">Next Due Date</th>
+                  <th className="p-3.5">Total Paid</th>
+                  <th className="p-3.5">Outstanding</th>
+                  <th className="p-3.5">Status</th>
+                  <th className="p-3.5 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {(activeTab === 'company' ? companyInvestments : projectInvestments).length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="p-8 text-center text-slate-500">
-                      No {activeTab === 'company' ? 'Company' : 'Project'} investments found.
-                    </td>
-                  </tr>
-                ) : (
-                  (activeTab === 'company' ? companyInvestments : projectInvestments).map((inv: any) => (
-                    <tr key={inv._id} className="hover:bg-slate-50">
-                      <td className="p-4">
-                        <div className="font-bold text-slate-900">{inv.title}</div>
-                        <span className="text-[10px] text-slate-500">{inv.investmentModel}</span>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {agreements.map((agr) => {
+                  const hasPayable = agr.activePayablePaymentId && (agr.activePayableStatus === 'Due' || agr.activePayableStatus === 'Overdue' || agr.activePayableStatus === 'Upcoming');
+                  return (
+                    <tr key={agr._id} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="p-3.5">
+                        <span className="font-mono font-bold text-brand-600 block">
+                          {agr.agreementNumber}
+                        </span>
+                        <span className="text-[10px] text-slate-400 truncate max-w-[140px] block">
+                          {agr.projectTitle}
+                        </span>
                       </td>
-                      <td className="p-4 text-slate-700 font-medium">{inv.investorName}</td>
-                      <td className="p-4 font-bold text-slate-900">{formatINR(inv.principalAmount)}</td>
-                      <td className="p-4 font-semibold text-[#DE8E0A]">{inv.returnRate}% p.a.</td>
-                      <td className="p-4 font-semibold text-emerald-700">{formatINR(inv.expectedReturn)}</td>
-                      <td className="p-4 font-semibold text-emerald-600">{formatINR(inv.repaidAmount)}</td>
-                      <td className="p-4 font-bold text-amber-700">{formatINR(inv.pendingRepayment)}</td>
-                      <td className="p-4 text-slate-600">
-                        {new Date(inv.nextRepaymentDate).toLocaleDateString()}
+                      <td className="p-3.5 text-slate-800 font-semibold">
+                        {agr.investorName}
                       </td>
-                      <td className="p-4">
-                        <Badge variant="success">{inv.status}</Badge>
+                      <td className="p-3.5 font-bold text-slate-900">
+                        {formatINR(agr.amountReceived)}
                       </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-
-      {/* TAB 3: Repayment History */}
-      {activeTab === 'repayments' && (
-        <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#FFFDF7] text-slate-500 uppercase tracking-wider border-b border-[#F2EBD9]">
-                <tr>
-                  <th className="p-4">Reference ID</th>
-                  <th className="p-4">Repayment Title</th>
-                  <th className="p-4">Amount Repaid</th>
-                  <th className="p-4">Payment Method</th>
-                  <th className="p-4">Date Settled</th>
-                  <th className="p-4">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {repaymentHistory.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-slate-500">
-                      No repayment transactions recorded yet.
-                    </td>
-                  </tr>
-                ) : (
-                  repaymentHistory.map((tx: any) => (
-                    <tr key={tx._id} className="hover:bg-slate-50">
-                      <td className="p-4 font-mono font-bold text-slate-900">{tx.referenceId}</td>
-                      <td className="p-4 font-medium text-slate-800">{tx.title}</td>
-                      <td className="p-4 font-bold text-emerald-700">{formatINR(tx.amount)}</td>
-                      <td className="p-4 text-slate-600">{tx.paymentMethod}</td>
-                      <td className="p-4 text-slate-500">
-                        {new Date(tx.createdAt || tx.transactionDate).toLocaleDateString()}
-                      </td>
-                      <td className="p-4">
-                        <Badge variant="success">{tx.status}</Badge>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-
-      {/* TAB 4: Equity Dividends */}
-      {activeTab === 'dividends' && (
-        <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#FFFDF7] text-slate-500 uppercase tracking-wider border-b border-[#F2EBD9]">
-                <tr>
-                  <th className="p-4">Board Resolution Ref</th>
-                  <th className="p-4">FY & Type</th>
-                  <th className="p-4">Per Share Rate</th>
-                  <th className="p-4">Total Consideration</th>
-                  <th className="p-4">Eligible Shareholders</th>
-                  <th className="p-4">Declaration Date</th>
-                  <th className="p-4">Disbursement Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {dividends.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="p-8 text-center text-slate-500">
-                      No board-approved dividend declarations logged yet.
-                    </td>
-                  </tr>
-                ) : (
-                  dividends.map((div: any) => (
-                    <tr key={div._id} className="hover:bg-slate-50">
-                      <td className="p-4 font-bold font-mono text-slate-900">{div.boardResolutionRef}</td>
-                      <td className="p-4">
-                        <span className="font-semibold text-slate-800">{div.financialYear}</span>
-                        <span className="block text-[10px] text-slate-500">{div.dividendType} Dividend</span>
-                      </td>
-                      <td className="p-4 font-bold text-brand-600">₹{div.amountPerShare} / share</td>
-                      <td className="p-4 font-bold text-emerald-700">{formatINR(div.totalDividendAmount)}</td>
-                      <td className="p-4 text-slate-600">{div.eligibleShareholdersCount} Shareholders</td>
-                      <td className="p-4 text-slate-500">
-                        {new Date(div.declarationDate).toLocaleDateString()}
-                      </td>
-                      <td className="p-4">
-                        <Badge variant={div.disbursementStatus === 'Completed' ? 'success' : 'warning'}>
-                          {div.disbursementStatus}
+                      <td className="p-3.5">
+                        <Badge variant="outline" className="font-semibold text-brand-600 bg-brand-50/40">
+                          {agr.agreedReturnRate}% / mo
                         </Badge>
                       </td>
+                      <td className="p-3.5 font-bold text-emerald-700">
+                        {formatINR(agr.monthlyReturnAmount)}
+                      </td>
+                      <td className="p-3.5 text-slate-600">
+                        {formatDate(agr.disbursementDate)}
+                      </td>
+                      <td className="p-3.5 text-slate-900 font-medium">
+                        {formatDate(agr.nextDueDate)}
+                      </td>
+                      <td className="p-3.5 font-bold text-emerald-700">
+                        {formatINR(agr.totalReturnsPaid)}
+                      </td>
+                      <td className="p-3.5 font-bold text-amber-700">
+                        {formatINR(agr.outstandingAmount)}
+                      </td>
+                      <td className="p-3.5">
+                        <Badge
+                          variant={
+                            agr.status === 'Active'
+                              ? 'success'
+                              : agr.status === 'Completed'
+                              ? 'brand'
+                              : 'warning'
+                          }
+                        >
+                          {agr.status}
+                        </Badge>
+                      </td>
+                      <td className="p-3.5 text-right space-x-2 whitespace-nowrap">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewSchedule(agr._id)}
+                          className="text-[11px] py-1 px-2.5 h-auto font-semibold"
+                        >
+                          Schedule
+                        </Button>
+                        {hasPayable && (
+                          <Button
+                            size="sm"
+                            disabled={payingPaymentId === agr.activePayablePaymentId}
+                            onClick={() => handleInitiatePayment(agr.activePayablePaymentId, agr.projectTitle)}
+                            className={`text-[11px] py-1 px-3 h-auto font-bold shadow-sm ${
+                              agr.activePayableStatus === 'Overdue'
+                                ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                                : 'bg-[#DE8E0A] hover:bg-[#c27c08] text-white'
+                            }`}
+                          >
+                            <CreditCard className="w-3 h-3 mr-1 inline" />
+                            {payingPaymentId === agr.activePayablePaymentId ? 'Processing...' : 'Pay Now'}
+                          </Button>
+                        )}
+                      </td>
                     </tr>
-                  ))
-                )}
+                  );
+                })}
               </tbody>
             </table>
           </div>
-        </Card>
-      )}
+        )}
+      </Card>
 
-      {/* Modal: Declare Dividend */}
+      {/* Monthly Return Schedule Modal */}
       <Modal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title="Declare Corporate Dividend (Board Resolution)"
+        isOpen={scheduleModalOpen}
+        onClose={() => setScheduleModalOpen(false)}
+        title={activeAgreementSchedule ? `Monthly Return Schedule – ${activeAgreementSchedule.agreement?.agreementNumber}` : 'Return Schedule'}
       >
-        <form onSubmit={handleDeclareDividend} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Board Resolution Reference *</label>
-            <input
-              type="text"
-              required
-              value={newDividend.boardResolutionRef}
-              onChange={(e) => setNewDividend({ ...newDividend, boardResolutionRef: e.target.value })}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm"
-              placeholder="BR-DIV-2026/01"
-            />
+        {loadingSchedule ? (
+          <div className="py-8">
+            <Loader text="Loading schedule..." />
           </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Financial Year</label>
-              <input
-                type="text"
-                required
-                value={newDividend.financialYear}
-                onChange={(e) => setNewDividend({ ...newDividend, financialYear: e.target.value })}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm"
-              />
+        ) : activeAgreementSchedule ? (
+          <div className="space-y-4 text-xs">
+            {/* Agreement Terms Banner */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase tracking-wide block">Principal</span>
+                <span className="font-bold text-slate-900 text-sm">
+                  {formatINR(activeAgreementSchedule.agreement?.principalAmount)}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase tracking-wide block">Monthly Rate</span>
+                <span className="font-bold text-brand-600 text-sm">
+                  {activeAgreementSchedule.agreement?.agreedMonthlyRate}% / mo
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase tracking-wide block">Monthly Return</span>
+                <span className="font-bold text-emerald-700 text-sm">
+                  {formatINR(activeAgreementSchedule.agreement?.monthlyReturnAmount)}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase tracking-wide block">Tenure</span>
+                <span className="font-bold text-slate-900 text-sm">
+                  {activeAgreementSchedule.agreement?.tenureMonths} Months
+                </span>
+              </div>
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Dividend Amount Per Share (INR) *</label>
-              <input
-                type="number"
-                step="0.1"
-                required
-                value={newDividend.amountPerShare}
-                onChange={(e) => setNewDividend({ ...newDividend, amountPerShare: Number(e.target.value) })}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm"
-              />
+
+            {/* Schedule Table */}
+            <div className="max-h-[380px] overflow-y-auto border border-slate-200 rounded-xl">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-slate-100 text-slate-600 font-semibold sticky top-0 border-b border-slate-200">
+                  <tr>
+                    <th className="p-3">#</th>
+                    <th className="p-3">Cycle / Period</th>
+                    <th className="p-3">Due Date</th>
+                    <th className="p-3">Amount Due</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {activeAgreementSchedule.schedule?.map((item: any) => (
+                    <tr key={item._id} className="hover:bg-slate-50 transition-colors">
+                      <td className="p-3 font-bold text-slate-400">{item.cycleNumber}</td>
+                      <td className="p-3 font-medium text-slate-800">{item.paymentPeriod}</td>
+                      <td className="p-3 text-slate-600">{formatDate(item.dueDate)}</td>
+                      <td className="p-3 font-bold text-slate-900">{formatINR(item.amountDue)}</td>
+                      <td className="p-3">
+                        <Badge
+                          variant={
+                            item.paymentStatus === 'Paid'
+                              ? 'success'
+                              : item.paymentStatus === 'Due'
+                              ? 'warning'
+                              : item.paymentStatus === 'Overdue'
+                              ? 'danger'
+                              : 'outline'
+                          }
+                        >
+                          {item.paymentStatus}
+                        </Badge>
+                      </td>
+                      <td className="p-3 text-right">
+                        {item.paymentStatus === 'Paid' ? (
+                          <button
+                            onClick={() => handleViewReceipt(item._id)}
+                            className="text-brand-600 hover:text-brand-700 font-bold inline-flex items-center gap-1"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            Receipt
+                          </button>
+                        ) : item.paymentStatus === 'Due' || item.paymentStatus === 'Overdue' || item.paymentStatus === 'Upcoming' ? (
+                          <Button
+                            size="sm"
+                            disabled={payingPaymentId === item._id}
+                            onClick={() => handleInitiatePayment(item._id, activeAgreementSchedule.agreement?.projectTitle)}
+                            className="text-[10px] py-0.5 px-2.5 h-auto font-bold bg-[#DE8E0A] hover:bg-[#c27c08]"
+                          >
+                            Pay Now
+                          </Button>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <Button variant="outline" size="sm" onClick={() => setScheduleModalOpen(false)}>
+                Close
+              </Button>
             </div>
           </div>
-
-          <div className="flex justify-end space-x-3 pt-3">
-            <Button variant="outline" type="button" onClick={() => setModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit">Submit Official Declaration</Button>
-          </div>
-        </form>
+        ) : null}
       </Modal>
+
+      {/* Payment Receipt Modal */}
+      <Modal
+        isOpen={receiptModalOpen}
+        onClose={() => setReceiptModalOpen(false)}
+        title="Payment Receipt – Monthly Return"
+      >
+        {loadingReceipt ? (
+          <div className="py-8">
+            <Loader text="Generating receipt..." />
+          </div>
+        ) : receiptData ? (
+          <div className="space-y-4 text-xs font-sans">
+            <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl flex items-center justify-between">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-emerald-800 tracking-wider">Receipt Reference</span>
+                <p className="font-mono font-bold text-slate-900 text-sm">{receiptData.receiptNumber}</p>
+              </div>
+              <Badge variant="success" className="text-xs">
+                Paid & Verified
+              </Badge>
+            </div>
+
+            <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white">
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-slate-500">Borrower Company</span>
+                <span className="font-bold text-slate-800">{receiptData.company?.name}</span>
+              </div>
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-slate-500">Agreement Reference</span>
+                <span className="font-mono font-semibold text-slate-800">{receiptData.agreementNumber}</span>
+              </div>
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-slate-500">Period Paid</span>
+                <span className="font-semibold text-slate-800">{receiptData.paymentPeriod} (Cycle #{receiptData.cycleNumber})</span>
+              </div>
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-slate-500">Payment Date</span>
+                <span className="text-slate-800">{formatDate(receiptData.paymentDate)}</span>
+              </div>
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-slate-500">Razorpay Payment ID</span>
+                <span className="font-mono text-slate-800">{receiptData.razorpayPaymentId}</span>
+              </div>
+              <div className="flex justify-between pt-1">
+                <span className="text-sm font-bold text-slate-900">Total Return Amount Paid</span>
+                <span className="text-base font-black text-emerald-700 font-display">
+                  {formatINR(receiptData.amount)}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" size="sm" onClick={() => window.print()}>
+                Print Receipt
+              </Button>
+              <Button size="sm" onClick={() => setReceiptModalOpen(false)}>
+                Done
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      {/* Razorpay Test Mode Checkout Modal */}
+      {activeCheckoutOrder && (
+        <RazorpayCheckoutModal
+          isOpen={!!activeCheckoutOrder}
+          onClose={() => {
+            setActiveCheckoutOrder(null);
+            setPayingPaymentId(null);
+          }}
+          orderData={activeCheckoutOrder}
+          onSuccess={(response: any) => {
+            handlePaymentVerificationSuccess(
+              activeCheckoutOrder.returnPaymentId,
+              activeCheckoutOrder.orderId,
+              response
+            );
+          }}
+          onFailure={(error: any) => {
+            console.warn('Payment failed or dismissed:', error);
+            setPayingPaymentId(null);
+          }}
+        />
+      )}
     </div>
   );
 };

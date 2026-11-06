@@ -288,7 +288,36 @@ export const ReturnsPayouts = () => {
                           </td>
                         )}
                         <td style={{ padding: '14px 16px' }}>
-                          <span className={`badge badge-${(payout.status || 'pending').toLowerCase()}`}>
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              fontSize: '11.5px',
+                              fontWeight: '700',
+                              backgroundColor:
+                                payout.status === 'Completed' || payout.status === 'Disbursed to Investor'
+                                  ? 'rgba(16, 185, 129, 0.12)'
+                                  : payout.status === 'Paid by Company' || payout.distributionStatus === 'Received by Platform'
+                                  ? 'rgba(59, 130, 246, 0.12)'
+                                  : payout.status === 'Delayed'
+                                  ? 'rgba(239, 68, 68, 0.12)'
+                                  : 'rgba(245, 158, 11, 0.12)',
+                              color:
+                                payout.status === 'Completed' || payout.status === 'Disbursed to Investor'
+                                  ? '#059669'
+                                  : payout.status === 'Paid by Company' || payout.distributionStatus === 'Received by Platform'
+                                  ? '#2563EB'
+                                  : payout.status === 'Delayed'
+                                  ? '#DC2626'
+                                  : '#D97706',
+                              border:
+                                payout.status === 'Paid by Company' || payout.distributionStatus === 'Received by Platform'
+                                  ? '1px solid rgba(59, 130, 246, 0.25)'
+                                  : 'none'
+                            }}
+                          >
                             {payout.status}
                           </span>
                         </td>

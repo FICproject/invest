@@ -5,7 +5,7 @@ import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
 import { Loader } from '../../components/common/Loader';
 import { investorService } from '../../services/investorService';
-import { validateIFSC } from '../../utils/validators';
+import { validateIFSC, validateBankAccount, ERROR_MESSAGES } from '../../utils/validators';
 
 export const BankDetails = () => {
   const [bankDetails, setBankDetails] = useState({
@@ -14,10 +14,34 @@ export const BankDetails = () => {
     ifscCode: '',
     accountHolderName: ''
   });
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [touched, setTouched] = useState({});
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+
+  const validateField = (name, value) => {
+    let err = '';
+    if (name === 'accountNumber') {
+      if (!value) err = 'Bank account number is required.';
+      else if (!validateBankAccount(value)) err = ERROR_MESSAGES.BANK_ACCOUNT_INVALID;
+    } else if (name === 'ifscCode') {
+      if (!value) err = 'IFSC code is required.';
+      else if (!validateIFSC(value)) err = ERROR_MESSAGES.IFSC_INVALID;
+    } else if (name === 'bankName') {
+      if (!value.trim()) err = 'Bank name is required.';
+    } else if (name === 'accountHolderName') {
+      if (!value.trim()) err = 'Account holder name is required.';
+    }
+    setFieldErrors(prev => ({ ...prev, [name]: err }));
+    return !err;
+  };
+
+  const handleBlur = (field) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+    validateField(field, bankDetails[field]);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -49,13 +73,18 @@ export const BankDetails = () => {
     setMessage('');
     setError('');
 
-    if (!bankDetails.bankName || !bankDetails.accountNumber) {
-      setError('Please provide bank name and account number.');
+    if (!bankDetails.bankName.trim() || !bankDetails.accountHolderName.trim()) {
+      setError('Please provide all required bank account fields.');
+      return;
+    }
+
+    if (!validateBankAccount(bankDetails.accountNumber)) {
+      setError(ERROR_MESSAGES.BANK_ACCOUNT_INVALID);
       return;
     }
 
     if (!validateIFSC(bankDetails.ifscCode)) {
-      setError('Invalid IFSC format. Expected format: HDFC0001234.');
+      setError(ERROR_MESSAGES.IFSC_INVALID);
       return;
     }
 
@@ -117,7 +146,12 @@ export const BankDetails = () => {
             <Input
               label="Account Holder Name"
               value={bankDetails.accountHolderName}
-              onChange={(e) => setBankDetails({ ...bankDetails, accountHolderName: e.target.value })}
+              onChange={(e) => {
+                setBankDetails({ ...bankDetails, accountHolderName: e.target.value });
+                if (touched.accountHolderName) validateField('accountHolderName', e.target.value);
+              }}
+              onBlur={() => handleBlur('accountHolderName')}
+              error={touched.accountHolderName ? fieldErrors.accountHolderName : ''}
               placeholder="As registered in your bank records"
               required
             />
@@ -125,7 +159,12 @@ export const BankDetails = () => {
             <Input
               label="Bank Name"
               value={bankDetails.bankName}
-              onChange={(e) => setBankDetails({ ...bankDetails, bankName: e.target.value })}
+              onChange={(e) => {
+                setBankDetails({ ...bankDetails, bankName: e.target.value });
+                if (touched.bankName) validateField('bankName', e.target.value);
+              }}
+              onBlur={() => handleBlur('bankName')}
+              error={touched.bankName ? fieldErrors.bankName : ''}
               placeholder="e.g. HDFC Bank Ltd."
               required
             />
@@ -133,15 +172,29 @@ export const BankDetails = () => {
             <Input
               label="Bank Account Number"
               value={bankDetails.accountNumber}
-              onChange={(e) => setBankDetails({ ...bankDetails, accountNumber: e.target.value })}
-              placeholder="Enter full account number"
+              maxLength={18}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '').slice(0, 18);
+                setBankDetails({ ...bankDetails, accountNumber: val });
+                if (touched.accountNumber) validateField('accountNumber', val);
+              }}
+              onBlur={() => handleBlur('accountNumber')}
+              error={touched.accountNumber ? fieldErrors.accountNumber : ''}
+              placeholder="9 to 18 digits (e.g. 123456789012)"
               required
             />
 
             <Input
               label="Bank IFSC Code"
               value={bankDetails.ifscCode}
-              onChange={(e) => setBankDetails({ ...bankDetails, ifscCode: e.target.value.toUpperCase() })}
+              maxLength={11}
+              onChange={(e) => {
+                const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11);
+                setBankDetails({ ...bankDetails, ifscCode: val });
+                if (touched.ifscCode) validateField('ifscCode', val);
+              }}
+              onBlur={() => handleBlur('ifscCode')}
+              error={touched.ifscCode ? fieldErrors.ifscCode : ''}
               placeholder="e.g. HDFC0001234"
               required
             />

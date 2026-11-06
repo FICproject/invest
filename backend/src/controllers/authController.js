@@ -7,6 +7,16 @@ import { ENV } from '../config/env.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { broadcastSyncEvent } from '../services/sse.js';
+import {
+  validateDOB,
+  validateMobile,
+  validatePAN,
+  validateAadhaar,
+  validateBankAccount,
+  validateIFSC,
+  validateEmail,
+  ERROR_MESSAGES
+} from '../utils/validators.js';
 
 const generateToken = (id) => {
   return jwt.sign({ id, userId: id }, ENV.JWT_SECRET, { expiresIn: ENV.JWT_EXPIRES_IN });
@@ -79,8 +89,43 @@ export const register = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Please provide full legal name, email address, mobile number, and password.');
   }
 
+  if (!validateEmail(email)) {
+    throw new ApiError(400, 'Please enter a valid Email Address.');
+  }
+
+  // 1. Mobile Number Validation: Exactly 10 digits, starts with 6-9
+  if (!validateMobile(mobile)) {
+    throw new ApiError(400, ERROR_MESSAGES.MOBILE_INVALID);
+  }
+
   if (password.length < 6) {
     throw new ApiError(400, 'Password must be at least 6 characters long.');
+  }
+
+  // 2. Date of Birth Validation: Mandatory, at least 18 years old, no future dates
+  const dobResult = validateDOB(dateOfBirth);
+  if (!dobResult.valid) {
+    throw new ApiError(400, dobResult.message);
+  }
+
+  // 3. PAN Validation: Must match Indian PAN format ABCDE1234F if provided
+  if (pan && !validatePAN(pan)) {
+    throw new ApiError(400, ERROR_MESSAGES.PAN_INVALID);
+  }
+
+  // 4. Aadhaar Validation: Exactly 12 numeric digits if provided
+  if (aadhaarNumber && !validateAadhaar(aadhaarNumber)) {
+    throw new ApiError(400, ERROR_MESSAGES.AADHAAR_INVALID);
+  }
+
+  // 5. Bank Account Number Validation: 9-18 digits if provided
+  if (accountNumber && !validateBankAccount(accountNumber)) {
+    throw new ApiError(400, ERROR_MESSAGES.BANK_ACCOUNT_INVALID);
+  }
+
+  // 6. IFSC Code Validation: 11-character Indian IFSC code if provided
+  if (ifscCode && !validateIFSC(ifscCode)) {
+    throw new ApiError(400, ERROR_MESSAGES.IFSC_INVALID);
   }
 
   // Check if email or mobile already registered
@@ -89,7 +134,7 @@ export const register = asyncHandler(async (req, res) => {
     throw new ApiError(409, 'An investor account with this email address already exists. Please sign in.');
   }
 
-  const existingMobile = await User.findOne({ mobile });
+  const existingMobile = await User.findOne({ mobile: String(mobile).trim() });
   if (existingMobile) {
     throw new ApiError(409, 'An investor account with this mobile number already exists. Please sign in.');
   }

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Download, ExternalLink, ZoomIn, ZoomOut, RotateCw, FileText, AlertCircle } from 'lucide-react';
+import { getApiBase, getBackendOrigin } from '../services/api';
 
 export default function DocumentPreviewModal({ isOpen, onClose, documentUrl, title, documentType }) {
   const [zoom, setZoom] = useState(1);
@@ -10,12 +11,20 @@ export default function DocumentPreviewModal({ isOpen, onClose, documentUrl, tit
   const filename = documentUrl.split('/').pop()?.split('?')[0] || '';
   const isPdf = filename.toLowerCase().endsWith('.pdf');
 
-  // Relative paths ensure seamless preview & download across localhost and LAN networks via Vite proxy
-  const normalizedUrl = documentUrl.startsWith('http')
-    ? documentUrl
-    : (documentUrl.startsWith('/') ? documentUrl : `/uploads/${documentUrl}`);
+  // Resolve normalized URL:
+  // If full absolute http/https, use directly.
+  // Otherwise, prefix with backend origin so it works reliably in production (Vercel) as well as local dev.
+  const backendOrigin = getBackendOrigin();
+  const apiBase = getApiBase();
 
-  const downloadUrl = `/api/v1/admin/documents/${filename}/download`;
+  let normalizedUrl = documentUrl;
+  if (!normalizedUrl.startsWith('http')) {
+    const cleanPath = normalizedUrl.startsWith('/') ? normalizedUrl : `/uploads/${normalizedUrl}`;
+    normalizedUrl = backendOrigin ? `${backendOrigin}${cleanPath}` : cleanPath;
+  }
+
+  // Direct download endpoint URL
+  const downloadUrl = `${apiBase}/admin/documents/${filename}/download`;
 
   const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.25, 3));
   const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.25, 0.5));

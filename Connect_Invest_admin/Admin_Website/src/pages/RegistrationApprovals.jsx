@@ -21,7 +21,7 @@ import {
   ExternalLink,
   ChevronRight
 } from 'lucide-react';
-import { adminApi } from '../services/api';
+import { adminApi, getApiBase } from '../services/api';
 import { initRealTimeSync } from '../services/realTimeSync';
 import { useToast } from '../context/ToastContext';
 import DocumentPreviewModal from '../components/DocumentPreviewModal';
@@ -963,7 +963,8 @@ export default function RegistrationApprovals() {
                     {selectedApp.documents.map((doc, idx) => {
                       const isDocPdf = (doc.url || '').toLowerCase().endsWith('.pdf');
                       const docFilename = (doc.url || '').split('/').pop();
-                      const directDownloadUrl = `/api/v1/admin/documents/${docFilename}/download`;
+                      const apiBase = getApiBase();
+                      const directDownloadUrl = `${apiBase}/admin/documents/${docFilename}/download`;
 
                       return (
                         <div

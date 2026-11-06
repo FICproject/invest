@@ -107,8 +107,11 @@ function MainApp() {
 
         {/* Modules navigated to via Sidebar (Identical to Website) */}
         {[
+          'fund_approvals',
+          'investment_approvals',
           'investments_portfolio',
           'releases',
+          'maturity_releases',
           'subscriptions',
           'queries',
           'notifications',

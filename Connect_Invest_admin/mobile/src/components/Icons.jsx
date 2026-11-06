@@ -13,6 +13,7 @@ const iconGlyphs = {
   Check: '✓',
   CheckCircle: '✓',
   CheckCircle2: '✓',
+  CheckSquare: '☑️',
   ChevronDown: '⌄',
   ChevronRight: '›',
   Clock: '🕒',
@@ -90,6 +91,7 @@ export const Calendar = createIcon('Calendar');
 export const Check = createIcon('Check');
 export const CheckCircle = createIcon('CheckCircle');
 export const CheckCircle2 = createIcon('CheckCircle2');
+export const CheckSquare = createIcon('CheckSquare');
 export const ChevronDown = createIcon('ChevronDown');
 export const ChevronRight = createIcon('ChevronRight');
 export const Clock = createIcon('Clock');
@@ -163,6 +165,7 @@ const Icons = new Proxy({
   Check,
   CheckCircle,
   CheckCircle2,
+  CheckSquare,
   ChevronDown,
   ChevronRight,
   Clock,

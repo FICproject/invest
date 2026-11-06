@@ -91,6 +91,7 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     setUser(null);
     setKycStatus('NOT_STARTED');
+    window.location.href = '/login';
   };
 
   const refreshMe = async () => {

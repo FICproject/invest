@@ -3,6 +3,13 @@ import { InvestorProfile } from '../models/InvestorProfile.js';
 import { Notification } from '../models/Notification.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import {
+  validatePAN,
+  validateAadhaar,
+  validateBankAccount,
+  validateIFSC,
+  ERROR_MESSAGES
+} from '../utils/validators.js';
 
 // @route   GET /api/kyc/status
 // @desc    Get KYC verification status and document details
@@ -42,9 +49,25 @@ export const submitKyc = asyncHandler(async (req, res) => {
   }
 
   // Validate PAN format: 5 letters, 4 digits, 1 letter
-  const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-  if (!panRegex.test(panNumber.toUpperCase().trim())) {
-    throw new ApiError(400, 'Invalid PAN number format. Expected format: ABCDE1234F.');
+  if (!validatePAN(panNumber)) {
+    throw new ApiError(400, ERROR_MESSAGES.PAN_INVALID);
+  }
+
+  // Validate Aadhaar if selected as address proof or provided
+  if ((addressProofType === 'Aadhaar Card' || addressProofType === 'Aadhaar') && addressProofNumber) {
+    if (!validateAadhaar(addressProofNumber)) {
+      throw new ApiError(400, ERROR_MESSAGES.AADHAAR_INVALID);
+    }
+  }
+
+  // Validate Bank Account Number if provided
+  if (accountNumber && !validateBankAccount(accountNumber)) {
+    throw new ApiError(400, ERROR_MESSAGES.BANK_ACCOUNT_INVALID);
+  }
+
+  // Validate Bank IFSC if provided
+  if (ifscCode && !validateIFSC(ifscCode)) {
+    throw new ApiError(400, ERROR_MESSAGES.IFSC_INVALID);
   }
 
   let kyc = await KYC.findOne({ investorId });

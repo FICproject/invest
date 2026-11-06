@@ -18,7 +18,14 @@ export default function Login() {
     try {
       await login(email, password);
     } catch (err) {
-      setError(err.response?.data?.error || err.message || 'Invalid email or password');
+      const serverErr = err.response?.data?.error || err.response?.data?.message;
+      if (err.response?.status === 401 || err.response?.status === 400) {
+        setError(serverErr || 'Invalid email or password. Please verify your administrator credentials.');
+      } else if (err.response?.status === 500) {
+        setError(serverErr || 'Unable to connect to administration service. Please check server logs or network.');
+      } else {
+        setError(serverErr || err.message || 'Invalid email or password');
+      }
     } finally {
       setLoading(false);
     }

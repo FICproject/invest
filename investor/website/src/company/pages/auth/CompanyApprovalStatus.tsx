@@ -241,7 +241,10 @@ export const CompanyApprovalStatus: React.FC = () => {
           </div>
 
           <button
-            onClick={logout}
+            onClick={() => {
+              logout();
+              navigate('/company/login');
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',

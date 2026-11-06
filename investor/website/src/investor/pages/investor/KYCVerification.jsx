@@ -17,7 +17,14 @@ import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
 import { Loader } from '../../components/common/Loader';
 import { kycService } from '../../services/kycService';
-import { validatePAN, validateIFSC } from '../../utils/validators';
+import {
+  validatePAN,
+  validateAadhaar,
+  validateBankAccount,
+  validateIFSC,
+  maskAadhaar,
+  ERROR_MESSAGES
+} from '../../utils/validators';
 import { useAuth } from '../../context/AuthContext';
 
 export const KYCVerification = () => {
@@ -39,6 +46,66 @@ export const KYCVerification = () => {
     accountNumber: '',
     ifscCode: ''
   });
+
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [touched, setTouched] = useState({});
+
+  const validateField = (name, val, data = formData) => {
+    switch (name) {
+      case 'fullName':
+        if (!val || !val.trim()) return 'Please provide your full legal name as per PAN.';
+        return '';
+      case 'panNumber':
+        if (!val || !val.trim()) return ERROR_MESSAGES.PAN_INVALID;
+        if (!validatePAN(val)) return ERROR_MESSAGES.PAN_INVALID;
+        return '';
+      case 'addressProofNumber':
+        if (data.addressProofType === 'Aadhaar Card' && val) {
+          if (!validateAadhaar(val)) return ERROR_MESSAGES.AADHAAR_INVALID;
+        }
+        return '';
+      case 'bankName':
+        if (!val || !val.trim()) return 'Please enter Bank Name.';
+        return '';
+      case 'accountNumber':
+        if (!val || !val.trim()) return ERROR_MESSAGES.BANK_ACCOUNT_INVALID;
+        if (!validateBankAccount(val)) return ERROR_MESSAGES.BANK_ACCOUNT_INVALID;
+        return '';
+      case 'ifscCode':
+        if (!val || !val.trim()) return ERROR_MESSAGES.IFSC_INVALID;
+        if (!validateIFSC(val)) return ERROR_MESSAGES.IFSC_INVALID;
+        return '';
+      default:
+        return '';
+    }
+  };
+
+  const handleFieldChange = (name, value) => {
+    let finalVal = value;
+    if (name === 'panNumber') {
+      finalVal = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+    } else if (name === 'addressProofNumber' && formData.addressProofType === 'Aadhaar Card') {
+      finalVal = value.replace(/\D/g, '').slice(0, 12);
+    } else if (name === 'accountNumber') {
+      finalVal = value.replace(/\D/g, '').slice(0, 18);
+    } else if (name === 'ifscCode') {
+      finalVal = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11);
+    }
+
+    const updated = { ...formData, [name]: finalVal };
+    setFormData(updated);
+
+    if (touched[name]) {
+      const err = validateField(name, finalVal, updated);
+      setFieldErrors((prev) => ({ ...prev, [name]: err }));
+    }
+  };
+
+  const handleBlur = (name) => {
+    setTouched((prev) => ({ ...prev, [name]: true }));
+    const err = validateField(name, formData[name], formData);
+    setFieldErrors((prev) => ({ ...prev, [name]: err }));
+  };
 
   // File uploads
   const [panFile, setPanFile] = useState(null);
@@ -83,23 +150,26 @@ export const KYCVerification = () => {
     setError('');
     setSuccess('');
 
-    if (!formData.fullName.trim()) {
-      setError('Please provide your full legal name as per PAN.');
-      return;
+    // Mark all touched and validate
+    const fieldsToValidate = ['fullName', 'panNumber', 'bankName', 'accountNumber', 'ifscCode'];
+    if (formData.addressProofType === 'Aadhaar Card' && formData.addressProofNumber) {
+      fieldsToValidate.push('addressProofNumber');
     }
 
-    if (!validatePAN(formData.panNumber)) {
-      setError('Please provide a valid 10-character PAN number (e.g. ABCDE1234F).');
-      return;
-    }
+    const newErrors = {};
+    const newTouched = {};
+    fieldsToValidate.forEach((f) => {
+      newTouched[f] = true;
+      const err = validateField(f, formData[f], formData);
+      if (err) newErrors[f] = err;
+    });
 
-    if (!formData.bankName || !formData.accountNumber) {
-      setError('Please enter complete bank account coordinates.');
-      return;
-    }
+    setTouched((prev) => ({ ...prev, ...newTouched }));
+    setFieldErrors((prev) => ({ ...prev, ...newErrors }));
 
-    if (!validateIFSC(formData.ifscCode)) {
-      setError('Please provide a valid 11-character bank IFSC code (e.g. HDFC0001234).');
+    const errorKeys = Object.keys(newErrors);
+    if (errorKeys.length > 0) {
+      setError(newErrors[errorKeys[0]]);
       return;
     }
 
@@ -306,16 +376,23 @@ export const KYCVerification = () => {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
                 <Input
                   label="Full Legal Name"
+                  name="fullName"
                   value={formData.fullName}
-                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                  onChange={(e) => handleFieldChange('fullName', e.target.value)}
+                  onBlur={() => handleBlur('fullName')}
+                  error={touched.fullName ? fieldErrors.fullName : ''}
                   placeholder="As per PAN Card"
                   required
                 />
                 <Input
                   label="PAN Card Number"
+                  name="panNumber"
                   value={formData.panNumber}
-                  onChange={(e) => setFormData({ ...formData, panNumber: e.target.value.toUpperCase() })}
-                  placeholder="ABCDE1234F"
+                  onChange={(e) => handleFieldChange('panNumber', e.target.value)}
+                  onBlur={() => handleBlur('panNumber')}
+                  error={touched.panNumber ? fieldErrors.panNumber : ''}
+                  placeholder="e.g. ABCDE1234F"
+                  maxLength={10}
                   required
                 />
               </div>
@@ -356,10 +433,19 @@ export const KYCVerification = () => {
                 </div>
 
                 <Input
-                  label="Document Number"
+                  label={formData.addressProofType === 'Aadhaar Card' ? 'Aadhaar Number (12 Digits)' : 'Document Number'}
+                  name="addressProofNumber"
                   value={formData.addressProofNumber}
-                  onChange={(e) => setFormData({ ...formData, addressProofNumber: e.target.value })}
-                  placeholder="e.g. XXXX-XXXX-1234"
+                  onChange={(e) => handleFieldChange('addressProofNumber', e.target.value)}
+                  onBlur={() => handleBlur('addressProofNumber')}
+                  error={touched.addressProofNumber ? fieldErrors.addressProofNumber : ''}
+                  placeholder={formData.addressProofType === 'Aadhaar Card' ? '12-digit Aadhaar number' : 'Document ID Number'}
+                  maxLength={formData.addressProofType === 'Aadhaar Card' ? 12 : 30}
+                  helperText={
+                    formData.addressProofType === 'Aadhaar Card' && formData.addressProofNumber?.length === 12
+                      ? `Verified format: ${maskAadhaar(formData.addressProofNumber)}`
+                      : ''
+                  }
                 />
               </div>
             </div>
@@ -374,23 +460,34 @@ export const KYCVerification = () => {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
                 <Input
                   label="Bank Name"
+                  name="bankName"
                   value={formData.bankName}
-                  onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
+                  onChange={(e) => handleFieldChange('bankName', e.target.value)}
+                  onBlur={() => handleBlur('bankName')}
+                  error={touched.bankName ? fieldErrors.bankName : ''}
                   placeholder="e.g. HDFC Bank, ICICI Bank"
                   required
                 />
                 <Input
                   label="Account Number"
+                  name="accountNumber"
                   value={formData.accountNumber}
-                  onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
-                  placeholder="Enter Account Number"
+                  onChange={(e) => handleFieldChange('accountNumber', e.target.value)}
+                  onBlur={() => handleBlur('accountNumber')}
+                  error={touched.accountNumber ? fieldErrors.accountNumber : ''}
+                  placeholder="9 to 18 digits account number"
+                  maxLength={18}
                   required
                 />
                 <Input
                   label="Bank IFSC Code"
+                  name="ifscCode"
                   value={formData.ifscCode}
-                  onChange={(e) => setFormData({ ...formData, ifscCode: e.target.value.toUpperCase() })}
+                  onChange={(e) => handleFieldChange('ifscCode', e.target.value)}
+                  onBlur={() => handleBlur('ifscCode')}
+                  error={touched.ifscCode ? fieldErrors.ifscCode : ''}
                   placeholder="e.g. HDFC0001234"
+                  maxLength={11}
                   required
                 />
               </div>

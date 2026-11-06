@@ -3,6 +3,14 @@ import { Card, Button, Badge, Loader, Modal } from '../../components/common';
 import { useAuth } from '../../context/AuthContext';
 import { companyService } from '../../services';
 import {
+  validatePAN,
+  validateMobile,
+  validateEmail,
+  validateCIN,
+  validateGSTIN,
+  ERROR_MESSAGES
+} from '../../utils/validators';
+import {
   Building2,
   Users,
   ShieldCheck,
@@ -51,6 +59,24 @@ export const CompanyDetails: React.FC = () => {
     setIsSaving(true);
     setStatusMsg({ type: '', text: '' });
 
+    if (formData.pan && !validatePAN(formData.pan)) {
+      setStatusMsg({ type: 'error', text: ERROR_MESSAGES.PAN_INVALID });
+      setIsSaving(false);
+      return;
+    }
+
+    if (formData.cin && !validateCIN(formData.cin)) {
+      setStatusMsg({ type: 'error', text: ERROR_MESSAGES.CIN_INVALID });
+      setIsSaving(false);
+      return;
+    }
+
+    if (formData.gstin && !validateGSTIN(formData.gstin)) {
+      setStatusMsg({ type: 'error', text: ERROR_MESSAGES.GSTIN_INVALID });
+      setIsSaving(false);
+      return;
+    }
+
     try {
       await companyService.updateProfile({
         ...formData,
@@ -73,6 +99,24 @@ export const CompanyDetails: React.FC = () => {
 
   const handleAddDirector = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!newDirector.name.trim()) {
+      alert('Please enter director name.');
+      return;
+    }
+    if (!validateEmail(newDirector.email)) {
+      alert('Please enter a valid email address.');
+      return;
+    }
+    if (!validateMobile(newDirector.mobile)) {
+      alert(ERROR_MESSAGES.MOBILE_INVALID);
+      return;
+    }
+    if (newDirector.pan && !validatePAN(newDirector.pan)) {
+      alert(ERROR_MESSAGES.PAN_INVALID);
+      return;
+    }
+
     try {
       await companyService.addDirector(newDirector);
       await refreshCompany();
@@ -202,8 +246,9 @@ export const CompanyDetails: React.FC = () => {
                 <label className="block text-xs font-bold text-slate-700 mb-1">Corporate ID Number (CIN)</label>
                 <input
                   type="text"
+                  maxLength={21}
                   value={formData.cin || ''}
-                  onChange={(e) => setFormData({ ...formData, cin: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, cin: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 21) })}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono uppercase focus:outline-none focus:border-brand-500"
                 />
               </div>
@@ -212,8 +257,9 @@ export const CompanyDetails: React.FC = () => {
                 <label className="block text-xs font-bold text-slate-700 mb-1">Company PAN</label>
                 <input
                   type="text"
+                  maxLength={10}
                   value={formData.pan || ''}
-                  onChange={(e) => setFormData({ ...formData, pan: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, pan: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10) })}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono uppercase focus:outline-none focus:border-brand-500"
                 />
               </div>
@@ -222,8 +268,9 @@ export const CompanyDetails: React.FC = () => {
                 <label className="block text-xs font-bold text-slate-700 mb-1">GSTIN Number</label>
                 <input
                   type="text"
+                  maxLength={15}
                   value={formData.gstin || ''}
-                  onChange={(e) => setFormData({ ...formData, gstin: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, gstin: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15) })}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono uppercase focus:outline-none focus:border-brand-500"
                 />
               </div>
@@ -480,8 +527,9 @@ export const CompanyDetails: React.FC = () => {
               <label className="block text-xs font-bold text-slate-700 mb-1">PAN Card Number</label>
               <input
                 type="text"
+                maxLength={10}
                 value={newDirector.pan}
-                onChange={(e) => setNewDirector({ ...newDirector, pan: e.target.value })}
+                onChange={(e) => setNewDirector({ ...newDirector, pan: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10) })}
                 placeholder="ABCDE1234F"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono uppercase"
               />
@@ -502,10 +550,12 @@ export const CompanyDetails: React.FC = () => {
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Mobile *</label>
               <input
-                type="text"
+                type="tel"
                 required
+                maxLength={10}
                 value={newDirector.mobile}
-                onChange={(e) => setNewDirector({ ...newDirector, mobile: e.target.value })}
+                onChange={(e) => setNewDirector({ ...newDirector, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                placeholder="10-digit mobile"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm"
               />
             </div>

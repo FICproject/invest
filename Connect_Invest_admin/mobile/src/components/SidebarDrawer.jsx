@@ -23,7 +23,9 @@ import {
   Settings as SettingsIcon,
   LogOut,
   X,
-  ChevronRight
+  ChevronRight,
+  CheckSquare,
+  Send
 } from './Icons';
 import { ForgeIndiaBrandHeader } from './ForgeIndiaLogo';
 import { useAuth } from '../context/AuthContext';
@@ -54,20 +56,22 @@ export default function SidebarDrawer({
 }) {
   const { user, logout } = useAuth();
 
-  // Exact tabs matching frontend/src/components/Sidebar.jsx
+  // Exact tabs matching Admin Website frontend/src/components/Sidebar.jsx
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
     { id: 'approvals', label: 'Registration Approvals', icon: ShieldCheck, badge: pendingKycCount },
-    { id: 'investment_approvals', label: 'Investment Approvals', icon: ShieldCheck },
+    { id: 'fund_approvals', label: 'Fund Approvals', icon: CheckSquare },
+    { id: 'investment_approvals', label: 'Investment Approvals', icon: TrendingUp },
     { id: 'investors', label: 'Investor Management', icon: Users },
     { id: 'companies', label: 'Company Management', icon: Building2 },
     { id: 'offers', label: 'Investment Management', icon: Briefcase },
-    { id: 'kyc', label: 'KYC Management', icon: ShieldCheck, badge: pendingKycCount },
+    { id: 'releases', label: 'Company Fund Releases', icon: Send },
+    { id: 'kyc', label: 'KYC Management', icon: ShieldCheck },
     { id: 'investments_portfolio', label: 'Investments', icon: TrendingUp },
     { id: 'transactions', label: 'Transactions', icon: CreditCard },
-    { id: 'releases', label: 'Payments & Transactions', icon: CreditCard },
     { id: 'subscriptions', label: 'Subscriptions', icon: CreditCard },
     { id: 'payouts', label: 'Returns & Payouts', icon: Wallet },
+    { id: 'maturity_releases', label: 'Maturity Releases', icon: Send },
     { id: 'queries', label: 'Queries & Support', icon: MessageSquare },
     { id: 'notifications', label: 'Notifications', icon: Bell, badge: 3, badgeColor: '#FAB800' },
     { id: 'settings', label: 'Settings', icon: SettingsIcon }
@@ -122,7 +126,10 @@ export default function SidebarDrawer({
           <ScrollView
             style={styles.navScroll}
             contentContainerStyle={styles.navContainer}
-            showsVerticalScrollIndicator={false}
+            showsVerticalScrollIndicator={true}
+            bounces={true}
+            overScrollMode="always"
+            nestedScrollEnabled={true}
           >
             {navItems.map(item => {
               const Icon = item.icon;
@@ -196,8 +203,6 @@ const styles = StyleSheet.create({
     width: 290,
     backgroundColor: '#FFFFFF',
     height: '100%',
-    display: 'flex',
-    flexDirection: 'column',
     shadowColor: '#000',
     shadowOffset: { width: 4, height: 0 },
     shadowOpacity: 0.25,
@@ -258,7 +263,8 @@ const styles = StyleSheet.create({
   },
   navContainer: {
     paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 28,
     gap: 4
   },
   navItem: {

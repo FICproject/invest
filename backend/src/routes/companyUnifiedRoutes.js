@@ -13,6 +13,14 @@ import {
   verifyCompanySubscription
 } from '../controllers/companySubscriptionController.js';
 import {
+  getCompanyReturnsOverview,
+  getCompanyReturnAgreements,
+  getAgreementSchedule,
+  createReturnPaymentOrder,
+  verifyReturnPayment,
+  getPaymentReceipt
+} from '../controllers/companyReturnController.js';
+import {
   getCompanyProfile,
   updateCompanyProfile,
   addDirector,
@@ -92,6 +100,14 @@ router.put('/notifications/:id/read', markCompanyNotificationRead);
 router.get('/subscription', getCompanySubscription);
 router.post('/subscription/create-order', createCompanySubscriptionOrder);
 router.post('/subscription/verify', verifyCompanySubscription);
+
+// Monthly Returns Management Workflow (PRD Section 2, 3, 4, 6)
+router.get('/returns/overview', getCompanyReturnsOverview);
+router.get('/returns/agreements', getCompanyReturnAgreements);
+router.get('/returns/schedule/:agreementId', getAgreementSchedule);
+router.post('/returns/create-order', createReturnPaymentOrder);
+router.post('/returns/verify-payment', verifyReturnPayment);
+router.get('/returns/receipt/:paymentId', getPaymentReceipt);
 
 export default router;
 

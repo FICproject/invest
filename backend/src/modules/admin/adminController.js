@@ -25,8 +25,11 @@ import {
   Dividend,
   KYC,
   Transaction,
-  Notification
+  Notification,
+  ReturnAgreement,
+  ReturnPayment
 } from '../../models/index.js';
+import { activateReturnAgreementForDisbursement } from '../../services/returnService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1975,6 +1978,63 @@ export async function approveRelease(req, res, next) {
       console.warn('[approveRelease] Notification dispatch notice:', notifErr.message);
     }
 
+    // 4. Activate Return Agreement & Monthly Return Payment Schedule (Section 3 & 10)
+    // Strictly applicable to Fixed-Term investments, deriving rates and terms from approved agreement
+    try {
+      const offerId = release.investmentOfferId || release.offerId;
+      // Find matching investment(s) associated with this offer/release
+      const candidateInvestments = await Investment.find({
+        $or: [
+          { offerId: offerId },
+          { companyId: release.companyId._id }
+        ],
+        status: { $in: [Statuses.INVESTMENT.ACTIVE, 'Confirmed', 'Active', 'Funded'] }
+      }).sort({ createdAt: -1 });
+
+      if (candidateInvestments.length > 0) {
+        for (const inv of candidateInvestments) {
+          // Check investment model - strictly Fixed-Term agreements
+          const isFixedTerm = !inv.investmentModel || inv.investmentModel === 'Fixed-Term' || inv.kind === 'debt' || inv.kind === 'bond';
+          if (isFixedTerm) {
+            await activateReturnAgreementForDisbursement({
+              investment: inv,
+              companyId: release.companyId._id,
+              investorId: inv.investorId,
+              disbursementReference: release.reference,
+              disbursedAmount: amountInRupees || (release.amountPaise / 100)
+            });
+          }
+        }
+      } else {
+        // Fallback: If no single investment found, check InvestmentRequest
+        const reqDoc = await InvestmentRequest.findOne({
+          $or: [{ _id: offerId }, { companyId: release.companyId._id }]
+        });
+        if (reqDoc && (reqDoc.investmentModel === 'Fixed-Term' || !reqDoc.investmentModel)) {
+          const pseudoInvestment = {
+            _id: release._id,
+            companyId: release.companyId._id,
+            investorId: req.user._id,
+            offerId: reqDoc._id,
+            offerTitle: reqDoc.title || release.offerTitle || 'Fixed-Term Note',
+            amount: amountInRupees,
+            monthlyReturnRate: reqDoc.agreedReturnRate || reqDoc.expectedReturnRate || 2,
+            tenureMonths: reqDoc.durationMonths || 12,
+            investmentModel: 'Fixed-Term'
+          };
+          await activateReturnAgreementForDisbursement({
+            investment: pseudoInvestment,
+            companyId: release.companyId._id,
+            investorId: req.user._id,
+            disbursementReference: release.reference,
+            disbursedAmount: amountInRupees
+          });
+        }
+      }
+    } catch (retErr) {
+      console.warn('[approveRelease] Return agreement activation notice:', retErr.message);
+    }
+
     await logAction({
       actorId: req.user._id,
       role: req.user.role,
@@ -2015,6 +2075,35 @@ export async function getRepayments(req, res, next) {
       .sort({ dueDate: 1 });
 
     return res.json({ success: true, count: repayments.length, repayments });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// 7.1 COMPANY RETURN AGREEMENTS & PAYMENTS MONITOR (Section 7 - Admin Console)
+export async function getAdminReturnAgreements(req, res, next) {
+  try {
+    const { status, companyId } = req.query;
+    const query = {};
+    if (status) query.agreementStatus = status;
+    if (companyId) query.companyId = companyId;
+
+    const agreements = await ReturnAgreement.find(query)
+      .populate('companyId', 'name legalName pan officialEmail')
+      .populate('investorId', 'fullName name email')
+      .sort({ createdAt: -1 });
+
+    const payments = await ReturnPayment.find()
+      .populate('companyId', 'name legalName')
+      .populate('investorId', 'fullName name email')
+      .sort({ dueDate: 1 });
+
+    return res.json({
+      success: true,
+      count: agreements.length,
+      agreements,
+      payments
+    });
   } catch (error) {
     next(error);
   }

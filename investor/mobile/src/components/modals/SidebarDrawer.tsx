@@ -81,6 +81,12 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
       route: ROUTES.TAB_PORTFOLIO,
     },
     {
+      id: 'subscription',
+      label: 'Subscription',
+      icon: 'credit-card',
+      route: ROUTES.TAB_PROFILE,
+    },
+    {
       id: 'notifications',
       label: 'Notifications',
       icon: 'bell',

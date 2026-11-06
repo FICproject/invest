@@ -12,6 +12,13 @@ import { AuditLog } from '../models/AuditLog.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { broadcastSyncEvent } from '../services/sse.js';
+import {
+  validateMobile,
+  validatePAN,
+  validateBankAccount,
+  validateIFSC,
+  ERROR_MESSAGES
+} from '../utils/validators.js';
 
 // 1. Company Profile Management
 export const getCompanyProfile = asyncHandler(async (req, res) => {
@@ -26,6 +33,23 @@ export const getCompanyProfile = asyncHandler(async (req, res) => {
 export const updateCompanyProfile = asyncHandler(async (req, res) => {
   const company = req.company;
   const updates = req.body;
+
+  if (updates.pan && !validatePAN(updates.pan)) {
+    throw new ApiError(400, `Company PAN: ${ERROR_MESSAGES.PAN_INVALID}`);
+  }
+
+  if (updates.officialMobile && !validateMobile(updates.officialMobile)) {
+    throw new ApiError(400, `Official Mobile: ${ERROR_MESSAGES.MOBILE_INVALID}`);
+  }
+
+  if (updates.bankDetails) {
+    if (updates.bankDetails.accountNumber && !validateBankAccount(updates.bankDetails.accountNumber)) {
+      throw new ApiError(400, ERROR_MESSAGES.BANK_ACCOUNT_INVALID);
+    }
+    if (updates.bankDetails.ifscCode && !validateIFSC(updates.bankDetails.ifscCode)) {
+      throw new ApiError(400, ERROR_MESSAGES.IFSC_INVALID);
+    }
+  }
 
   if (updates.registeredAddress) {
     company.registeredAddress = { ...company.registeredAddress, ...updates.registeredAddress };
@@ -55,12 +79,20 @@ export const addDirector = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Name, email, and mobile are required for director');
   }
 
+  if (!validateMobile(mobile)) {
+    throw new ApiError(400, `Director Mobile: ${ERROR_MESSAGES.MOBILE_INVALID}`);
+  }
+
+  if (pan && !validatePAN(pan)) {
+    throw new ApiError(400, `Director PAN: ${ERROR_MESSAGES.PAN_INVALID}`);
+  }
+
   req.company.directors.push({
     name,
     din,
-    pan,
+    pan: pan ? pan.toUpperCase().trim() : '',
     email,
-    mobile,
+    mobile: String(mobile).trim(),
     designation: designation || 'Director',
     sharesOwnedPercentage: Number(sharesOwnedPercentage) || 0
   });

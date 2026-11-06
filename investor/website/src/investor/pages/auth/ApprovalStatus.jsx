@@ -230,7 +230,10 @@ export const ApprovalStatus = () => {
           </div>
 
           <button
-            onClick={logout}
+            onClick={() => {
+              logout();
+              navigate('/login');
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',

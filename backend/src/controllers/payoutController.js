@@ -1,5 +1,7 @@
 import { Payout } from '../models/Payout.js';
 import { Investment } from '../models/Investment.js';
+import { ReturnPayment } from '../models/ReturnPayment.js';
+import { ReturnAgreement } from '../models/ReturnAgreement.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 // Helper to compute remaining tenure months given a maturityDate and scheduled or current date
@@ -92,6 +94,58 @@ export const getPayouts = asyncHandler(async (req, res) => {
       upcomingList.push(p);
     }
   });
+
+  // Also include Monthly Return Payments from ReturnPayment schema
+  try {
+    const returnPayments = await ReturnPayment.find({ investorId })
+      .populate('returnAgreementId')
+      .populate('companyId', 'name legalName')
+      .sort({ dueDate: 1 });
+
+    for (const rp of returnPayments) {
+      const agr = rp.returnAgreementId || {};
+      const company = rp.companyId || {};
+
+      let displayStatus = 'Upcoming';
+      if (rp.distributionStatus === 'Disbursed to Investor') {
+        displayStatus = 'Completed';
+      } else if (rp.paymentStatus === 'Paid' || rp.distributionStatus === 'Received by Platform') {
+        displayStatus = 'Paid by Company'; // PRD Section 8 - clearly distinguish
+      } else if (rp.paymentStatus === 'Due') {
+        displayStatus = 'Pending Company Collection';
+      } else if (rp.paymentStatus === 'Overdue') {
+        displayStatus = 'Delayed';
+      }
+
+      const item = {
+        _id: rp._id,
+        scheduledDate: rp.dueDate,
+        paidDate: rp.paidAt,
+        offerTitle: agr.projectTitle || `Monthly Return (${company.name || 'Company'})`,
+        payoutType: `Monthly Yield: ${rp.paymentPeriod}`,
+        investedAmount: agr.principalAmount || 0,
+        returnRate: agr.agreedMonthlyRate ? agr.agreedMonthlyRate * 12 : 12,
+        tenureMonths: agr.tenureMonths || 12,
+        remainingTenureMonths: Math.max(0, (agr.tenureMonths || 12) - rp.cycleNumber),
+        amount: rp.amountDue || (rp.amountDuePaise ? rp.amountDuePaise / 100 : 0),
+        status: displayStatus,
+        distributionStatus: rp.distributionStatus,
+        utrNumber: rp.receiptReference || rp.razorpayPaymentId || 'In Processing',
+        isReturnCycle: true,
+        companyName: company.name || company.legalName || 'Authorized Issuer'
+      };
+
+      if (displayStatus === 'Completed') {
+        totalReceived += item.amount;
+        completedList.push(item);
+      } else {
+        totalScheduled += item.amount;
+        upcomingList.push(item);
+      }
+    }
+  } catch (err) {
+    console.warn('[getPayouts] ReturnPayment enrichment notice:', err.message);
+  }
 
   // Calculate expected returns from investments
   const investments = await Investment.find({ investorId });

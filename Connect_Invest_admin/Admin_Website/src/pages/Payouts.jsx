@@ -25,24 +25,31 @@ export default function Payouts() {
   const toast = useToast();
   const [payouts, setPayouts] = useState([]);
   const [batches, setBatches] = useState([]);
+  const [companyAgreements, setCompanyAgreements] = useState([]);
+  const [companyPayments, setCompanyPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [search, setSearch] = useState('');
   const [activeRazorpayPayout, setActiveRazorpayPayout] = useState(null);
 
-  // Tab switch within Returns & Payouts
-  const [viewTab, setViewTab] = useState('verification'); // 'verification' (all returns) or 'batches'
+  // Tab switch: 'verification' (investor returns) or 'company_returns' (company obligations) or 'batches'
+  const [viewTab, setViewTab] = useState('company_returns');
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [pRes, bRes] = await Promise.all([
+      const [pRes, bRes, cRes] = await Promise.all([
         adminApi.getPayouts(),
-        adminApi.getBatches()
+        adminApi.getBatches(),
+        adminApi.getCompanyReturns().catch(() => ({ data: { agreements: [], payments: [] } }))
       ]);
       if (pRes.data.success) setPayouts(pRes.data.payouts || []);
       if (bRes.data.success) setBatches(bRes.data.batches || []);
+      if (cRes.data.success) {
+        setCompanyAgreements(cRes.data.agreements || []);
+        setCompanyPayments(cRes.data.payments || []);
+      }
     } catch (err) {
       console.error('Failed to load payouts & batches:', err);
     } finally {
@@ -321,8 +328,107 @@ export default function Payouts() {
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="glass-panel" style={{ padding: '24px' }}>
+      {/* Module Navigation Tabs */}
+      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #E2E8F0', paddingBottom: '4px' }}>
+        <button
+          onClick={() => setViewTab('company_returns')}
+          style={{
+            padding: '8px 18px',
+            borderRadius: '8px',
+            fontSize: '0.875rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+            border: 'none',
+            backgroundColor: viewTab === 'company_returns' ? '#0047BA' : 'transparent',
+            color: viewTab === 'company_returns' ? '#FFFFFF' : '#64748B'
+          }}
+        >
+          Company Return Obligations ({companyAgreements.length})
+        </button>
+        <button
+          onClick={() => setViewTab('verification')}
+          style={{
+            padding: '8px 18px',
+            borderRadius: '8px',
+            fontSize: '0.875rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+            border: 'none',
+            backgroundColor: viewTab === 'verification' ? '#0047BA' : 'transparent',
+            color: viewTab === 'verification' ? '#FFFFFF' : '#64748B'
+          }}
+        >
+          Investor Payout Verification ({payouts.length})
+        </button>
+      </div>
+
+      {viewTab === 'company_returns' ? (
+        <div className="glass-panel" style={{ padding: '24px' }}>
+          <div style={{ marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '4px' }}>
+              Company Monthly Return Obligations (Section 2, 3 & 7)
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              Monitor active return agreements generated upon capital disbursement. Track monthly return payments collected from companies via Razorpay.
+            </p>
+          </div>
+
+          {companyAgreements.length === 0 ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              No company return obligations active. When admin approves a fund release for a fixed-term agreement, return obligations activate automatically.
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <table className="custom-table" style={{ width: '100%', fontSize: '0.825rem' }}>
+                <thead>
+                  <tr>
+                    <th>Agreement #</th>
+                    <th>Borrower Company</th>
+                    <th>Investor</th>
+                    <th>Principal Disbursed</th>
+                    <th>Agreed Rate</th>
+                    <th>Monthly Return</th>
+                    <th>Next Due Date</th>
+                    <th>Total Returns Paid</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {companyAgreements.map((agr) => (
+                    <tr key={agr._id}>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0047BA' }}>
+                        {agr.agreementNumber}
+                      </td>
+                      <td style={{ fontWeight: 600 }}>{agr.companyId?.name || agr.companyId?.legalName || 'Company'}</td>
+                      <td>{agr.investorId?.fullName || agr.investorId?.name || 'Investor'}</td>
+                      <td style={{ fontWeight: 700 }}>{formatINR(agr.principalAmountPaise || agr.principalAmount * 100)}</td>
+                      <td>
+                        <span className="badge badge-info">{agr.agreedMonthlyRate}% / mo</span>
+                      </td>
+                      <td style={{ fontWeight: 700, color: '#059669' }}>
+                        {formatINR(agr.monthlyReturnAmountPaise || agr.monthlyReturnAmount * 100)}
+                      </td>
+                      <td style={{ color: '#D97706', fontWeight: 600 }}>
+                        {agr.nextDueDate ? new Date(agr.nextDueDate).toLocaleDateString('en-IN') : 'N/A'}
+                      </td>
+                      <td style={{ fontWeight: 700, color: '#059669' }}>
+                        {formatINR(agr.totalReturnsPaidPaise || (agr.totalReturnsPaid || 0) * 100)}
+                      </td>
+                      <td>
+                        <span className={`badge badge-${agr.agreementStatus === 'Active' ? 'success' : 'neutral'}`}>
+                          {agr.agreementStatus}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Main Content Area */
+        <div className="glass-panel" style={{ padding: '24px' }}>
         {/* Verification Filters Row & In-Page Search */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -554,7 +660,8 @@ export default function Payouts() {
               </table>
             </div>
           )}
-      </div>
+        </div>
+      )}
 
       {/* Razorpay Disbursal Modal */}
       <RazorpayAdminDisburseModal

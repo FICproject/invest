@@ -26,6 +26,7 @@ import {
   getReleases,
   approveRelease,
   getRepayments,
+  getAdminReturnAgreements,
   confirmRepaymentReceipt,
   markDefault,
   getPayouts,
@@ -143,8 +144,9 @@ router.put('/shareholders/:id/allotment', updateShareholderAllotment);
 router.get('/releases', getReleases);
 router.post('/releases/:id/approve', approveRelease);
 
-// Repayments (Company collections)
+// Repayments & Company Returns (Company collections)
 router.get('/repayments', getRepayments);
+router.get('/company-returns', getAdminReturnAgreements);
 router.post('/repayments/:id/receipt', confirmRepaymentReceipt);
 router.post('/repayments/:id/default', markDefault);
 

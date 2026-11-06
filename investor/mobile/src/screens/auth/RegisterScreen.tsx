@@ -19,7 +19,18 @@ import CustomInput from '../../components/common/CustomInput';
 import CustomButton from '../../components/common/CustomButton';
 import Icon from '../../components/common/Icon';
 import { useAuthContext } from '../../context/authContext';
-import { isValidEmail, isValidMobile, isValidPassword } from '../../utils/validators';
+import {
+  isValidEmail,
+  isValidMobile,
+  isValidPassword,
+  validateDOB,
+  isValidPan,
+  isValidAadhaar,
+  isValidBankAccount,
+  isValidIfsc,
+  isValidCin,
+  isValidGstin
+} from '../../utils/validators';
 
 export const RegisterScreen = ({ navigation, route }: any) => {
   const { register, registerCompany } = useAuthContext();
@@ -110,26 +121,29 @@ export const RegisterScreen = ({ navigation, route }: any) => {
 
   const currentStep = activeRole === 'investor' ? investorStep : companyStep;
 
-  // Validation
+  // Validation strictly matching Web registration rules
   const validateInvestor = (step: number) => {
     setError('');
     if (step === 1) {
       if (!invName.trim()) return 'Please enter your Full Legal Name.';
       if (!isValidEmail(invEmail)) return 'Please enter a valid Email Address.';
-      if (!isValidMobile(invMobile)) return 'Please enter a valid 10-digit Mobile Number.';
+      if (!isValidMobile(invMobile)) return 'Please enter a valid 10-digit mobile number.';
       if (!isValidPassword(invPassword)) return 'Password must be at least 6 characters.';
       if (invPassword !== invConfirmPassword) return 'Passwords do not match.';
+      const dobCheck = validateDOB(invDob);
+      if (!dobCheck.valid) return dobCheck.message || 'You must be at least 18 years old to register.';
     }
     if (step === 2) {
-      if (!invPan.trim() || invPan.trim().length !== 10) return 'Please enter a valid 10-character PAN.';
+      if (!isValidPan(invPan)) return 'Please enter a valid PAN number (e.g., ABCDE1234F).';
+      if (invAadhaar && !isValidAadhaar(invAadhaar)) return 'Aadhaar number must contain exactly 12 digits.';
       if (!invAddress.trim()) return 'Please enter your Residential Address.';
       if (!invCity.trim() || !invState.trim() || !invPincode.trim()) return 'Please enter City, State, and Pincode.';
     }
     if (step === 3) {
       if (!invAccHolder.trim()) return 'Please enter Account Holder Name.';
       if (!invBankName.trim()) return 'Please enter Bank Name.';
-      if (!invAccNum.trim()) return 'Please enter Account Number.';
-      if (!invIfsc.trim()) return 'Please enter IFSC Code.';
+      if (!isValidBankAccount(invAccNum)) return 'Please enter a valid bank account number (9–18 digits).';
+      if (!isValidIfsc(invIfsc)) return 'Please enter a valid 11-character IFSC code.';
     }
     return null;
   };
@@ -139,25 +153,27 @@ export const RegisterScreen = ({ navigation, route }: any) => {
     if (step === 1) {
       if (!compLegalName.trim()) return 'Please enter Registered Company Name.';
       if (!isValidEmail(compEmail)) return 'Please enter valid Company Email.';
-      if (!isValidMobile(compMobile)) return 'Please enter Official Mobile Number.';
+      if (!isValidMobile(compMobile)) return 'Please enter a valid 10-digit mobile number.';
       if (!isValidPassword(compPassword)) return 'Password must be at least 6 characters.';
       if (compPassword !== compConfirmPassword) return 'Passwords do not match.';
     }
     if (step === 2) {
-      if (!compPan.trim() || compPan.trim().length !== 10) return 'Please enter a valid 10-character Company PAN.';
+      if (!isValidPan(compPan)) return 'Please enter a valid PAN number (e.g., ABCDE1234F).';
+      if (compCin && !isValidCin(compCin)) return 'Please enter a valid 21-character CIN (e.g., U12345MH2020PTC123456).';
+      if (compGst && !isValidGstin(compGst)) return 'Please enter a valid 15-character GSTIN (e.g., 27ABCDE1234F1Z5).';
       if (!compAddress.trim()) return 'Please enter Registered Office Address.';
       if (!compCity.trim() || !compState.trim() || !compPincode.trim()) return 'Please enter City, State, and Pincode.';
     }
     if (step === 3) {
       if (!compRepName.trim()) return 'Please enter Representative Full Name.';
       if (!isValidEmail(compRepEmail)) return 'Please enter Representative Email.';
-      if (!isValidMobile(compRepMobile)) return 'Please enter Representative Mobile.';
+      if (!isValidMobile(compRepMobile)) return 'Please enter a valid 10-digit mobile number.';
     }
     if (step === 4) {
       if (!compAccHolder.trim()) return 'Please enter Bank Account Holder Name.';
       if (!compBankName.trim()) return 'Please enter Bank Name.';
-      if (!compAccNum.trim()) return 'Please enter Account Number.';
-      if (!compIfsc.trim()) return 'Please enter IFSC Code.';
+      if (!isValidBankAccount(compAccNum)) return 'Please enter a valid bank account number (9–18 digits).';
+      if (!isValidIfsc(compIfsc)) return 'Please enter a valid 11-character IFSC code.';
     }
     return null;
   };

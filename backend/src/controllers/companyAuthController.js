@@ -7,6 +7,16 @@ import { ENV } from '../config/env.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { broadcastSyncEvent } from '../services/sse.js';
+import {
+  validateMobile,
+  validatePAN,
+  validateBankAccount,
+  validateIFSC,
+  validateEmail,
+  validateCIN,
+  validateGSTIN,
+  ERROR_MESSAGES
+} from '../utils/validators.js';
 
 const generateToken = (id) => {
   return jwt.sign({ id, userId: id }, ENV.JWT_SECRET, { expiresIn: ENV.JWT_EXPIRES_IN });
@@ -60,12 +70,68 @@ export const registerCompany = asyncHandler(async (req, res) => {
   const adminName = name || 'Authorized Representative';
 
   if (!companyLegalName || !pan || !adminEmail || !adminMobile || !password) {
-    throw new ApiError(400, 'Please provide all mandatory registration details');
+    throw new ApiError(400, 'Please provide all mandatory registration details.');
+  }
+
+  if (!validateEmail(adminEmail)) {
+    throw new ApiError(400, 'Please enter a valid Company or Representative Email Address.');
+  }
+
+  // Mobile Validation: Official company mobile and representative mobile
+  if (companyMobile && !validateMobile(companyMobile)) {
+    throw new ApiError(400, `Official Company Mobile: ${ERROR_MESSAGES.MOBILE_INVALID}`);
+  }
+  if (!validateMobile(adminMobile)) {
+    throw new ApiError(400, `Representative Mobile: ${ERROR_MESSAGES.MOBILE_INVALID}`);
+  }
+
+  if (password.length < 6) {
+    throw new ApiError(400, 'Password must be at least 6 characters long.');
+  }
+
+  // CIN Validation (if provided)
+  if (cin && !validateCIN(cin)) {
+    throw new ApiError(400, ERROR_MESSAGES.CIN_INVALID);
+  }
+
+  // GSTIN Validation (if provided)
+  if (gstin && !validateGSTIN(gstin)) {
+    throw new ApiError(400, ERROR_MESSAGES.GSTIN_INVALID);
+  }
+
+  // Company PAN Validation
+  if (!validatePAN(pan)) {
+    throw new ApiError(400, `Company PAN: ${ERROR_MESSAGES.PAN_INVALID}`);
+  }
+
+  // Representative PAN Validation (if provided)
+  if (repPan && !validatePAN(repPan)) {
+    throw new ApiError(400, `Representative PAN: ${ERROR_MESSAGES.PAN_INVALID}`);
+  }
+
+  // Incorporation Date Validation (Past or today only, no 18+ restriction)
+  if (incorporationDate) {
+    const incDate = new Date(incorporationDate);
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    if (isNaN(incDate.getTime()) || incDate > today) {
+      throw new ApiError(400, 'Company incorporation date cannot be a future date.');
+    }
+  }
+
+  // Bank Account Validation (if provided)
+  if (accountNumber && !validateBankAccount(accountNumber)) {
+    throw new ApiError(400, ERROR_MESSAGES.BANK_ACCOUNT_INVALID);
+  }
+
+  // IFSC Validation (if provided)
+  if (ifscCode && !validateIFSC(ifscCode)) {
+    throw new ApiError(400, ERROR_MESSAGES.IFSC_INVALID);
   }
 
   const existing = await User.findOne({ email: adminEmail });
   if (existing) {
-    throw new ApiError(409, 'An account with this email address already exists');
+    throw new ApiError(409, 'An account with this email address already exists.');
   }
 
   const user = await User.create({
@@ -296,9 +362,18 @@ export const resubmitCompany = asyncHandler(async (req, res) => {
 
   if (companyLegalName) company.legalName = companyLegalName;
   if (brandName) company.brandName = brandName;
-  if (cin) company.cin = cin.toUpperCase();
-  if (pan) company.pan = pan.toUpperCase();
-  if (gstin) company.gstin = gstin.toUpperCase();
+  if (cin) {
+    if (!validateCIN(cin)) throw new ApiError(400, ERROR_MESSAGES.CIN_INVALID);
+    company.cin = cin.toUpperCase();
+  }
+  if (pan) {
+    if (!validatePAN(pan)) throw new ApiError(400, ERROR_MESSAGES.PAN_INVALID);
+    company.pan = pan.toUpperCase();
+  }
+  if (gstin) {
+    if (!validateGSTIN(gstin)) throw new ApiError(400, ERROR_MESSAGES.GSTIN_INVALID);
+    company.gstin = gstin.toUpperCase();
+  }
   if (website) company.website = website;
   if (industry) company.industry = industry;
 
