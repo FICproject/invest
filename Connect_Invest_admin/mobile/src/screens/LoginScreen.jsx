@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,9 @@ import {
   Platform,
   ScrollView
 } from 'react-native';
-import { Mail, Lock, Eye, EyeOff, Server, Check } from '../components/Icons';
+import { Mail, Lock, Eye, EyeOff } from '../components/Icons';
 import { useAuth } from '../context/AuthContext';
-import { getApiHost, setApiHost } from '../services/api';
-import { ForgeIndiaLogoCircle, ForgeIndiaLogoEmblem } from '../components/ForgeIndiaLogo';
+import { ForgeIndiaLogoCircle } from '../components/ForgeIndiaLogo';
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -22,12 +21,6 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [serverUrl, setServerUrl] = useState('');
-  const [showServerConfig, setShowServerConfig] = useState(false);
-
-  useEffect(() => {
-    getApiHost().then(setServerUrl);
-  }, []);
 
   const handleLogin = async () => {
     const cleanEmail = email ? email.trim() : '';
@@ -48,16 +41,6 @@ export default function LoginScreen() {
       Alert.alert('Login Failed', errorMsg);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSaveServer = async () => {
-    try {
-      await setApiHost(serverUrl);
-      Alert.alert('Saved', `Backend endpoint set to: ${serverUrl}/api/v1`);
-      setShowServerConfig(false);
-    } catch (err) {
-      Alert.alert('Error', 'Failed to update server endpoint');
     }
   };
 
@@ -137,41 +120,6 @@ export default function LoginScreen() {
                 <Text style={styles.loginBtnText}>Sign In to Admin Console</Text>
               )}
             </TouchableOpacity>
-
-            {/* Server Config Switcher */}
-            <TouchableOpacity
-              onPress={() => setShowServerConfig(!showServerConfig)}
-              style={styles.serverConfigToggle}
-              activeOpacity={0.7}
-            >
-              <Server size={13} color="#64748B" />
-              <Text style={styles.serverConfigToggleText}>
-                {showServerConfig ? 'Hide Host Endpoint Settings' : 'Configure Backend Host IP'}
-              </Text>
-            </TouchableOpacity>
-
-            {/* Expandable Server Config Box */}
-            {showServerConfig && (
-              <View style={styles.serverBox}>
-                <Text style={styles.serverHelp}>
-                  • Android Emulator: http://10.0.2.2:5000{'\n'}
-                  • USB Cable: http://localhost:5000 (run adb reverse){'\n'}
-                  • Wi-Fi Device: http://YOUR_PC_IP:5000
-                </Text>
-                <TextInput
-                  style={styles.serverInput}
-                  value={serverUrl}
-                  onChangeText={setServerUrl}
-                  placeholder="http://10.0.2.2:5000"
-                  placeholderTextColor="#94A3B8"
-                  autoCapitalize="none"
-                />
-                <TouchableOpacity onPress={handleSaveServer} style={styles.saveHostBtn} activeOpacity={0.8}>
-                  <Check size={14} color="#FFFFFF" />
-                  <Text style={styles.saveHostBtnText}>Save Server Host</Text>
-                </TouchableOpacity>
-              </View>
-            )}
           </View>
         </View>
 
@@ -301,57 +249,6 @@ const styles = StyleSheet.create({
   },
   loginBtnText: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF'
-  },
-  serverConfigToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    marginTop: 4
-  },
-  serverConfigToggleText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748B'
-  },
-  serverBox: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0'
-  },
-  serverHelp: {
-    fontSize: 10,
-    color: '#64748B',
-    lineHeight: 14,
-    marginBottom: 8
-  },
-  serverInput: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    height: 38,
-    fontSize: 12,
-    color: '#0F172A',
-    marginBottom: 8
-  },
-  saveHostBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#059669',
-    height: 34,
-    borderRadius: 8,
-    gap: 6
-  },
-  saveHostBtnText: {
-    fontSize: 12,
     fontWeight: '700',
     color: '#FFFFFF'
   },

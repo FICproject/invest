@@ -87,7 +87,13 @@ export const storage = {
 
   async getCustomApiUrl(): Promise<string | null> {
     try {
-      return await AsyncStorage.getItem(STORAGE_KEYS.CUSTOM_API_URL);
+      const val = await AsyncStorage.getItem(STORAGE_KEYS.CUSTOM_API_URL);
+      // Clean up legacy local addresses so device uses deployed live backend
+      if (val && (val.includes('192.168.') || val.includes('10.0.2.2') || val.includes('localhost'))) {
+        await AsyncStorage.removeItem(STORAGE_KEYS.CUSTOM_API_URL);
+        return null;
+      }
+      return val;
     } catch (e) {
       return null;
     }

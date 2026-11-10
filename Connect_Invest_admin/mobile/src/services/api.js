@@ -2,13 +2,12 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-// Default development host
-// Works for both reverse-port physical devices and emulators
-const DEFAULT_HOST = 'http://192.168.1.171:5000';
+// Default deployed live backend host
+const DEFAULT_HOST = 'https://connect-invest-backend.onrender.com';
 
 export const api = axios.create({
   baseURL: `${DEFAULT_HOST}/api/v1`,
-  timeout: 10000,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json'
   }
@@ -25,6 +24,11 @@ export async function setApiHost(hostUrl) {
 
 export async function getApiHost() {
   const saved = await AsyncStorage.getItem('ci_api_host');
+  // If old local IP was previously stored on device, override it with deployed live host
+  if (saved && (saved.includes('192.168.') || saved.includes('10.0.2.2') || saved.includes('localhost'))) {
+    await AsyncStorage.setItem('ci_api_host', DEFAULT_HOST);
+    return DEFAULT_HOST;
+  }
   return saved || DEFAULT_HOST;
 }
 
@@ -32,11 +36,11 @@ export async function getApiHost() {
 api.interceptors.request.use(async config => {
   try {
     const savedHost = await AsyncStorage.getItem('ci_api_host');
-    if (savedHost) {
-      config.baseURL = `${savedHost}/api/v1`;
-    } else {
-      config.baseURL = `${DEFAULT_HOST}/api/v1`;
-    }
+    const activeHost = (savedHost && !savedHost.includes('192.168.') && !savedHost.includes('10.0.2.2') && !savedHost.includes('localhost'))
+      ? savedHost
+      : DEFAULT_HOST;
+
+    config.baseURL = `${activeHost}/api/v1`;
 
     if (config.url?.includes('/auth/login')) {
       delete config.headers.Authorization;
@@ -52,25 +56,10 @@ api.interceptors.request.use(async config => {
   return config;
 });
 
-// Response interceptor for automatic Wi-Fi IP fallback on Network Error
+// Response interceptor for error handling
 api.interceptors.response.use(
   response => response,
   async error => {
-    const originalRequest = error.config;
-    if (
-      (!error.response || error.code === 'ERR_NETWORK') &&
-      originalRequest &&
-      !originalRequest._retry
-    ) {
-      originalRequest._retry = true;
-      const currentWifiIp = '192.168.1.171';
-      const wifiBase = `http://${currentWifiIp}:5000/api/v1`;
-      originalRequest.baseURL = wifiBase;
-      api.defaults.baseURL = wifiBase;
-      await AsyncStorage.setItem('ci_api_host', `http://${currentWifiIp}:5000`);
-      console.log('[API Fallback] Retrying request via Wi-Fi host:', wifiBase);
-      return api(originalRequest);
-    }
     return Promise.reject(error);
   }
 );
