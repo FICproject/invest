@@ -12,7 +12,9 @@ import {
   Building2,
   Plus,
   Minus,
-  X
+  X,
+  Menu,
+  ChevronRight
 } from 'lucide-react';
 import './common-landing.css';
 
@@ -20,19 +22,78 @@ export const CommonLandingPage = () => {
   const [activeFaq, setActiveFaq] = useState(null);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [showFaqModal, setShowFaqModal] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState('home');
+
+  const navItems = [
+    { id: 'home', label: 'Home' },
+    { id: 'about', label: 'About' },
+    { id: 'opportunities', label: 'Opportunities' },
+    { id: 'how-it-works', label: 'How It Works' },
+    { id: 'faqs', label: 'FAQs' }
+  ];
 
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         setShowRoleModal(false);
         setShowFaqModal(false);
+        setMobileMenuOpen(false);
       }
     };
-    if (showRoleModal || showFaqModal) {
+    if (showRoleModal || showFaqModal || mobileMenuOpen) {
       window.addEventListener('keydown', handleKeyDown);
     }
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showRoleModal, showFaqModal]);
+  }, [showRoleModal, showFaqModal, mobileMenuOpen]);
+
+  // Close mobile drawer on desktop resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth > 960) {
+        setMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Scroll spy to highlight active section in navbar
+  useEffect(() => {
+    const handleScroll = () => {
+      const sections = ['home', 'about', 'how-it-works', 'opportunities', 'faqs'];
+      const scrollPos = window.scrollY + 120;
+      for (const sectionId of sections) {
+        const el = document.getElementById(sectionId);
+        if (el) {
+          const top = el.offsetTop;
+          const height = el.offsetHeight;
+          if (scrollPos >= top && scrollPos < top + height) {
+            setActiveSection(sectionId);
+            break;
+          }
+        }
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToSection = (e, sectionId) => {
+    e.preventDefault();
+    setActiveSection(sectionId);
+    setMobileMenuOpen(false);
+    const element = document.getElementById(sectionId);
+    if (element) {
+      const headerOffset = 70;
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   const toggleFaq = (idx) => {
     setActiveFaq(activeFaq === idx ? null : idx);
@@ -65,7 +126,7 @@ export const CommonLandingPage = () => {
       <header className="cl-header">
         <div className="cl-container cl-header-inner">
           {/* Logo */}
-          <Link to="/" className="cl-logo">
+          <Link to="/" className="cl-logo" onClick={() => setMobileMenuOpen(false)}>
             <img
               src="/logo.png"
               alt="Forge India Connect"
@@ -80,16 +141,21 @@ export const CommonLandingPage = () => {
             </div>
           </Link>
 
-          {/* Navigation Menu */}
+          {/* Desktop Navigation Menu */}
           <nav className="cl-nav">
-            <a href="#home" className="cl-nav-link active">Home</a>
-            <a href="#about" className="cl-nav-link">About</a>
-            <a href="#opportunities" className="cl-nav-link">Opportunities</a>
-            <a href="#how-it-works" className="cl-nav-link">How It Works</a>
-            <a href="#faqs" className="cl-nav-link">FAQs</a>
+            {navItems.map((item) => (
+              <a
+                key={item.id}
+                href={`#${item.id}`}
+                onClick={(e) => scrollToSection(e, item.id)}
+                className={`cl-nav-link ${activeSection === item.id ? 'active' : ''}`}
+              >
+                {item.label}
+              </a>
+            ))}
           </nav>
 
-          {/* Auth CTA Buttons */}
+          {/* Desktop Auth CTA Buttons */}
           <div className="cl-auth-actions">
             <button
               type="button"
@@ -100,7 +166,67 @@ export const CommonLandingPage = () => {
               Get Started
             </button>
           </div>
+
+          {/* Mobile Navigation Toggle Button */}
+          <div className="cl-mobile-nav-toggle-wrap">
+            <button
+              type="button"
+              className="cl-mobile-menu-btn"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={mobileMenuOpen}
+            >
+              {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+            </button>
+          </div>
         </div>
+
+        {/* Mobile Navigation Dropdown / Drawer */}
+        {mobileMenuOpen && (
+          <>
+            <div
+              className="cl-mobile-overlay"
+              onClick={() => setMobileMenuOpen(false)}
+              aria-hidden="true"
+            />
+            <div className="cl-mobile-drawer" role="dialog" aria-modal="true">
+              <nav className="cl-mobile-nav-list">
+                {navItems.map((item) => (
+                  <a
+                    key={item.id}
+                    href={`#${item.id}`}
+                    onClick={(e) => scrollToSection(e, item.id)}
+                    className={`cl-mobile-nav-link ${activeSection === item.id ? 'active' : ''}`}
+                  >
+                    <span>{item.label}</span>
+                    <ChevronRight size={16} className="cl-mobile-nav-chevron" />
+                  </a>
+                ))}
+              </nav>
+
+              <div className="cl-mobile-drawer-actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setShowRoleModal(true);
+                  }}
+                  className="cl-mobile-btn-getstarted"
+                >
+                  <span>Get Started</span>
+                  <ArrowRight size={16} />
+                </button>
+                <Link
+                  to="/login"
+                  className="cl-mobile-btn-login"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Sign In
+                </Link>
+              </div>
+            </div>
+          </>
+        )}
       </header>
 
       {/* Role Selection Modal on Get Started */}

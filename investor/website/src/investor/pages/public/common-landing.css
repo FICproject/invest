@@ -176,6 +176,19 @@
   transform: translateY(-1px);
 }
 
+/* Mobile Toggle & Drawer - Hidden on Desktop */
+.cl-mobile-nav-toggle-wrap {
+  display: none;
+}
+
+.cl-mobile-overlay {
+  display: none;
+}
+
+.cl-mobile-drawer {
+  display: none;
+}
+
 /* ======================================================== */
 /* 2. HERO SECTION                                          */
 /* ======================================================== */
@@ -1111,13 +1124,231 @@
 }
 
 /* Responsive adjustments */
+@keyframes clSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (max-width: 960px) {
+  /* Header Mobile Adaptations */
+  .cl-header {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+  }
+
+  .cl-header-inner {
+    height: 64px;
+  }
+
+  .cl-header .cl-container {
+    padding: 0 16px;
+  }
+
+  .cl-logo {
+    gap: 10px;
+  }
+
+  .cl-logo-img {
+    width: 38px;
+    height: 38px;
+  }
+
+  .cl-brand-blue,
+  .cl-brand-gold {
+    font-size: 18px;
+  }
+
+  .cl-tagline {
+    font-size: 7.5px;
+    letter-spacing: 0.12em;
+  }
+
+  /* Hide Desktop Nav and Auth CTA */
+  .cl-nav {
+    display: none !important;
+  }
+
+  .cl-auth-actions {
+    display: none !important;
+  }
+
+  /* Show Mobile Hamburger Toggle */
+  .cl-mobile-nav-toggle-wrap {
+    display: flex;
+    align-items: center;
+  }
+
+  .cl-mobile-menu-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: 1.5px solid #E2E8F0;
+    background: #F8FAFD;
+    color: var(--cl-blue-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .cl-mobile-menu-btn:hover,
+  .cl-mobile-menu-btn:active {
+    background: #EEF4FD;
+    border-color: var(--cl-gold);
+    color: var(--cl-blue-primary);
+  }
+
+  /* Mobile Backdrop Overlay */
+  .cl-mobile-overlay {
+    display: block;
+    position: fixed;
+    top: 64px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(7, 41, 121, 0.45);
+    backdrop-filter: blur(4px);
+    z-index: 998;
+    animation: clFadeIn 0.2s ease-out;
+  }
+
+  /* Mobile Drawer Panel */
+  .cl-mobile-drawer {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 64px;
+    left: 0;
+    right: 0;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: #FFFFFF;
+    border-bottom: 3px solid var(--cl-gold);
+    box-shadow: 0 20px 40px rgba(6, 26, 64, 0.18);
+    z-index: 999;
+    padding: 18px 20px 24px;
+    animation: clSlideDown 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .cl-mobile-nav-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .cl-mobile-nav-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #334155;
+    text-decoration: none;
+    transition: all 0.15s ease;
+  }
+
+  .cl-mobile-nav-link:hover {
+    background: #F8FAFD;
+    color: var(--cl-blue-primary);
+  }
+
+  .cl-mobile-nav-link.active {
+    background: #EFF6FF;
+    color: var(--cl-blue-primary);
+    font-weight: 700;
+    border-left: 3px solid var(--cl-gold);
+  }
+
+  .cl-mobile-nav-chevron {
+    color: #94A3B8;
+    transition: transform 0.15s ease;
+  }
+
+  .cl-mobile-nav-link:hover .cl-mobile-nav-chevron {
+    transform: translateX(2px);
+    color: var(--cl-blue-primary);
+  }
+
+  .cl-mobile-drawer-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #EEF2F7;
+  }
+
+  .cl-mobile-btn-getstarted {
+    width: 100%;
+    padding: 13px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #061A40;
+    background-color: var(--cl-gold);
+    border: none;
+    border-radius: 10px;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(245, 176, 20, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+  }
+
+  .cl-mobile-btn-getstarted:hover {
+    background-color: var(--cl-gold-hover);
+  }
+
+  .cl-mobile-btn-login {
+    width: 100%;
+    padding: 11px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--cl-blue-dark);
+    background: transparent;
+    border: 1.5px solid #CBD5E1;
+    border-radius: 10px;
+    text-align: center;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  .cl-mobile-btn-login:hover {
+    border-color: var(--cl-blue-primary);
+    background: #F8FAFD;
+  }
+
+  /* Grid Layouts Stacked on Tablet & Mobile */
   .cl-hero-grid,
   .cl-about-how-grid,
   .cl-dual-grid,
   .cl-opps-box,
   .cl-faq-box {
     grid-template-columns: 1fr;
+  }
+
+  .cl-steps-horizontal {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .cl-faq-accordion-col {
+    padding: 24px 20px;
   }
 
   .cl-hero-content {
@@ -1428,14 +1659,87 @@
 }
 
 @media (max-width: 640px) {
+  .cl-container {
+    padding: 0 16px;
+  }
+
+  .cl-section {
+    padding: 38px 0;
+  }
+
+  .cl-hero-section {
+    padding: 20px 0 32px;
+  }
+
+  .cl-hero-title {
+    font-size: 26px;
+    line-height: 1.22;
+  }
+
+  .cl-hero-subtitle {
+    font-size: 13.5px;
+    margin-bottom: 22px;
+  }
+
+  .cl-hero-buttons {
+    flex-direction: column;
+    width: 100%;
+    gap: 12px;
+  }
+
+  .cl-btn-hero-investor,
+  .cl-btn-hero-company {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
   .cl-pillars-row {
     grid-template-columns: 1fr;
+    gap: 14px;
   }
+
+  .cl-opps-cards-row {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .cl-opps-box {
+    padding: 22px 16px;
+    gap: 24px;
+  }
+
+  .cl-faq-banner {
+    padding: 28px 20px;
+  }
+
+  .cl-cta-banner-row {
+    padding: 24px 18px;
+  }
+
+  .cl-footer-inner {
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+    text-align: center;
+  }
+
+  .cl-footer-links {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 12px;
+  }
+
   .cl-modal-cards-grid {
     grid-template-columns: 1fr;
     gap: 14px;
   }
+
   .cl-modal-body {
-    padding: 24px 20px;
+    padding: 24px 18px;
+  }
+
+  .cl-modal-title {
+    font-size: 22px;
   }
 }
