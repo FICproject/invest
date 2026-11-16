@@ -285,4 +285,66 @@ h1, h2, h3, h4, h5, h6 {
   will-change: transform;
 }
 
+/* ======================================================== */
+/* AUTH SPLIT SCREEN RESPONSIVENESS                         */
+/* ======================================================== */
+.auth-mobile-brand {
+  display: none;
+}
+
+@media (max-width: 960px) {
+  .auth-split-wrapper {
+    flex-direction: column !important;
+    min-height: 100vh !important;
+    height: auto !important;
+  }
+
+  .auth-banner-panel {
+    display: none !important;
+  }
+
+  .auth-form-panel {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    padding: 24px 16px !important;
+    min-height: 100vh !important;
+    box-sizing: border-box !important;
+  }
+
+  .auth-top-bar {
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+    margin-bottom: 20px !important;
+  }
+
+  .auth-card {
+    padding: 26px 20px !important;
+    border-radius: 16px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .auth-mobile-brand {
+    display: block !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .auth-form-panel {
+    padding: 16px 12px 28px !important;
+  }
+
+  .auth-card {
+    padding: 20px 14px !important;
+    border-radius: 14px !important;
+  }
+
+  .auth-form-panel div[style*="gridTemplateColumns"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 

@@ -846,7 +846,7 @@ export const Register = () => {
         className="auth-form-panel"
       >
         {/* Header: Back Link & Portal indicator */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }} className="auth-top-bar">
           <Link
             to="/"
             style={{
@@ -886,6 +886,15 @@ export const Register = () => {
           }}
           className="auth-card"
         >
+          {/* Mobile Brand Header */}
+          <div className="auth-mobile-brand" style={{ textAlign: 'center', marginBottom: '16px' }}>
+            <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
+              <img src="/logo.png" alt="Connect Invest" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'contain' }} />
+              <span style={{ fontFamily: 'Outfit, sans-serif', fontSize: '20px', fontWeight: '800', color: '#3B0A11' }}>
+                Connect <span style={{ color: '#C8963E' }}>Invest</span>
+              </span>
+            </Link>
+          </div>
           {/* ROLE SELECTOR */}
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: 'var(--color-gold-hover)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>

@@ -298,7 +298,7 @@ export const Login = () => {
         className="auth-form-panel"
       >
         {/* Header: Back to Home Link & Security Indicator */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }} className="auth-top-bar">
           <Link
             to="/"
             style={{
@@ -349,6 +349,15 @@ export const Login = () => {
           }}
           className="auth-card"
         >
+          {/* Mobile Brand Header */}
+          <div className="auth-mobile-brand" style={{ textAlign: 'center', marginBottom: '18px' }}>
+            <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
+              <img src="/logo.png" alt="Connect Invest" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'contain' }} />
+              <span style={{ fontFamily: 'Outfit, sans-serif', fontSize: '20px', fontWeight: '800', color: activeRole === 'company' ? '#874A00' : '#3B0A11' }}>
+                Connect <span style={{ color: activeRole === 'company' ? '#DE8E0A' : '#C8963E' }}>Invest</span>
+              </span>
+            </Link>
+          </div>
           {/* ROLE SELECTOR TOGGLE (Role-based access) */}
           <div
             style={{
